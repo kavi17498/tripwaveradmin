@@ -55,6 +55,12 @@ const waitForAuthInit = async () => {
 };
 
 export const authService = {
+  subscribeToAuthChanges(callback: (user: User | null) => void) {
+    return onAuthStateChanged(auth, (firebaseUser) => {
+      callback(firebaseUser ? toAppUser(firebaseUser) : null);
+    });
+  },
+
   async login(email: string, password: string): Promise<ServiceResponse<User>> {
     await sleep(150);
     try {
