@@ -16,6 +16,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState("");
 
   const handleSubmit = async (event: FormEvent) => {
@@ -26,10 +27,29 @@ export default function LoginPage() {
     if (password.length < 6) return setError("Password must be at least 6 characters.");
 
     setLoading(true);
-    await authService.login(email, password);
-    pushToast({ type: "success", title: "Welcome back", description: "You are now logged in." });
-    router.push("/dashboard");
-    setLoading(false);
+    try {
+      await authService.login(email, password);
+      pushToast({ type: "success", title: "Welcome back", description: "You are now logged in." });
+      router.push("/dashboard");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to login.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    setError("");
+    setGoogleLoading(true);
+    try {
+      await authService.loginWithGoogle();
+      pushToast({ type: "success", title: "Google sign in successful", description: "Welcome to TripWaver." });
+      router.push("/dashboard");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Google sign in failed.");
+    } finally {
+      setGoogleLoading(false);
+    }
   };
 
   return (
@@ -55,7 +75,9 @@ export default function LoginPage() {
             </Button>
           </form>
 
-          <Button variant="outline" className="mt-3 w-full">Continue with Google</Button>
+          <Button variant="outline" className="mt-3 w-full" onClick={handleGoogleLogin} disabled={googleLoading}>
+            {googleLoading ? "Connecting..." : "Continue with Google"}
+          </Button>
           <div className="mt-4 flex justify-between text-sm">
             <Link className="text-muted-foreground underline" href="/forgot-password">Forgot password?</Link>
             <Link className="text-muted-foreground underline" href="/register">Create account</Link>

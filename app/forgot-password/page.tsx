@@ -11,12 +11,22 @@ import { authService } from "@/lib/services/authService";
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
   const [success, setSuccess] = useState(false);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
+    setError("");
     if (!email.includes("@")) return;
-    await authService.forgotPassword(email);
-    setSuccess(true);
+    setLoading(true);
+    try {
+      await authService.forgotPassword(email);
+      setSuccess(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to send reset link.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -33,7 +43,8 @@ export default function ForgotPasswordPage() {
                 <label className="mb-1 block text-sm font-medium">Email address</label>
                 <Input value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" />
               </div>
-              <Button className="w-full">Send reset link</Button>
+              {error ? <p className="text-sm text-destructive">{error}</p> : null}
+              <Button className="w-full" disabled={loading}>{loading ? "Sending..." : "Send reset link"}</Button>
             </form>
           ) : (
             <div className="mt-6 border border-border bg-muted/20 p-4 text-sm">

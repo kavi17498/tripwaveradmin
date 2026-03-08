@@ -19,6 +19,8 @@ export default function RegisterPage() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [role, setRole] = useState<UserRole>("traveler");
+  const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState("");
 
   const submit = async (event: FormEvent) => {
@@ -29,9 +31,30 @@ export default function RegisterPage() {
     if (password.length < 8) return setError("Password should be at least 8 characters.");
     if (password !== confirmPassword) return setError("Passwords do not match.");
 
-    await authService.register({ name, email, password, role });
-    pushToast({ type: "success", title: "Account created", description: "Your TripWaver account is ready." });
-    router.push("/dashboard");
+    setLoading(true);
+    try {
+      await authService.register({ name, email, password, role });
+      pushToast({ type: "success", title: "Account created", description: "Your TripWaver account is ready." });
+      router.push("/dashboard");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to create account.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleSignup = async () => {
+    setError("");
+    setGoogleLoading(true);
+    try {
+      await authService.loginWithGoogle();
+      pushToast({ type: "success", title: "Google signup successful", description: "Your account is ready." });
+      router.push("/dashboard");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Google signup failed.");
+    } finally {
+      setGoogleLoading(false);
+    }
   };
 
   return (
@@ -75,8 +98,10 @@ export default function RegisterPage() {
             </div>
 
             {error ? <p className="text-sm text-destructive">{error}</p> : null}
-            <Button className="w-full">Create account</Button>
-            <Button type="button" variant="outline" className="w-full">Sign up with Google</Button>
+            <Button className="w-full" disabled={loading}>{loading ? "Creating account..." : "Create account"}</Button>
+            <Button type="button" variant="outline" className="w-full" onClick={handleGoogleSignup} disabled={googleLoading}>
+              {googleLoading ? "Connecting..." : "Sign up with Google"}
+            </Button>
           </form>
 
           <p className="mt-4 text-sm text-muted-foreground">
