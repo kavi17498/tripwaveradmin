@@ -8,21 +8,34 @@ import { authService } from "@/lib/services/authService";
 import { User } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-const publicLinks = [
+type AppMode = "explorer" | "creator";
+
+const explorerLinks = [
   { href: "/", label: "Home" },
   { href: "/trips", label: "Trips" },
+  { href: "/chat", label: "Chat" },
 ];
 
-const privateLinks = [
+const creatorLinks = [
   { href: "/dashboard", label: "Dashboard" },
+  { href: "/chat", label: "Chat" },
   { href: "/organizer", label: "Organizer" },
 ];
+
+const APP_MODE_STORAGE_KEY = "tripwaver:app-mode";
+
+const getInitialMode = (): AppMode => {
+  if (typeof window === "undefined") return "explorer";
+  const storedMode = localStorage.getItem(APP_MODE_STORAGE_KEY);
+  return storedMode === "creator" ? "creator" : "explorer";
+};
 
 export function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [mode, setMode] = useState<AppMode>(getInitialMode);
 
   useEffect(() => {
     const unsubscribe = authService.subscribeToAuthChanges((user) => {
@@ -33,9 +46,17 @@ export function Navbar() {
   }, []);
 
   const links = useMemo(() => {
-    if (!currentUser) return publicLinks;
-    return [...publicLinks, ...privateLinks];
-  }, [currentUser]);
+    return mode === "explorer" ? explorerLinks : creatorLinks;
+  }, [mode]);
+
+  const handleModeToggle = (nextMode: AppMode) => {
+    setMode(nextMode);
+    if (typeof window !== "undefined") {
+      localStorage.setItem(APP_MODE_STORAGE_KEY, nextMode);
+    }
+
+    router.push(nextMode === "explorer" ? "/" : "/dashboard");
+  };
 
   const handleLogout = async () => {
     setLoggingOut(true);
@@ -50,6 +71,28 @@ export function Navbar() {
         <Link href="/" className="text-lg font-semibold tracking-tight">
           TripWaver
         </Link>
+        <div className="hidden items-center rounded-md border border-border p-1 md:flex">
+          <button
+            type="button"
+            onClick={() => handleModeToggle("explorer")}
+            className={cn(
+              "rounded-sm px-3 py-1 text-xs font-medium transition-colors",
+              mode === "explorer" ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            Explorer
+          </button>
+          <button
+            type="button"
+            onClick={() => handleModeToggle("creator")}
+            className={cn(
+              "rounded-sm px-3 py-1 text-xs font-medium transition-colors",
+              mode === "creator" ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            Creator
+          </button>
+        </div>
         <nav className="hidden items-center gap-6 md:flex">
           {links.map((link) => (
             <Link
