@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { RatingStars } from "@/components/common/rating-stars";
 import { StatusBadge } from "@/components/common/status-badge";
 import { Trip } from "@/lib/types";
+import { formatCurrencyRs } from "@/lib/utils";
 
 interface TripCardProps {
   trip: Trip;
@@ -36,7 +37,7 @@ export function TripCard({ trip, href }: TripCardProps) {
 
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-xl font-semibold">${trip.price}</p>
+            <p className="text-xl font-semibold">{formatCurrencyRs(trip.price)}</p>
             <RatingStars rating={trip.organizerRating} />
           </div>
           <Button asChild>

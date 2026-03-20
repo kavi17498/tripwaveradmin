@@ -7,6 +7,7 @@ import { Footer } from "@/components/layout/footer";
 import { Button } from "@/components/ui/button";
 import { paymentService } from "@/lib/services/paymentService";
 import { Payment } from "@/lib/types";
+import { formatCurrencyRs } from "@/lib/utils";
 
 export default function ReceiptPage() {
   const { paymentId } = useParams<{ paymentId: string }>();
@@ -29,7 +30,7 @@ export default function ReceiptPage() {
             <p><span className="font-medium">Trip:</span> {payment?.tripId ?? "N/A"}</p>
             <p><span className="font-medium">Method:</span> {payment?.method ?? "N/A"}</p>
             <p><span className="font-medium">Status:</span> {payment?.status ?? "N/A"}</p>
-            <p><span className="font-medium">Amount:</span> ${payment?.amount ?? 0}</p>
+            <p><span className="font-medium">Amount:</span> {formatCurrencyRs(payment?.amount ?? 0)}</p>
           </div>
 
           <Button className="mt-4" variant="outline">Download Receipt</Button>

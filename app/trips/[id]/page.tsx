@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { reviewService } from "@/lib/services/reviewService";
 import { tripService } from "@/lib/services/tripService";
 import { Review, Trip } from "@/lib/types";
+import { formatCurrencyRs } from "@/lib/utils";
 
 export default function TripDetailsPage() {
   const { id } = useParams<{ id: string }>();
@@ -72,7 +73,7 @@ export default function TripDetailsPage() {
           </div>
           <div className="border border-border bg-card p-4">
             <p className="text-sm text-muted-foreground">From</p>
-            <p className="text-3xl font-semibold">${trip.price}</p>
+            <p className="text-3xl font-semibold">{formatCurrencyRs(trip.price)}</p>
             <p className="mt-2 text-sm text-muted-foreground">{trip.bookedCount}/{trip.capacity} participants</p>
             <Button className="mt-4 w-full" asChild>
               <Link href={`/booking/${trip.id}`}>Join / Request</Link>

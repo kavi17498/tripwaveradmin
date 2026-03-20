@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { tripService } from "@/lib/services/tripService";
 import { Trip } from "@/lib/types";
+import { formatCurrencyRs } from "@/lib/utils";
 
 export default function BookingPage() {
   const router = useRouter();
@@ -44,7 +45,7 @@ export default function BookingPage() {
           <h2 className="font-semibold">Trip summary</h2>
           <p className="mt-2 text-sm">{trip?.title ?? "Loading..."}</p>
           <p className="mt-1 text-sm text-muted-foreground">{trip?.destination}</p>
-          <p className="mt-4 text-lg font-semibold">${trip ? trip.price * Number(seats) : 0}</p>
+          <p className="mt-4 text-lg font-semibold">{formatCurrencyRs(trip ? trip.price * Number(seats) : 0)}</p>
           <Button variant="outline" className="mt-4 w-full" asChild>
             <Link href={`/trips/${tripId}`}>Back to Trip</Link>
           </Button>

@@ -2,17 +2,27 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Navbar } from "@/components/layout/navbar";
 import { Footer } from "@/components/layout/footer";
 import { Button } from "@/components/ui/button";
 import { paymentService } from "@/lib/services/paymentService";
+import { tripService } from "@/lib/services/tripService";
+import { Trip } from "@/lib/types";
+import { formatCurrencyRs } from "@/lib/utils";
 
 export default function PaymentPage() {
   const router = useRouter();
   const { tripId } = useParams<{ tripId: string }>();
+  const [trip, setTrip] = useState<Trip | null>(null);
   const [method, setMethod] = useState<"card" | "bank-transfer" | "wallet">("card");
   const [status, setStatus] = useState<"idle" | "processing" | "success" | "failed">("idle");
+
+  useEffect(() => {
+    tripService.getTripById(tripId).then((result) => setTrip(result.data));
+  }, [tripId]);
+
+  const amount = trip?.price ?? 0;
 
   const payNow = async () => {
     setStatus("processing");
@@ -21,7 +31,7 @@ export default function PaymentPage() {
       bookingId: "b1",
       userId: "u1",
       method,
-      amount: 980,
+      amount,
     });
     if (result.data.status === "success") {
       setStatus("success");
@@ -58,7 +68,7 @@ export default function PaymentPage() {
           <h2 className="font-semibold">Billing summary</h2>
           <p className="mt-2 text-sm text-muted-foreground">Trip: {tripId}</p>
           <p className="mt-1 text-sm text-muted-foreground">Seats: 1</p>
-          <p className="mt-4 text-2xl font-semibold">$980</p>
+          <p className="mt-4 text-2xl font-semibold">{formatCurrencyRs(amount)}</p>
           <Button className="mt-4 w-full" variant="outline" asChild>
             <Link href={`/booking/${tripId}`}>Back to booking</Link>
           </Button>
