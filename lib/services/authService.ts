@@ -173,6 +173,7 @@ export const authService = {
   async logout(): Promise<ServiceResponse<boolean>> {
     await signOut(auth);
     userSessionService.clearUserProfile();
+    userSessionService.clearToken();
     return { data: true, message: "Logged out" };
   },
 };

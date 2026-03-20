@@ -33,6 +33,7 @@ export default function LoginPage() {
       const authResult = await authService.loginForUserModule(email, password);
       const userResult = await userService.getUserProfileById(authResult.data.uid, authResult.data.token);
       userSessionService.saveUserProfile(userResult.data);
+      userSessionService.saveToken(authResult.data.token);
       pushToast({ type: "success", title: "Welcome back", description: "You are now logged in." });
       router.push("/dashboard");
     } catch (err) {
@@ -49,6 +50,7 @@ export default function LoginPage() {
       const authResult = await authService.loginWithGoogleForUserModule();
       const userResult = await userService.getUserProfileById(authResult.data.uid, authResult.data.token);
       userSessionService.saveUserProfile(userResult.data);
+      userSessionService.saveToken(authResult.data.token);
       pushToast({ type: "success", title: "Google sign in successful", description: "Welcome to TripWaver." });
       router.push("/dashboard");
     } catch (err) {

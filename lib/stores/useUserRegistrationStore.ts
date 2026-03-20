@@ -113,6 +113,7 @@ export const useUserRegistrationStore = create<RegistrationState>((set, get) => 
       );
 
       userSessionService.saveUserProfile(createResult.data);
+      userSessionService.saveToken(authResult.data.token);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to create account.";
       set({ error: message });
@@ -148,6 +149,7 @@ export const useUserRegistrationStore = create<RegistrationState>((set, get) => 
       );
 
       userSessionService.saveUserProfile(createResult.data);
+      userSessionService.saveToken(authResult.data.token);
 
       set((state) => ({ form: { ...state.form, email: resolvedEmail } }));
     } catch (error) {
