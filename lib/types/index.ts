@@ -139,3 +139,57 @@ export interface UserModulePayload extends UserModuleRegistrationInput {
   id: string;
   isVerified: boolean;
 }
+
+export interface TripDestinationPayload {
+  name: string;
+  description: string;
+  geoCode: {
+    latitude: number;
+    longitude: number;
+  };
+  photos: string[];
+}
+
+export interface TripItineraryDayPayload {
+  day: number;
+  title: string;
+  timeSlot: {
+    startTime: string;
+    endTime: string;
+  };
+  activities: string[];
+}
+
+export interface TripIncludedPayload {
+  hotelFacilities: string[];
+  transportFacilities: string[];
+  otherInclusions: string[];
+  exclusions: string[];
+}
+
+export interface TripParticipantPayload {
+  name: string;
+  address: string;
+  phone: string;
+  email: string;
+}
+
+export interface CreateTripApiPayload {
+  tripName: string;
+  tripCategory: "Travel with Guide" | "Join Group Trip" | "Family Trip with Guide" | "Private trip";
+  destinations: TripDestinationPayload[];
+  startDate: string;
+  endDate: string;
+  startLocation: string;
+  organizer: string;
+  price: number;
+  itinerary: {
+    days: TripItineraryDayPayload[];
+  };
+  included: TripIncludedPayload;
+  participants: TripParticipantPayload[];
+  photos: string[];
+  coverImage: string;
+  description: string;
+  maxParticipants: number;
+}
