@@ -10,8 +10,9 @@ import {
 } from "firebase/auth";
 import { auth, googleProvider } from "@/lib/config/firebase";
 import { mockUsers } from "@/lib/data/users";
-import { ServiceResponse, User, UserRole } from "@/lib/types";
+import { AuthSession, ServiceResponse, User, UserRole } from "@/lib/types";
 import { sleep, sometimesFail } from "@/lib/services/serviceUtils";
+import { userSessionService } from "@/lib/services/userSessionService";
 
 const roleByEmail = mockUsers.reduce<Record<string, UserRole>>((acc, user) => {
   acc[user.email.toLowerCase()] = user.role;
@@ -54,6 +55,15 @@ const waitForAuthInit = async () => {
   });
 };
 
+const toAuthSession = async (firebaseUser: FirebaseUser): Promise<AuthSession> => {
+  const token = await firebaseUser.getIdToken();
+  return {
+    uid: firebaseUser.uid,
+    email: firebaseUser.email ?? "",
+    token,
+  };
+};
+
 export const authService = {
   subscribeToAuthChanges(callback: (user: User | null) => void) {
     return onAuthStateChanged(auth, (firebaseUser) => {
@@ -66,6 +76,19 @@ export const authService = {
     try {
       const credential = await signInWithEmailAndPassword(auth, email, password);
       return { data: toAppUser(credential.user), message: "Logged in successfully" };
+    } catch (error) {
+      throw new Error(mapAuthError(error));
+    }
+  },
+
+  async loginForUserModule(email: string, password: string): Promise<ServiceResponse<AuthSession>> {
+    await sleep(150);
+    try {
+      const credential = await signInWithEmailAndPassword(auth, email, password);
+      return {
+        data: await toAuthSession(credential.user),
+        message: "Firebase login successful",
+      };
     } catch (error) {
       throw new Error(mapAuthError(error));
     }
@@ -99,6 +122,39 @@ export const authService = {
     }
   },
 
+  async registerForUserModule(payload: {
+    email: string;
+    password: string;
+    displayName?: string;
+  }): Promise<ServiceResponse<AuthSession>> {
+    await sleep(150);
+    try {
+      const credential = await createUserWithEmailAndPassword(auth, payload.email, payload.password);
+      if (payload.displayName) {
+        await updateProfile(credential.user, { displayName: payload.displayName });
+      }
+      return {
+        data: await toAuthSession(credential.user),
+        message: "Firebase registration successful",
+      };
+    } catch (error) {
+      throw new Error(mapAuthError(error));
+    }
+  },
+
+  async loginWithGoogleForUserModule(): Promise<ServiceResponse<AuthSession>> {
+    await sleep(100);
+    try {
+      const credential = await signInWithPopup(auth, googleProvider);
+      return {
+        data: await toAuthSession(credential.user),
+        message: "Google authentication successful",
+      };
+    } catch (error) {
+      throw new Error(mapAuthError(error));
+    }
+  },
+
   async forgotPassword(email: string): Promise<ServiceResponse<boolean>> {
     await sleep(100);
     try {
@@ -116,6 +172,7 @@ export const authService = {
 
   async logout(): Promise<ServiceResponse<boolean>> {
     await signOut(auth);
+    userSessionService.clearUserProfile();
     return { data: true, message: "Logged out" };
   },
 };

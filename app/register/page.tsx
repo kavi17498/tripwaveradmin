@@ -8,71 +8,117 @@ import { Footer } from "@/components/layout/footer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/feedback/toast-provider";
-import { authService } from "@/lib/services/authService";
-import { UserRole } from "@/lib/types";
+import { useUserRegistrationStore } from "@/lib/stores/useUserRegistrationStore";
 
 export default function RegisterPage() {
   const router = useRouter();
   const { pushToast } = useToast();
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
+  const { form, loading, googleLoading, error, setField, registerManual, registerWithGoogle, clearError, resetForm } =
+    useUserRegistrationStore();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [role, setRole] = useState<UserRole>("traveler");
-  const [loading, setLoading] = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(false);
-  const [error, setError] = useState("");
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    setError("");
-    if (name.trim().length < 2) return setError("Name should have at least 2 characters.");
-    if (!email.includes("@")) return setError("Please enter a valid email.");
-    if (password.length < 8) return setError("Password should be at least 8 characters.");
-    if (password !== confirmPassword) return setError("Passwords do not match.");
+    clearError();
 
-    setLoading(true);
     try {
-      await authService.register({ name, email, password, role });
+      await registerManual(password, confirmPassword);
       pushToast({ type: "success", title: "Account created", description: "Your TripWaver account is ready." });
+      resetForm();
+      setPassword("");
+      setConfirmPassword("");
       router.push("/dashboard");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to create account.");
-    } finally {
-      setLoading(false);
-    }
+    } catch {}
   };
 
   const handleGoogleSignup = async () => {
-    setError("");
-    setGoogleLoading(true);
+    clearError();
     try {
-      await authService.loginWithGoogle();
-      pushToast({ type: "success", title: "Google signup successful", description: "Your account is ready." });
+      await registerWithGoogle();
+      pushToast({ type: "success", title: "Google signup successful", description: "Profile submitted successfully." });
+      resetForm();
       router.push("/dashboard");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Google signup failed.");
-    } finally {
-      setGoogleLoading(false);
-    }
+    } catch {}
   };
 
   return (
     <div>
       <Navbar />
       <main className="mx-auto max-w-7xl px-4 py-12 md:px-6">
-        <div className="mx-auto max-w-lg border border-border bg-card p-6">
+        <div className="mx-auto max-w-2xl border border-border bg-card p-6">
           <h1 className="text-2xl font-semibold">Register</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Create your account to manage trips and bookings.</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Create your account and complete your profile details before continuing.
+          </p>
           <form onSubmit={submit} className="mt-6 grid grid-cols-1 gap-4">
-            <div>
-              <label className="mb-1 block text-sm font-medium">Full name</label>
-              <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="Your full name" />
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-sm font-medium">First name</label>
+                <Input value={form.firstName} onChange={(event) => setField("firstName", event.target.value)} placeholder="John" />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium">Last name</label>
+                <Input value={form.lastName} onChange={(event) => setField("lastName", event.target.value)} placeholder="Doe" />
+              </div>
             </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium">Email</label>
-              <Input value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" />
+
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-sm font-medium">Email</label>
+                <Input value={form.email} onChange={(event) => setField("email", event.target.value)} placeholder="you@example.com" />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium">Phone</label>
+                <Input value={form.phone} onChange={(event) => setField("phone", event.target.value)} placeholder="+1234567890" />
+              </div>
             </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-medium">Profile image URL (optional)</label>
+              <Input
+                value={form.profileImage}
+                onChange={(event) => setField("profileImage", event.target.value)}
+                placeholder="https://example.com/profile.jpg"
+              />
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-medium">Bio</label>
+              <Input value={form.bio} onChange={(event) => setField("bio", event.target.value)} placeholder="Travel enthusiast" />
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-medium">Street</label>
+              <Input value={form.street} onChange={(event) => setField("street", event.target.value)} placeholder="123 Main St" />
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-sm font-medium">City</label>
+                <Input value={form.city ?? ""} onChange={(event) => setField("city", event.target.value)} placeholder="New York" />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium">State</label>
+                <Input value={form.state ?? ""} onChange={(event) => setField("state", event.target.value)} placeholder="NY" />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-sm font-medium">Postal code</label>
+                <Input
+                  value={form.postalCode ?? ""}
+                  onChange={(event) => setField("postalCode", event.target.value)}
+                  placeholder="10001"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium">Country</label>
+                <Input value={form.country ?? ""} onChange={(event) => setField("country", event.target.value)} placeholder="USA" />
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
               <div>
                 <label className="mb-1 block text-sm font-medium">Password</label>
@@ -84,23 +130,12 @@ export default function RegisterPage() {
               </div>
             </div>
 
-            <div>
-              <label className="mb-1 block text-sm font-medium">Primary role</label>
-              <select
-                value={role}
-                onChange={(event) => setRole(event.target.value as UserRole)}
-                className="h-9 w-full border border-input bg-background px-3 text-sm"
-              >
-                <option value="traveler">Traveler</option>
-                <option value="organizer">Organizer</option>
-              </select>
-              <p className="mt-1 text-xs text-muted-foreground">Organizers can apply for verification to publish public trips.</p>
-            </div>
-
             {error ? <p className="text-sm text-destructive">{error}</p> : null}
-            <Button className="w-full" disabled={loading}>{loading ? "Creating account..." : "Create account"}</Button>
+            <Button className="w-full" disabled={loading || googleLoading}>
+              {loading ? "Creating account..." : "Create account"}
+            </Button>
             <Button type="button" variant="outline" className="w-full" onClick={handleGoogleSignup} disabled={googleLoading}>
-              {googleLoading ? "Connecting..." : "Sign up with Google"}
+              {googleLoading ? "Connecting..." : "Sign up with Google and submit profile"}
             </Button>
           </form>
 

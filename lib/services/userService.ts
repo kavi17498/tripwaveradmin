@@ -1,0 +1,41 @@
+import { apiClient } from "@/lib/services/apiClient";
+import { ServiceResponse, UserModulePayload } from "@/lib/types";
+
+export type UserProfileRecord = Record<string, unknown>;
+
+export const userService = {
+  async createUserProfile(payload: UserModulePayload, token: string): Promise<ServiceResponse<UserModulePayload>> {
+    const response = await apiClient.authenticatedRequest<UserModulePayload | ServiceResponse<UserModulePayload>>("/users", token, {
+      method: "POST",
+      body: payload,
+    });
+
+    if (response && typeof response === "object" && "data" in response) {
+      return response as ServiceResponse<UserModulePayload>;
+    }
+
+    return {
+      data: response as UserModulePayload,
+      message: "User profile created successfully",
+    };
+  },
+
+  async getUserProfileById(userId: string, token: string): Promise<ServiceResponse<UserProfileRecord>> {
+    const response = await apiClient.authenticatedRequest<UserProfileRecord | ServiceResponse<UserProfileRecord>>(
+      `/users/${userId}`,
+      token,
+      {
+        method: "GET",
+      },
+    );
+
+    if (response && typeof response === "object" && "data" in response) {
+      return response as ServiceResponse<UserProfileRecord>;
+    }
+
+    return {
+      data: response as UserProfileRecord,
+      message: "User profile fetched successfully",
+    };
+  },
+};

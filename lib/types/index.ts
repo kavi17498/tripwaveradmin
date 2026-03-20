@@ -114,3 +114,28 @@ export interface ServiceResponse<T> {
   data: T;
   message?: string;
 }
+
+export interface AuthSession {
+  uid: string;
+  email: string;
+  token: string;
+}
+
+export interface UserModuleRegistrationInput {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  profileImage?: string;
+  bio: string;
+  street: string;
+  city?: string;
+  state?: string;
+  postalCode?: string;
+  country?: string;
+}
+
+export interface UserModulePayload extends UserModuleRegistrationInput {
+  id: string;
+  isVerified: boolean;
+}
