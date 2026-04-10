@@ -19,6 +19,9 @@ const defaultCenter = {
   lng: 79.8612,
 };
 
+const googleMapsLibraries: ("places")[] = ["places"];
+const googleMapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? "";
+
 type LocationValue = {
   lat: number;
   lng: number;
@@ -32,8 +35,8 @@ type LocationPickerProps = {
 
 function LocationPicker({ value, onChange }: LocationPickerProps) {
   const { isLoaded } = useLoadScript({
-    googleMapsApiKey: "YOUR_GOOGLE_MAPS_API_KEY",
-    libraries: ["places"],
+    googleMapsApiKey,
+    libraries: googleMapsLibraries,
   });
 
   const [marker, setMarker] = useState<google.maps.LatLngLiteral>(value ?? defaultCenter);

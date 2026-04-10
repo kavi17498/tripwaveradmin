@@ -13,6 +13,7 @@ import {
 } from "@/lib/types";
 import { tripApiService } from "@/lib/services/tripApiService";
 import { userSessionService } from "@/lib/services/userSessionService";
+import LocationPicker from "@/components/common/locationpicker";
 
 type TripCategory = CreateTripApiPayload["tripCategory"];
 
@@ -380,6 +381,9 @@ export default function CreateTripPage() {
                 onChange={(event) => setStartLocation(event.target.value)}
                 placeholder="Colombo International Airport"
               />
+              <LocationPicker onChange={function (location: { lat: number; lng: number; address: string; }): void {
+                throw new Error("Function not implemented.");
+              } } />
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium">Organizer id (user id)</label>
