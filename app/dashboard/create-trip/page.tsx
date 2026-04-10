@@ -381,9 +381,11 @@ export default function CreateTripPage() {
                 onChange={(event) => setStartLocation(event.target.value)}
                 placeholder="Colombo International Airport"
               />
-              <LocationPicker onChange={function (location: { lat: number; lng: number; address: string; }): void {
-                throw new Error("Function not implemented.");
-              } } />
+              <LocationPicker
+                onChange={(location) => {
+                  setStartLocation(location.address);
+                }}
+              />
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium">Organizer id (user id)</label>

@@ -48,11 +48,19 @@ function LocationPicker({ value, onChange }: LocationPickerProps) {
     setValue,
     suggestions: { status, data },
     clearSuggestions,
+    init,
   } = usePlacesAutocomplete({
+    debounce: 300,
+    initOnMount: false,
     requestOptions: {
       componentRestrictions: { country: "lk" }, // Sri Lanka only
     },
   });
+
+  useEffect(() => {
+    if (!isLoaded) return;
+    init();
+  }, [init, isLoaded]);
 
   useEffect(() => {
     if (!value) return;
