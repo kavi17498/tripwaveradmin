@@ -99,6 +99,7 @@ export default function CreateTripPage() {
 
   const [tripName, setTripName] = useState("");
   const [tripCategory, setTripCategory] = useState<TripCategory>("Travel with Guide");
+  const [canSelectTravelWithGuide, setCanSelectTravelWithGuide] = useState(false);
   const [description, setDescription] = useState("");
 
   const [startDate, setStartDate] = useState("");
@@ -134,6 +135,16 @@ export default function CreateTripPage() {
     }
 
     setOrganizerName(getOrganizerName(profile));
+  }, []);
+
+  useEffect(() => {
+    const role = userSessionService.getRole();
+    const isGuide = role === "guide";
+    setCanSelectTravelWithGuide(isGuide);
+
+    if (!isGuide) {
+      setTripCategory((current) => (current === "Travel with Guide" ? "Join Group Trip" : current));
+    }
   }, []);
 
   const mapQuery = useMemo(() => {
@@ -320,11 +331,19 @@ export default function CreateTripPage() {
               <label className="mb-1 block text-sm font-medium">Trip category</label>
               <select
                 value={tripCategory}
-                onChange={(event) => setTripCategory(event.target.value as TripCategory)}
+                onChange={(event) => {
+                  const nextCategory = event.target.value as TripCategory;
+                  if (nextCategory === "Travel with Guide" && !canSelectTravelWithGuide) return;
+                  setTripCategory(nextCategory);
+                }}
                 className="h-9 w-full border border-input bg-background px-3 text-sm"
               >
                 {categories.map((categoryItem) => (
-                  <option key={categoryItem} value={categoryItem}>
+                  <option
+                    key={categoryItem}
+                    value={categoryItem}
+                    disabled={categoryItem === "Travel with Guide" && !canSelectTravelWithGuide}
+                  >
                     {categoryItem}
                   </option>
                 ))}
