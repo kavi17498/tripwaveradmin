@@ -128,6 +128,7 @@ export default function CreateTripPage() {
   const [errors, setErrors] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [isTripwaverAIOpen, setIsTripwaverAIOpen] = useState(false);
+  const [tripwaverAIError, setTripwaverAIError] = useState("");
 
   useEffect(() => {
     const profile = userSessionService.getUserProfile<StoredUserProfile>();
@@ -316,6 +317,12 @@ export default function CreateTripPage() {
   };
 
   const openTripwaverAIpopup = () => {
+    if (!startDate || !endDate || !startLocation.trim()) {
+      setTripwaverAIError("Start date, end date, and start destination should be selected.");
+      return;
+    }
+
+    setTripwaverAIError("");
     setIsTripwaverAIOpen(true);
   };
 
@@ -414,6 +421,11 @@ export default function CreateTripPage() {
             <Button type="button" variant="outline" onClick={addDestination}>Add destination</Button>
              <Button type="button" variant="outline" onClick={openTripwaverAIpopup}>Use TripWaver AI to List Destinations</Button>
           </div>
+          {tripwaverAIError ? (
+            <div className="rounded border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+              {tripwaverAIError}
+            </div>
+          ) : null}
 
           <div className="space-y-3">
             {destinations.map((destination, index) => (
@@ -656,7 +668,13 @@ export default function CreateTripPage() {
         </div>
       </form>
 
-      <TripwaverAIPopup isOpen={isTripwaverAIOpen} onClose={closeTripwaverAIpopup} />
+      <TripwaverAIPopup
+        isOpen={isTripwaverAIOpen}
+        startDate={startDate}
+        endDate={endDate}
+        startLocation={startLocation}
+        onClose={closeTripwaverAIpopup}
+      />
     </div>
   );
 }
