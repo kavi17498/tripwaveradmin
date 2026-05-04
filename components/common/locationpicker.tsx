@@ -84,6 +84,21 @@ function LocationPicker({ value, onChange }: LocationPickerProps) {
     onChange({ lat, lng, address });
   }, [onChange]);
 
+  // 📍 Handle marker drag
+  const handleMarkerDragEnd = useCallback(async (e: google.maps.MapMouseEvent) => {
+    if (!e.latLng) return;
+
+    const lat = e.latLng.lat();
+    const lng = e.latLng.lng();
+
+    setMarker({ lat, lng });
+
+    const results = await getGeocode({ location: { lat, lng } });
+    const address = results[0]?.formatted_address || "";
+
+    onChange({ lat, lng, address });
+  }, [onChange]);
+
   // 🔍 Handle search select
   const handleSelect = async (description: string) => {
     setValue(description, false);
@@ -108,13 +123,7 @@ function LocationPicker({ value, onChange }: LocationPickerProps) {
       
       {/* 🔍 Search Box */}
       <div>
-        <input
-          value={search}
-          onChange={(e) => setValue(e.target.value)}
-          disabled={!ready}
-          placeholder="Search location..."
-          className="w-full p-2 border rounded"
-        />
+        
 
         {/* Suggestions */}
         {status === "OK" && (
@@ -139,7 +148,11 @@ function LocationPicker({ value, onChange }: LocationPickerProps) {
         zoom={12}
         onClick={handleMapClick}
       >
-        <Marker position={marker} />
+        <Marker
+          position={marker}
+          draggable
+          onDragEnd={handleMarkerDragEnd}
+        />
       </GoogleMap>
 
       {/* 📤 Output */}
