@@ -14,6 +14,7 @@ import {
 import { tripApiService } from "@/lib/services/tripApiService";
 import { userSessionService } from "@/lib/services/userSessionService";
 import LocationPicker from "@/components/common/locationpicker";
+import TripwaverAIPopup from "@/components/common/tripwaver-ai-popup";
 
 type TripCategory = CreateTripApiPayload["tripCategory"];
 
@@ -126,6 +127,7 @@ export default function CreateTripPage() {
 
   const [errors, setErrors] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
+  const [isTripwaverAIOpen, setIsTripwaverAIOpen] = useState(false);
 
   useEffect(() => {
     const profile = userSessionService.getUserProfile<StoredUserProfile>();
@@ -313,6 +315,14 @@ export default function CreateTripPage() {
     }
   };
 
+  const openTripwaverAIpopup = () => {
+    setIsTripwaverAIOpen(true);
+  };
+
+  const closeTripwaverAIpopup = () => {
+    setIsTripwaverAIOpen(false);
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -402,6 +412,7 @@ export default function CreateTripPage() {
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold">Destinations</h2>
             <Button type="button" variant="outline" onClick={addDestination}>Add destination</Button>
+             <Button type="button" variant="outline" onClick={openTripwaverAIpopup}>Use TripWaver AI to List Destinations</Button>
           </div>
 
           <div className="space-y-3">
@@ -644,6 +655,8 @@ export default function CreateTripPage() {
           <Button type="button" variant="outline">Save as local draft</Button>
         </div>
       </form>
+
+      <TripwaverAIPopup isOpen={isTripwaverAIOpen} onClose={closeTripwaverAIpopup} />
     </div>
   );
 }
