@@ -176,7 +176,7 @@ export interface TripParticipantPayload {
 
 export interface CreateTripApiPayload {
   tripName: string;
-  tripCategory: "Travel with Guide" | "Join Group Trip" | "Family Trip with Guide" | "Private trip";
+  tripCategory: "Solo Trip with guide" | "Family Trip with guide" | "Strangers Trip with guide" | "Private trip";
   destinations: TripDestinationPayload[];
   startDate: string;
   endDate: string;

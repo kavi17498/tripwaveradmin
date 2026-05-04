@@ -46,7 +46,7 @@ type StoredUserProfile = {
   lastName?: string;
 };
 
-const categories: TripCategory[] = ["Travel with Guide", "Join Group Trip", "Family Trip with Guide", "Private trip"];
+const categories: TripCategory[] = ["Solo Trip with guide", "Family Trip with guide", "Strangers Trip with guide", "Private trip"];
 
 const emptyDestination = (): DestinationFormItem => ({
   name: "",
@@ -99,7 +99,7 @@ export default function CreateTripPage() {
   const { pushToast } = useToast();
 
   const [tripName, setTripName] = useState("");
-  const [tripCategory, setTripCategory] = useState<TripCategory>("Travel with Guide");
+  const [tripCategory, setTripCategory] = useState<TripCategory>("Solo Trip with guide");
   const [canSelectTravelWithGuide, setCanSelectTravelWithGuide] = useState(false);
   const [description, setDescription] = useState("");
 
@@ -144,7 +144,7 @@ export default function CreateTripPage() {
     setCanSelectTravelWithGuide(isGuide);
 
     if (!isGuide) {
-      setTripCategory((current) => (current === "Travel with Guide" ? "Join Group Trip" : current));
+      setTripCategory((current) => (current === "Solo Trip with guide" ? "Family Trip with guide" : current));
     }
   }, []);
 
@@ -334,7 +334,7 @@ export default function CreateTripPage() {
                 value={tripCategory}
                 onChange={(event) => {
                   const nextCategory = event.target.value as TripCategory;
-                  if (nextCategory === "Travel with Guide" && !canSelectTravelWithGuide) return;
+                  if (nextCategory === "Solo Trip with guide" && !canSelectTravelWithGuide) return;
                   setTripCategory(nextCategory);
                 }}
                 className="h-9 w-full border border-input bg-background px-3 text-sm"
@@ -343,7 +343,7 @@ export default function CreateTripPage() {
                   <option
                     key={categoryItem}
                     value={categoryItem}
-                    disabled={categoryItem === "Travel with Guide" && !canSelectTravelWithGuide}
+                    disabled={categoryItem === "Strangers Trip with guide" && !canSelectTravelWithGuide}
                   >
                     {categoryItem}
                   </option>
