@@ -33,6 +33,7 @@ type ActivityFormItem = {
   startTime: string;
   endTime: string;
   notesEditor: string;
+  isAIGenerated?: boolean;
 };
 
 type ParticipantFormItem = {
@@ -147,6 +148,7 @@ export default function CreateTripPage() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [startTime, setStartTime] = useState("");
+  const [endTime, setEndTime] = useState("");
   const [startLocation, setStartLocation] = useState("");
   const [mainDestination, setMainDestination] = useState<MainDestination | null>(null);
   const [mainDestinations, setMainDestinations] = useState<MainDestination[]>([]);
@@ -246,6 +248,8 @@ export default function CreateTripPage() {
     );
   };
 
+  const [isGenerating, setIsGenerating] = useState(false);
+
   const addActivity = (dayIndex: number) => {
     setActivitiesByDay((prev) =>
       prev.map((day, currentDayIndex) => (currentDayIndex === dayIndex ? [...day, emptyActivity()] : day)),
@@ -323,6 +327,146 @@ export default function CreateTripPage() {
     } finally {
       setIsLoadingTravelDestinations(false);
     }
+  };
+
+  const validateForAuto = () => {
+    const issues: string[] = [];
+    if (!tripName.trim()) issues.push("Trip name is required.");
+    if (!tripCategory) issues.push("Trip category is required.");
+    const hasManualDest = destinations.some((d) => d.name.trim() && d.latitude.trim() && d.longitude.trim());
+    const hasSelectedDest = selectedTravelDestinations.length > 0;
+    if (!hasManualDest && !hasSelectedDest) {
+      issues.push("At least one destination with latitude and longitude is required. Add one in Destinations or pick from Travel Destinations.");
+    }
+    if (!startDate || !endDate) issues.push("Start date and end date are required.");
+    if (!startTime) issues.push("Start time is required.");
+    if (!endTime) issues.push("End time is required.");
+    if (!startLocation.trim()) issues.push("Start location is required.");
+    if (Number(maxParticipants) <= 0) issues.push("Max participants must be greater than 0.");
+    const hotel = toLines(hotelFacilitiesEditor);
+    if (hotel.length === 0) issues.push("At least one hotel facility is required in Included.");
+
+    if (issues.length > 0) {
+      pushToast({ type: "error", title: "Missing fields", description: issues.join(" ") });
+      return false;
+    }
+    return true;
+  };
+
+  const parse12HourTo24 = (time12: string) => {
+    // expects "08:00 AM" or "8:00 PM" -> returns "08:00"
+    if (!time12) return "";
+    const m = time12.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+    if (!m) return time12;
+    let hour = parseInt(m[1], 10);
+    const minute = m[2];
+    const suffix = m[3].toUpperCase();
+    if (suffix === "AM") {
+      if (hour === 12) hour = 0;
+    } else {
+      if (hour !== 12) hour += 12;
+    }
+    return `${String(hour).padStart(2, "0")}:${minute}`;
+  };
+
+  const generateItinerary = async () => {
+    if (!validateForAuto()) return;
+
+    const token = userSessionService.getToken();
+    if (!token) {
+      pushToast({ type: "error", title: "Missing auth token", description: "Please login again." });
+      return;
+    }
+
+    const manualPayload = destinations
+      .map((d) => {
+        if (!d.name.trim() || !d.latitude.trim() || !d.longitude.trim()) return null;
+        return {
+          name: d.name.trim(),
+          description: d.description.trim(),
+          geoCode: {
+            latitude: Number(d.latitude),
+            longitude: Number(d.longitude),
+          },
+        };
+      })
+      .filter(Boolean);
+
+    const selectedPayload = selectedTravelDestinations.map((s) => ({
+      name: s.name,
+      description: s.description || "",
+      geoCode: { latitude: Number(s.lat), longitude: Number(s.lng) },
+    }));
+
+    const destinationsPayload = [...manualPayload, ...selectedPayload];
+
+    const payload = {
+      tripName: tripName.trim(),
+      tripCategory,
+      destinations: destinationsPayload,
+      startDate,
+      endDate,
+      startTime: to12Hour(startTime),
+      endTime: to12Hour(endTime),
+      startLocation: startLocation.trim(),
+      included: {
+        hotelFacilities: toLines(hotelFacilitiesEditor),
+        transportFacilities: travelBy ? [travelBy] : [],
+        otherInclusions: toLines(otherInclusionsEditor),
+        exclusions: toLines(exclusionsEditor),
+      },
+      maxParticipants: Number(maxParticipants),
+    };
+
+    setIsGenerating(true);
+    try {
+      const resp = await tripPlanService.generateAutoItinerary(payload, token);
+      const days: any[] = resp?.days ?? [];
+
+      const next: ActivityFormItem[][] = Array.from({ length: dayCount }, (_, i) => []);
+      for (let i = 0; i < dayCount; i++) {
+        const day = days[i];
+        if (!day || !Array.isArray(day.activities) || day.activities.length === 0) {
+          next[i] = [emptyActivity()];
+          continue;
+        }
+
+        next[i] = day.activities.map((act: any) => ({
+          title: act.activity || act.title || "",
+          startTime: parse12HourTo24(act.startTime || ""),
+          endTime: parse12HourTo24(act.endTime || ""),
+          notesEditor: act.description || "",
+          isAIGenerated: true,
+        }));
+      }
+
+      setActivitiesByDay(next);
+      pushToast({ type: "success", title: "Itinerary generated", description: "AI itinerary added to activities. You can edit them." });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to generate itinerary.";
+      pushToast({ type: "error", title: "Generate failed", description: message });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const clearAIGenerated = () => {
+    const confirmClear = window.confirm("Clear AI suggestions? This will remove AI-generated activities.");
+    if (!confirmClear) return;
+
+    setActivitiesByDay((prev) => prev.map((day) => {
+      const filtered = day.filter((item) => !item.isAIGenerated);
+      return filtered.length ? filtered : [emptyActivity()];
+    }));
+    pushToast({ type: "success", title: "AI suggestions cleared" });
+  };
+
+  const clearEntireGenerated = () => {
+    const confirmClear = window.confirm("Clear entire generated itinerary? This will reset all activities. Are you sure?");
+    if (!confirmClear) return;
+
+    setActivitiesByDay(() => Array.from({ length: dayCount }, () => [emptyActivity()]));
+    pushToast({ type: "success", title: "Generated itinerary cleared" });
   };
 
   const addSelectedTravelDestination = (location: string, destination: TripPlanLocationResult["destinations"][number]) => {
@@ -560,6 +704,10 @@ export default function CreateTripPage() {
             <div>
               <label className="mb-1 block text-sm font-medium">Start time</label>
               <Input type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium">End time</label>
+              <Input type="time" value={endTime} onChange={(event) => setEndTime(event.target.value)} />
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium">Start location</label>
@@ -902,8 +1050,16 @@ export default function CreateTripPage() {
 
         <section className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold">Activities</h2>
-            <span className="text-xs text-muted-foreground">{dayCount} day(s)</span>
+            <h2 className="text-lg font-semibold">itinerary</h2>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">{dayCount} day(s)</span>
+              <Button type="button" variant="outline" size="sm" onClick={generateItinerary} disabled={isGenerating}>
+                {isGenerating ? "Generating..." : "Generate itinerary"}
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={clearEntireGenerated}>
+                Clear generated
+              </Button>
+            </div>
           </div>
 
           {dayCount === 0 ? (

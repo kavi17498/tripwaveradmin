@@ -20,4 +20,10 @@ export const tripPlanService = {
       body: { locations },
     });
   },
+  async generateAutoItinerary(payload: any, token: string) {
+    return apiClient.authenticatedRequest<any>("/trip-plan/itinerary/auto", token, {
+      method: "POST",
+      body: payload,
+    });
+  },
 };
