@@ -180,6 +180,7 @@ export interface CreateTripApiPayload {
   destinations: TripDestinationPayload[];
   startDate: string;
   endDate: string;
+  startTime?: string;
   startLocation: string;
   organizer: string;
   price: number;

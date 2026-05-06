@@ -146,6 +146,7 @@ export default function CreateTripPage() {
 
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [startTime, setStartTime] = useState("");
   const [startLocation, setStartLocation] = useState("");
   const [mainDestination, setMainDestination] = useState<MainDestination | null>(null);
   const [mainDestinations, setMainDestinations] = useState<MainDestination[]>([]);
@@ -351,6 +352,7 @@ export default function CreateTripPage() {
 
     if (!tripName.trim()) issues.push("Trip name is required.");
     if (!startDate || !endDate) issues.push("Start date and end date are required.");
+    if (!startTime) issues.push("Start time is required.");
     if (!startLocation.trim()) issues.push("Start location is required.");
     if (!organizerId.trim()) issues.push("Organizer id (user id) is required.");
     if (Number(price) <= 0) issues.push("Price must be greater than 0.");
@@ -446,6 +448,7 @@ export default function CreateTripPage() {
       destinations: destinationsPayload,
       startDate,
       endDate,
+      startTime,
       startLocation: startLocation.trim(),
       organizer: organizerId.trim(),
       price: Number(price),
@@ -553,6 +556,10 @@ export default function CreateTripPage() {
             <div>
               <label className="mb-1 block text-sm font-medium">End date</label>
               <Input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium">Start time</label>
+              <Input type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} />
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium">Start location</label>
