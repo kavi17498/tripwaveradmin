@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/common/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/feedback/toast-provider";
+import { Bus, Car, Train, Truck } from "lucide-react";
 import {
   CreateTripApiPayload,
   TripDestinationPayload,
@@ -80,6 +81,14 @@ const emptyActivity = (): ActivityFormItem => ({
   notesEditor: "",
 });
 
+const travelMethods = [
+  { key: "bus", label: "Bus", icon: Bus },
+  { key: "train", label: "Train", icon: Train },
+  { key: "car", label: "Car", icon: Car },
+  { key: "van", label: "Van", icon: Car },
+  { key: "lorry", label: "Lorry", icon: Truck },
+];
+
 const toDateOnly = (value: string) => {
   if (!value) return null;
   const date = new Date(`${value}T00:00:00`);
@@ -149,7 +158,7 @@ export default function CreateTripPage() {
   const [participants, setParticipants] = useState<ParticipantFormItem[]>([emptyParticipant()]);
 
   const [hotelFacilitiesEditor, setHotelFacilitiesEditor] = useState("");
-  const [transportFacilitiesEditor, setTransportFacilitiesEditor] = useState("");
+  const [travelBy, setTravelBy] = useState<string>("");
   const [otherInclusionsEditor, setOtherInclusionsEditor] = useState("");
   const [exclusionsEditor, setExclusionsEditor] = useState("");
 
@@ -263,6 +272,10 @@ export default function CreateTripPage() {
   const removeParticipant = (index: number) => {
     if (participants.length === 1) return;
     setParticipants((prev) => prev.filter((_, currentIndex) => currentIndex !== index));
+  };
+
+  const toggleTravelBy = (method: string) => {
+    setTravelBy((prev) => (prev === method ? "" : method));
   };
 
   const addMainDestination = () => {
@@ -441,7 +454,7 @@ export default function CreateTripPage() {
       },
       included: {
         hotelFacilities: toLines(hotelFacilitiesEditor),
-        transportFacilities: toLines(transportFacilitiesEditor),
+        transportFacilities: travelBy ? [travelBy] : [],
         otherInclusions: toLines(otherInclusionsEditor),
         exclusions: toLines(exclusionsEditor),
       },
@@ -757,79 +770,28 @@ export default function CreateTripPage() {
 
         <section className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold">Activities</h2>
-            <span className="text-xs text-muted-foreground">{dayCount} day(s)</span>
+            <h2 className="text-lg font-semibold">Travel By</h2>
           </div>
-
-          {dayCount === 0 ? (
-            <p className="text-sm text-muted-foreground">Select start and end dates to build the day plan.</p>
-          ) : (
-            <div className="space-y-4">
-              {activitiesByDay.map((dayActivities, dayIndex) => (
-                <div key={dayIndex} className="space-y-3 border border-border p-3">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-medium">Day {dayIndex + 1}</p>
-                    <Button type="button" variant="outline" size="sm" onClick={() => addActivity(dayIndex)}>
-                      Add activity
-                    </Button>
-                  </div>
-
-                  <div className="space-y-3">
-                    {dayActivities.map((item, activityIndex) => (
-                      <div key={activityIndex} className="space-y-3 rounded border border-border p-3">
-                        <div className="flex items-center justify-between">
-                          <p className="text-sm font-medium">Activity {activityIndex + 1}</p>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            onClick={() => removeActivity(dayIndex, activityIndex)}
-                            disabled={dayActivities.length === 1}
-                          >
-                            Remove
-                          </Button>
-                        </div>
-
-                        <Input
-                          value={item.title}
-                          onChange={(event) => updateActivity(dayIndex, activityIndex, "title", event.target.value)}
-                          placeholder="Arrival and check-in"
-                        />
-
-                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                          <div>
-                            <label className="mb-1 block text-xs font-medium">Start time</label>
-                            <Input
-                              type="time"
-                              value={item.startTime}
-                              onChange={(event) => updateActivity(dayIndex, activityIndex, "startTime", event.target.value)}
-                            />
-                          </div>
-                          <div>
-                            <label className="mb-1 block text-xs font-medium">End time</label>
-                            <Input
-                              type="time"
-                              value={item.endTime}
-                              onChange={(event) => updateActivity(dayIndex, activityIndex, "endTime", event.target.value)}
-                            />
-                          </div>
-                        </div>
-
-                        <div>
-                          <label className="mb-1 block text-xs font-medium">Notes (one per line)</label>
-                          <textarea
-                            value={item.notesEditor}
-                            onChange={(event) => updateActivity(dayIndex, activityIndex, "notesEditor", event.target.value)}
-                            className="min-h-20 w-full border border-input bg-background px-3 py-2 text-sm"
-                            placeholder={"Arrival and check-in\nWelcome dinner with southern cuisine tasting"}
-                          />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+            {travelMethods.map((method) => {
+              const Icon = method.icon;
+              const isSelected = travelBy === method.label;
+              return (
+                <button
+                  key={method.key}
+                  type="button"
+                  onClick={() => toggleTravelBy(method.label)}
+                  className={
+                    "flex items-center gap-2 rounded border px-3 py-2 text-left transition" +
+                    (isSelected ? " border-primary bg-primary/10" : " border-border bg-card hover:bg-accent")
+                  }
+                >
+                  <Icon className="size-4" />
+                  <span className="text-sm font-medium">{method.label}</span>
+                </button>
+              );
+            })}
+          </div>
         </section>
 
         <section className="space-y-4">
@@ -842,15 +804,6 @@ export default function CreateTripPage() {
                 onChange={(event) => setHotelFacilitiesEditor(event.target.value)}
                 className="min-h-24 w-full border border-input bg-background px-3 py-2 text-sm"
                 placeholder={"3-star hotel\nWiFi\nAir conditioning"}
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium">Transport facilities (one per line)</label>
-              <textarea
-                value={transportFacilitiesEditor}
-                onChange={(event) => setTransportFacilitiesEditor(event.target.value)}
-                className="min-h-24 w-full border border-input bg-background px-3 py-2 text-sm"
-                placeholder={"Air-conditioned coach\nAirport transfers\nDaily transport"}
               />
             </div>
             <div>
@@ -938,6 +891,83 @@ export default function CreateTripPage() {
               placeholder={"https://example.com/trips/sri-lanka-1.jpg\nhttps://example.com/trips/sri-lanka-2.jpg"}
             />
           </div>
+        </section>
+
+        <section className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold">Activities</h2>
+            <span className="text-xs text-muted-foreground">{dayCount} day(s)</span>
+          </div>
+
+          {dayCount === 0 ? (
+            <p className="text-sm text-muted-foreground">Select start and end dates to build the day plan.</p>
+          ) : (
+            <div className="space-y-4">
+              {activitiesByDay.map((dayActivities, dayIndex) => (
+                <div key={dayIndex} className="space-y-3 border border-border p-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium">Day {dayIndex + 1}</p>
+                    <Button type="button" variant="outline" size="sm" onClick={() => addActivity(dayIndex)}>
+                      Add activity
+                    </Button>
+                  </div>
+
+                  <div className="space-y-3">
+                    {dayActivities.map((item, activityIndex) => (
+                      <div key={activityIndex} className="space-y-3 rounded border border-border p-3">
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-medium">Activity {activityIndex + 1}</p>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            onClick={() => removeActivity(dayIndex, activityIndex)}
+                            disabled={dayActivities.length === 1}
+                          >
+                            Remove
+                          </Button>
+                        </div>
+
+                        <Input
+                          value={item.title}
+                          onChange={(event) => updateActivity(dayIndex, activityIndex, "title", event.target.value)}
+                          placeholder="Arrival and check-in"
+                        />
+
+                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                          <div>
+                            <label className="mb-1 block text-xs font-medium">Start time</label>
+                            <Input
+                              type="time"
+                              value={item.startTime}
+                              onChange={(event) => updateActivity(dayIndex, activityIndex, "startTime", event.target.value)}
+                            />
+                          </div>
+                          <div>
+                            <label className="mb-1 block text-xs font-medium">End time</label>
+                            <Input
+                              type="time"
+                              value={item.endTime}
+                              onChange={(event) => updateActivity(dayIndex, activityIndex, "endTime", event.target.value)}
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="mb-1 block text-xs font-medium">Notes (one per line)</label>
+                          <textarea
+                            value={item.notesEditor}
+                            onChange={(event) => updateActivity(dayIndex, activityIndex, "notesEditor", event.target.value)}
+                            className="min-h-20 w-full border border-input bg-background px-3 py-2 text-sm"
+                            placeholder={"Arrival and check-in\nWelcome dinner with southern cuisine tasting"}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
 
         {errors.length > 0 ? (
