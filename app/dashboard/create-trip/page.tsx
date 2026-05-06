@@ -27,11 +27,11 @@ type DestinationFormItem = {
   photosEditor: string;
 };
 
-type ItineraryFormItem = {
+type ActivityFormItem = {
   title: string;
   startTime: string;
   endTime: string;
-  activitiesEditor: string;
+  notesEditor: string;
 };
 
 type ParticipantFormItem = {
@@ -73,12 +73,27 @@ const emptyDestination = (): DestinationFormItem => ({
   photosEditor: "",
 });
 
-const emptyItineraryDay = (): ItineraryFormItem => ({
+const emptyActivity = (): ActivityFormItem => ({
   title: "",
   startTime: "08:00",
   endTime: "10:00",
-  activitiesEditor: "",
+  notesEditor: "",
 });
+
+const toDateOnly = (value: string) => {
+  if (!value) return null;
+  const date = new Date(`${value}T00:00:00`);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const getDayCount = (startDate: string, endDate: string) => {
+  const start = toDateOnly(startDate);
+  const end = toDateOnly(endDate);
+  if (!start || !end) return 0;
+  if (end < start) return 0;
+  const diffMs = end.getTime() - start.getTime();
+  return Math.floor(diffMs / (24 * 60 * 60 * 1000)) + 1;
+};
 
 const emptyParticipant = (): ParticipantFormItem => ({
   name: "",
@@ -130,7 +145,7 @@ export default function CreateTripPage() {
   const [selectedTravelDestinations, setSelectedTravelDestinations] = useState<SelectedTravelDestination[]>([]);
 
   const [destinations, setDestinations] = useState<DestinationFormItem[]>([emptyDestination()]);
-  const [itinerary, setItinerary] = useState<ItineraryFormItem[]>([emptyItineraryDay()]);
+  const [activitiesByDay, setActivitiesByDay] = useState<ActivityFormItem[][]>([[emptyActivity()]]);
   const [participants, setParticipants] = useState<ParticipantFormItem[]>([emptyParticipant()]);
 
   const [hotelFacilitiesEditor, setHotelFacilitiesEditor] = useState("");
@@ -172,6 +187,26 @@ export default function CreateTripPage() {
     }
   }, []);
 
+  const dayCount = useMemo(() => getDayCount(startDate, endDate), [startDate, endDate]);
+
+  useEffect(() => {
+    if (dayCount === 0) {
+      setActivitiesByDay([]);
+      return;
+    }
+
+    setActivitiesByDay((prev) => {
+      const next = [...prev];
+      while (next.length < dayCount) {
+        next.push([emptyActivity()]);
+      }
+      while (next.length > dayCount) {
+        next.pop();
+      }
+      return next;
+    });
+  }, [dayCount]);
+
   const mapQuery = useMemo(() => {
     const names = destinations.map((destination) => destination.name.trim()).filter(Boolean);
     return names.length ? names.join(" | ") : "Sri Lanka";
@@ -190,17 +225,31 @@ export default function CreateTripPage() {
     setDestinations((prev) => prev.filter((_, currentIndex) => currentIndex !== index));
   };
 
-  const updateItinerary = (index: number, key: keyof ItineraryFormItem, value: string) => {
-    setItinerary((prev) => prev.map((item, currentIndex) => (currentIndex === index ? { ...item, [key]: value } : item)));
+  const updateActivity = (dayIndex: number, activityIndex: number, key: keyof ActivityFormItem, value: string) => {
+    setActivitiesByDay((prev) =>
+      prev.map((day, currentDayIndex) => {
+        if (currentDayIndex !== dayIndex) return day;
+        return day.map((item, currentActivityIndex) =>
+          currentActivityIndex === activityIndex ? { ...item, [key]: value } : item,
+        );
+      }),
+    );
   };
 
-  const addItineraryDay = () => {
-    setItinerary((prev) => [...prev, emptyItineraryDay()]);
+  const addActivity = (dayIndex: number) => {
+    setActivitiesByDay((prev) =>
+      prev.map((day, currentDayIndex) => (currentDayIndex === dayIndex ? [...day, emptyActivity()] : day)),
+    );
   };
 
-  const removeItineraryDay = (index: number) => {
-    if (itinerary.length === 1) return;
-    setItinerary((prev) => prev.filter((_, currentIndex) => currentIndex !== index));
+  const removeActivity = (dayIndex: number, activityIndex: number) => {
+    setActivitiesByDay((prev) =>
+      prev.map((day, currentDayIndex) => {
+        if (currentDayIndex !== dayIndex) return day;
+        if (day.length === 1) return day;
+        return day.filter((_, currentActivityIndex) => currentActivityIndex !== activityIndex);
+      }),
+    );
   };
 
   const updateParticipant = (index: number, key: keyof ParticipantFormItem, value: string) => {
@@ -304,11 +353,11 @@ export default function CreateTripPage() {
       issues.push("Each destination needs name, description, latitude, longitude, and at least one photo URL.");
     }
 
-    const hasInvalidItinerary = itinerary.some(
-      (day) => !day.title.trim() || !day.startTime || !day.endTime || toLines(day.activitiesEditor).length === 0,
+    const hasInvalidActivities = activitiesByDay.some((day) =>
+      day.some((activity) => !activity.title.trim() || !activity.startTime || !activity.endTime || toLines(activity.notesEditor).length === 0),
     );
-    if (hasInvalidItinerary) {
-      issues.push("Each itinerary day needs title, start/end time, and at least one activity.");
+    if (hasInvalidActivities) {
+      issues.push("Each activity needs title, start/end time, and at least one note.");
     }
 
     const hasInvalidParticipant = participants.some(
@@ -347,15 +396,27 @@ export default function CreateTripPage() {
       photos: toLines(destination.photosEditor),
     }));
 
-    const itineraryDaysPayload: TripItineraryDayPayload[] = itinerary.map((day, index) => ({
-      day: index + 1,
-      title: day.title.trim(),
-      timeSlot: {
-        startTime: to12Hour(day.startTime),
-        endTime: to12Hour(day.endTime),
-      },
-      activities: toLines(day.activitiesEditor),
-    }));
+    const itineraryDaysPayload: TripItineraryDayPayload[] = activitiesByDay.map((dayActivities, index) => {
+      const first = dayActivities[0];
+      const last = dayActivities[dayActivities.length - 1];
+      const activities = dayActivities.flatMap((activity) => {
+        const notes = toLines(activity.notesEditor);
+        if (notes.length === 0) {
+          return [`${activity.title.trim()} (${to12Hour(activity.startTime)} - ${to12Hour(activity.endTime)})`];
+        }
+        return notes.map((note) => `${activity.title.trim()} (${to12Hour(activity.startTime)} - ${to12Hour(activity.endTime)}): ${note}`);
+      });
+
+      return {
+        day: index + 1,
+        title: `Day ${index + 1}`,
+        timeSlot: {
+          startTime: to12Hour(first.startTime),
+          endTime: to12Hour(last.endTime),
+        },
+        activities,
+      };
+    });
 
     const participantsPayload: TripParticipantPayload[] = participants.map((participant) => ({
       name: participant.name.trim(),
@@ -696,57 +757,79 @@ export default function CreateTripPage() {
 
         <section className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold">Itinerary</h2>
-            <Button type="button" variant="outline" onClick={addItineraryDay}>Add day</Button>
+            <h2 className="text-lg font-semibold">Activities</h2>
+            <span className="text-xs text-muted-foreground">{dayCount} day(s)</span>
           </div>
 
-          <div className="space-y-3">
-            {itinerary.map((item, index) => (
-              <div key={index} className="space-y-3 border border-border p-3">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium">Day {index + 1}</p>
-                  <Button type="button" variant="ghost" onClick={() => removeItineraryDay(index)} disabled={itinerary.length === 1}>
-                    Remove
-                  </Button>
-                </div>
-
-                <Input
-                  value={item.title}
-                  onChange={(event) => updateItinerary(index, "title", event.target.value)}
-                  placeholder="Arrival and check-in"
-                />
-
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                  <div>
-                    <label className="mb-1 block text-xs font-medium">Start time</label>
-                    <Input
-                      type="time"
-                      value={item.startTime}
-                      onChange={(event) => updateItinerary(index, "startTime", event.target.value)}
-                    />
+          {dayCount === 0 ? (
+            <p className="text-sm text-muted-foreground">Select start and end dates to build the day plan.</p>
+          ) : (
+            <div className="space-y-4">
+              {activitiesByDay.map((dayActivities, dayIndex) => (
+                <div key={dayIndex} className="space-y-3 border border-border p-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium">Day {dayIndex + 1}</p>
+                    <Button type="button" variant="outline" size="sm" onClick={() => addActivity(dayIndex)}>
+                      Add activity
+                    </Button>
                   </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-medium">End time</label>
-                    <Input
-                      type="time"
-                      value={item.endTime}
-                      onChange={(event) => updateItinerary(index, "endTime", event.target.value)}
-                    />
+
+                  <div className="space-y-3">
+                    {dayActivities.map((item, activityIndex) => (
+                      <div key={activityIndex} className="space-y-3 rounded border border-border p-3">
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-medium">Activity {activityIndex + 1}</p>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            onClick={() => removeActivity(dayIndex, activityIndex)}
+                            disabled={dayActivities.length === 1}
+                          >
+                            Remove
+                          </Button>
+                        </div>
+
+                        <Input
+                          value={item.title}
+                          onChange={(event) => updateActivity(dayIndex, activityIndex, "title", event.target.value)}
+                          placeholder="Arrival and check-in"
+                        />
+
+                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                          <div>
+                            <label className="mb-1 block text-xs font-medium">Start time</label>
+                            <Input
+                              type="time"
+                              value={item.startTime}
+                              onChange={(event) => updateActivity(dayIndex, activityIndex, "startTime", event.target.value)}
+                            />
+                          </div>
+                          <div>
+                            <label className="mb-1 block text-xs font-medium">End time</label>
+                            <Input
+                              type="time"
+                              value={item.endTime}
+                              onChange={(event) => updateActivity(dayIndex, activityIndex, "endTime", event.target.value)}
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="mb-1 block text-xs font-medium">Notes (one per line)</label>
+                          <textarea
+                            value={item.notesEditor}
+                            onChange={(event) => updateActivity(dayIndex, activityIndex, "notesEditor", event.target.value)}
+                            className="min-h-20 w-full border border-input bg-background px-3 py-2 text-sm"
+                            placeholder={"Arrival and check-in\nWelcome dinner with southern cuisine tasting"}
+                          />
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
-
-                <div>
-                  <label className="mb-1 block text-xs font-medium">Activities (one per line)</label>
-                  <textarea
-                    value={item.activitiesEditor}
-                    onChange={(event) => updateItinerary(index, "activitiesEditor", event.target.value)}
-                    className="min-h-20 w-full border border-input bg-background px-3 py-2 text-sm"
-                    placeholder={"Arrival and check-in\nWelcome dinner with southern cuisine tasting"}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </section>
 
         <section className="space-y-4">
