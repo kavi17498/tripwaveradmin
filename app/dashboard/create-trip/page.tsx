@@ -13,6 +13,7 @@ import {
 } from "@/lib/types";
 import { tripApiService } from "@/lib/services/tripApiService";
 import { userSessionService } from "@/lib/services/userSessionService";
+import { tripPlanService, TripPlanLocationResult } from "@/lib/services/tripPlanService";
 import LocationPicker from "@/components/common/locationpicker";
 import TripwaverAIPopup from "@/components/common/tripwaver-ai-popup";
 
@@ -45,6 +46,12 @@ type StoredUserProfile = {
   name?: string;
   firstName?: string;
   lastName?: string;
+};
+
+type MainDestination = {
+  lat: number;
+  lng: number;
+  address: string;
 };
 
 const categories: TripCategory[] = ["Solo Trip with guide", "Family Trip with guide", "Strangers Trip with guide", "Private trip"];
@@ -107,6 +114,10 @@ export default function CreateTripPage() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [startLocation, setStartLocation] = useState("");
+  const [mainDestination, setMainDestination] = useState<MainDestination | null>(null);
+  const [mainDestinations, setMainDestinations] = useState<MainDestination[]>([]);
+  const [travelDestinationGroups, setTravelDestinationGroups] = useState<TripPlanLocationResult[]>([]);
+  const [isLoadingTravelDestinations, setIsLoadingTravelDestinations] = useState(false);
 
   const [destinations, setDestinations] = useState<DestinationFormItem[]>([emptyDestination()]);
   const [itinerary, setItinerary] = useState<ItineraryFormItem[]>([emptyItineraryDay()]);
@@ -193,6 +204,64 @@ export default function CreateTripPage() {
   const removeParticipant = (index: number) => {
     if (participants.length === 1) return;
     setParticipants((prev) => prev.filter((_, currentIndex) => currentIndex !== index));
+  };
+
+  const addMainDestination = () => {
+    if (!mainDestination || !mainDestination.address.trim()) {
+      pushToast({ type: "error", title: "Select a location", description: "Pick a location before adding it as a main destination." });
+      return;
+    }
+
+    setMainDestinations((prev) => {
+      const exists = prev.some((item) => item.address === mainDestination.address);
+      return exists ? prev : [...prev, mainDestination];
+    });
+  };
+
+  const removeMainDestination = (index: number) => {
+    setMainDestinations((prev) => prev.filter((_, currentIndex) => currentIndex !== index));
+  };
+
+  const loadTravelDestinations = async () => {
+    const token = userSessionService.getToken();
+    if (!token) {
+      pushToast({ type: "error", title: "Missing auth token", description: "Please login again." });
+      return;
+    }
+
+    if (mainDestinations.length === 0) {
+      pushToast({ type: "error", title: "Add main destinations", description: "Add at least one main destination first." });
+      return;
+    }
+
+    const locations = mainDestinations.map((destination) => destination.address).filter(Boolean);
+    if (locations.length === 0) {
+      pushToast({ type: "error", title: "Invalid locations", description: "Main destinations need valid addresses." });
+      return;
+    }
+
+    setIsLoadingTravelDestinations(true);
+    try {
+      const results = await tripPlanService.getDestinations(locations, token);
+      setTravelDestinationGroups(results);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to load travel destinations.";
+      pushToast({ type: "error", title: "Load failed", description: message });
+    } finally {
+      setIsLoadingTravelDestinations(false);
+    }
+  };
+
+  const removeTravelDestination = (locationIndex: number, destinationIndex: number) => {
+    setTravelDestinationGroups((prev) =>
+      prev.map((group, index) => {
+        if (index !== locationIndex) return group;
+        return {
+          ...group,
+          destinations: group.destinations.filter((_, itemIndex) => itemIndex !== destinationIndex),
+        };
+      }),
+    );
   };
 
   const validate = () => {
@@ -408,6 +477,98 @@ export default function CreateTripPage() {
               <Input value={organizerName} onChange={(event) => setOrganizerName(event.target.value)} />
             </div>
           </div>
+        </section>
+
+
+        <section className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold">Main Destination Select</h2>
+          </div>
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <div className="space-y-3">
+              <LocationPicker value={mainDestination} onChange={setMainDestination} />
+              <div className="flex justify-end">
+                <Button type="button" variant="outline" onClick={addMainDestination}>
+                  Add as main destination
+                </Button>
+              </div>
+            </div>
+            <div className="space-y-3 rounded border border-border p-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-medium">Main destinations</h3>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">{mainDestinations.length}</span>
+                  <Button type="button" variant="outline" size="sm" onClick={loadTravelDestinations} disabled={isLoadingTravelDestinations}>
+                    {isLoadingTravelDestinations ? "Loading..." : "Load travel destinations"}
+                  </Button>
+                </div>
+              </div>
+              {mainDestinations.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No main destinations added yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {mainDestinations.map((destination, index) => (
+                    <div key={`${destination.address}-${index}`} className="flex items-center justify-between gap-2 rounded border border-border px-3 py-2">
+                      <div className="text-sm">
+                        <p className="font-medium">{destination.address}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {destination.lat.toFixed(5)}, {destination.lng.toFixed(5)}
+                        </p>
+                      </div>
+                      <Button type="button" variant="ghost" onClick={() => removeMainDestination(index)}>
+                        Remove
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+
+        <section className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold">Travel Destinations</h2>
+          </div>
+          {travelDestinationGroups.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Load travel destinations to see recommendations.</p>
+          ) : (
+            <div className="space-y-6">
+              {travelDestinationGroups.map((group, groupIndex) => (
+                <div key={`${group.location}-${groupIndex}`} className="space-y-3">
+                  <h3 className="text-sm font-semibold">{group.location}</h3>
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    {group.destinations.map((destination, destinationIndex) => (
+                      <div key={`${destination.name}-${destinationIndex}`} className="relative overflow-hidden rounded border border-border bg-card">
+                        <button
+                          type="button"
+                          onClick={() => removeTravelDestination(groupIndex, destinationIndex)}
+                          className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full border border-border bg-background text-xs"
+                          aria-label="Remove destination"
+                        >
+                          x
+                        </button>
+                        {destination.imageUrl ? (
+                          <img src={destination.imageUrl} alt={destination.name} className="h-40 w-full object-cover" />
+                        ) : (
+                          <div className="flex h-40 w-full items-center justify-center bg-muted text-sm text-muted-foreground">
+                            No image
+                          </div>
+                        )}
+                        <div className="space-y-1 p-3">
+                          <p className="text-sm font-medium">{destination.name}</p>
+                          <p className="text-xs text-muted-foreground">{destination.description}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {destination.lat.toFixed(5)}, {destination.lng.toFixed(5)}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
 
         <section className="space-y-4">
