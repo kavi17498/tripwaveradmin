@@ -114,3 +114,82 @@ export interface ServiceResponse<T> {
   data: T;
   message?: string;
 }
+
+export interface AuthSession {
+  uid: string;
+  email: string;
+  token: string;
+}
+
+export interface UserModuleRegistrationInput {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  profileImage?: string;
+  bio: string;
+  street: string;
+  city?: string;
+  state?: string;
+  postalCode?: string;
+  country?: string;
+}
+
+export interface UserModulePayload extends UserModuleRegistrationInput {
+  id: string;
+  isVerified: boolean;
+}
+
+export interface TripDestinationPayload {
+  name: string;
+  description: string;
+  geoCode: {
+    latitude: number;
+    longitude: number;
+  };
+  photos: string[];
+}
+
+export interface TripItineraryDayPayload {
+  day: number;
+  title: string;
+  timeSlot: {
+    startTime: string;
+    endTime: string;
+  };
+  activities: string[];
+}
+
+export interface TripIncludedPayload {
+  hotelFacilities: string[];
+  transportFacilities: string[];
+  otherInclusions: string[];
+  exclusions: string[];
+}
+
+export interface TripParticipantPayload {
+  name: string;
+  address: string;
+  phone: string;
+  email: string;
+}
+
+export interface CreateTripApiPayload {
+  tripName: string;
+  tripCategory: "Solo Trip with guide" | "Family Trip with guide" | "Strangers Trip with guide" | "Private trip";
+  destinations: TripDestinationPayload[];
+  startDate: string;
+  endDate: string;
+  startLocation: string;
+  organizer: string;
+  price: number;
+  itinerary: {
+    days: TripItineraryDayPayload[];
+  };
+  included: TripIncludedPayload;
+  participants: TripParticipantPayload[];
+  photos: string[];
+  coverImage: string;
+  description: string;
+  maxParticipants: number;
+}

@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/feedback/toast-provider";
 import { authService } from "@/lib/services/authService";
+import { userService } from "@/lib/services/userService";
+import { userSessionService } from "@/lib/services/userSessionService";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -28,7 +30,10 @@ export default function LoginPage() {
 
     setLoading(true);
     try {
-      await authService.login(email, password);
+      const authResult = await authService.loginForUserModule(email, password);
+      const userResult = await userService.getUserProfileById(authResult.data.uid, authResult.data.token);
+      userSessionService.saveUserProfile(userResult.data);
+      userSessionService.saveToken(authResult.data.token);
       pushToast({ type: "success", title: "Welcome back", description: "You are now logged in." });
       router.push("/dashboard");
     } catch (err) {
@@ -42,7 +47,10 @@ export default function LoginPage() {
     setError("");
     setGoogleLoading(true);
     try {
-      await authService.loginWithGoogle();
+      const authResult = await authService.loginWithGoogleForUserModule();
+      const userResult = await userService.getUserProfileById(authResult.data.uid, authResult.data.token);
+      userSessionService.saveUserProfile(userResult.data);
+      userSessionService.saveToken(authResult.data.token);
       pushToast({ type: "success", title: "Google sign in successful", description: "Welcome to TripWaver." });
       router.push("/dashboard");
     } catch (err) {
