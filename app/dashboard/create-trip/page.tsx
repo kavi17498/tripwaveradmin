@@ -54,6 +54,15 @@ type MainDestination = {
   address: string;
 };
 
+type SelectedTravelDestination = {
+  location: string;
+  name: string;
+  lat: number;
+  lng: number;
+  imageUrl: string | null;
+  description: string;
+};
+
 const categories: TripCategory[] = ["Solo Trip with guide", "Family Trip with guide", "Strangers Trip with guide", "Private trip"];
 
 const emptyDestination = (): DestinationFormItem => ({
@@ -118,6 +127,7 @@ export default function CreateTripPage() {
   const [mainDestinations, setMainDestinations] = useState<MainDestination[]>([]);
   const [travelDestinationGroups, setTravelDestinationGroups] = useState<TripPlanLocationResult[]>([]);
   const [isLoadingTravelDestinations, setIsLoadingTravelDestinations] = useState(false);
+  const [selectedTravelDestinations, setSelectedTravelDestinations] = useState<SelectedTravelDestination[]>([]);
 
   const [destinations, setDestinations] = useState<DestinationFormItem[]>([emptyDestination()]);
   const [itinerary, setItinerary] = useState<ItineraryFormItem[]>([emptyItineraryDay()]);
@@ -252,16 +262,26 @@ export default function CreateTripPage() {
     }
   };
 
-  const removeTravelDestination = (locationIndex: number, destinationIndex: number) => {
-    setTravelDestinationGroups((prev) =>
-      prev.map((group, index) => {
-        if (index !== locationIndex) return group;
-        return {
-          ...group,
-          destinations: group.destinations.filter((_, itemIndex) => itemIndex !== destinationIndex),
-        };
-      }),
-    );
+  const addSelectedTravelDestination = (location: string, destination: TripPlanLocationResult["destinations"][number]) => {
+    setSelectedTravelDestinations((prev) => {
+      const exists = prev.some((item) => item.location === location && item.name === destination.name);
+      if (exists) return prev;
+      return [
+        ...prev,
+        {
+          location,
+          name: destination.name,
+          lat: destination.lat,
+          lng: destination.lng,
+          imageUrl: destination.imageUrl,
+          description: destination.description,
+        },
+      ];
+    });
+  };
+
+  const removeSelectedTravelDestination = (location: string, name: string) => {
+    setSelectedTravelDestinations((prev) => prev.filter((item) => !(item.location === location && item.name === name)));
   };
 
   const validate = () => {
@@ -537,33 +557,60 @@ export default function CreateTripPage() {
               {travelDestinationGroups.map((group, groupIndex) => (
                 <div key={`${group.location}-${groupIndex}`} className="space-y-3">
                   <h3 className="text-sm font-semibold">{group.location}</h3>
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-                    {group.destinations.map((destination, destinationIndex) => (
-                      <div key={`${destination.name}-${destinationIndex}`} className="relative overflow-hidden rounded border border-border bg-card">
+                  <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                    <div className="space-y-2">
+                      {group.destinations.map((destination, destinationIndex) => (
                         <button
+                          key={`${destination.name}-${destinationIndex}`}
                           type="button"
-                          onClick={() => removeTravelDestination(groupIndex, destinationIndex)}
-                          className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full border border-border bg-background text-xs"
-                          aria-label="Remove destination"
+                          onClick={() => addSelectedTravelDestination(group.location, destination)}
+                          className="flex w-full items-center gap-3 rounded border border-border bg-card p-2 text-left transition hover:bg-accent"
                         >
-                          x
-                        </button>
-                        {destination.imageUrl ? (
-                          <img src={destination.imageUrl} alt={destination.name} className="h-40 w-full object-cover" />
-                        ) : (
-                          <div className="flex h-40 w-full items-center justify-center bg-muted text-sm text-muted-foreground">
-                            No image
+                          {destination.imageUrl ? (
+                            <img src={destination.imageUrl} alt={destination.name} className="h-12 w-12 rounded object-cover" />
+                          ) : (
+                            <div className="flex h-12 w-12 items-center justify-center rounded bg-muted text-xs text-muted-foreground">
+                              No image
+                            </div>
+                          )}
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium">{destination.name}</p>
+                            <p className="truncate text-xs text-muted-foreground">{destination.description}</p>
                           </div>
-                        )}
-                        <div className="space-y-1 p-3">
-                          <p className="text-sm font-medium">{destination.name}</p>
-                          <p className="text-xs text-muted-foreground">{destination.description}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {destination.lat.toFixed(5)}, {destination.lng.toFixed(5)}
-                          </p>
+                        </button>
+                      ))}
+                    </div>
+                    <div className="space-y-2 rounded border border-dashed border-border p-3">
+                      <p className="text-xs font-semibold text-muted-foreground">Selected destinations</p>
+                      {selectedTravelDestinations.filter((item) => item.location === group.location).length === 0 ? (
+                        <p className="text-xs text-muted-foreground">Click a destination to add it here.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {selectedTravelDestinations
+                            .filter((item) => item.location === group.location)
+                            .map((item) => (
+                              <button
+                                key={`${item.location}-${item.name}`}
+                                type="button"
+                                onClick={() => removeSelectedTravelDestination(item.location, item.name)}
+                                className="flex w-full items-center gap-3 rounded border border-border bg-background p-2 text-left transition hover:bg-accent"
+                              >
+                                {item.imageUrl ? (
+                                  <img src={item.imageUrl} alt={item.name} className="h-10 w-10 rounded object-cover" />
+                                ) : (
+                                  <div className="flex h-10 w-10 items-center justify-center rounded bg-muted text-xs text-muted-foreground">
+                                    No image
+                                  </div>
+                                )}
+                                <div className="min-w-0">
+                                  <p className="truncate text-sm font-medium">{item.name}</p>
+                                  <p className="truncate text-xs text-muted-foreground">{item.description}</p>
+                                </div>
+                              </button>
+                            ))}
                         </div>
-                      </div>
-                    ))}
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}
@@ -571,7 +618,7 @@ export default function CreateTripPage() {
           )}
         </section>
 
-        <section className="space-y-4">
+        {/* <section className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold">Destinations</h2>
             <Button type="button" variant="outline" onClick={addDestination}>Add destination</Button>
@@ -645,7 +692,7 @@ export default function CreateTripPage() {
               loading="lazy"
             />
           </div>
-        </section>
+        </section> */}
 
         <section className="space-y-4">
           <div className="flex items-center justify-between">
