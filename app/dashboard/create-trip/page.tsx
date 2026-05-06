@@ -393,11 +393,6 @@ export default function CreateTripPage() {
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium">Start location</label>
-              <Input
-                value={startLocation}
-                onChange={(event) => setStartLocation(event.target.value)}
-                placeholder="Colombo International Airport"
-              />
               <LocationPicker
                 onChange={(location) => {
                   setStartLocation(location.address);

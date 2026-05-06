@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
+import { Input } from "@/components/ui/input";
 import {
   GoogleMap,
   Marker,
@@ -81,8 +82,10 @@ function LocationPicker({ value, onChange }: LocationPickerProps) {
     const results = await getGeocode({ location: { lat, lng } });
     const address = results[0]?.formatted_address || "";
 
+    setValue(address, false);
+    clearSuggestions();
     onChange({ lat, lng, address });
-  }, [onChange]);
+  }, [clearSuggestions, onChange, setValue]);
 
   // 📍 Handle marker drag
   const handleMarkerDragEnd = useCallback(async (e: google.maps.MapMouseEvent) => {
@@ -96,8 +99,10 @@ function LocationPicker({ value, onChange }: LocationPickerProps) {
     const results = await getGeocode({ location: { lat, lng } });
     const address = results[0]?.formatted_address || "";
 
+    setValue(address, false);
+    clearSuggestions();
     onChange({ lat, lng, address });
-  }, [onChange]);
+  }, [clearSuggestions, onChange, setValue]);
 
   // 🔍 Handle search select
   const handleSelect = async (description: string) => {
@@ -123,10 +128,15 @@ function LocationPicker({ value, onChange }: LocationPickerProps) {
       
       {/* 🔍 Search Box */}
       <div>
-        
+        <Input
+          value={search}
+          onChange={(event) => setValue(event.target.value)}
+          placeholder="Search for a location"
+          disabled={!ready}
+        />
 
         {/* Suggestions */}
-        {status === "OK" && (
+        {status === "OK" && search.trim().length > 0 && (
           <div className="border rounded bg-white shadow mt-1 max-h-40 overflow-y-auto">
             {data.map(({ place_id, description }) => (
               <div
