@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/common/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +14,7 @@ import {
 } from "@/lib/types";
 import { tripApiService } from "@/lib/services/tripApiService";
 import { userSessionService } from "@/lib/services/userSessionService";
+import { tripImageUploadService } from "@/lib/services/tripImageUploadService";
 import { tripPlanService, TripPlanLocationResult } from "@/lib/services/tripPlanService";
 import LocationPicker from "@/components/common/locationpicker";
 import TripwaverAIPopup from "@/components/common/tripwaver-ai-popup";
@@ -118,6 +119,7 @@ const toLines = (value: string) =>
     .map((line) => line.trim())
     .filter(Boolean);
 
+
 const to12Hour = (time24: string) => {
   const [hourString, minute] = time24.split(":");
   const hour = Number(hourString);
@@ -166,6 +168,34 @@ export default function CreateTripPage() {
   const [exclusionsEditor, setExclusionsEditor] = useState("");
 
   const [tripPhotosEditor, setTripPhotosEditor] = useState("");
+  const [tripPhotoFiles, setTripPhotoFiles] = useState<File[]>([]);
+  const [tripPhotoPreviews, setTripPhotoPreviews] = useState<string[]>([]);
+  const [tripUploadDraftId] = useState(() => crypto.randomUUID());
+
+  const handleTripPhotosChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files ? Array.from(event.target.files) : [];
+    if (files.length === 0) return;
+    setTripPhotoFiles((prev) => [...prev, ...files]);
+    event.target.value = "";
+  };
+
+  const removeTripPhotoFile = (index: number) => {
+    setTripPhotoFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  useEffect(() => {
+    if (tripPhotoFiles.length === 0) {
+      setTripPhotoPreviews([]);
+      return;
+    }
+
+    const previewUrls = tripPhotoFiles.map((file) => URL.createObjectURL(file));
+    setTripPhotoPreviews(previewUrls);
+
+    return () => {
+      previewUrls.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, [tripPhotoFiles]);
 
   const [price, setPrice] = useState("");
   const [maxParticipants, setMaxParticipants] = useState("");
@@ -527,8 +557,8 @@ export default function CreateTripPage() {
     }
 
     const tripPhotos = toLines(tripPhotosEditor);
-    if (tripPhotos.length === 0) {
-      issues.push("Add at least one trip photo URL.");
+    if (tripPhotos.length === 0 && tripPhotoFiles.length === 0) {
+      issues.push("Add at least one trip photo (upload or URL).");
     }
 
     setErrors(issues);
@@ -584,7 +614,21 @@ export default function CreateTripPage() {
       email: participant.email.trim(),
     }));
 
-    const tripPhotos = toLines(tripPhotosEditor);
+    let uploadedTripPhotos: string[] = [];
+    if (tripPhotoFiles.length > 0) {
+      try {
+        const result = await tripImageUploadService.uploadTripImages(tripPhotoFiles, tripUploadDraftId);
+        uploadedTripPhotos = result.downloadUrls;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Failed to upload trip photos.";
+        pushToast({ type: "error", title: "Photo upload failed", description: message });
+        setSaving(false);
+        return;
+      }
+    }
+
+    const manualTripPhotos = toLines(tripPhotosEditor);
+    const tripPhotos = [...uploadedTripPhotos, ...manualTripPhotos];
 
     const payload: CreateTripApiPayload = {
       tripName: tripName.trim(),
@@ -1038,7 +1082,34 @@ export default function CreateTripPage() {
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium">Trip photos (one URL per line)</label>
+            <label className="mb-1 block text-sm font-medium">Trip photos</label>
+            <div className="flex items-center gap-3">
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={handleTripPhotosChange}
+                className="text-sm"
+              />
+            </div>
+
+            {tripPhotoFiles.length > 0 ? (
+              <div className="mt-3 grid grid-cols-3 gap-2">
+                {tripPhotoFiles.map((file, idx) => (
+                  <div key={`${file.name}-${idx}`} className="flex flex-col items-center gap-1">
+                    <img src={tripPhotoPreviews[idx]} alt={file.name} className="h-20 w-28 rounded object-cover" />
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="truncate max-w-[120px]">{file.name}</span>
+                      <button type="button" className="text-primary text-xs" onClick={() => removeTripPhotoFile(idx)}>
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+
+            <p className="mt-3 mb-1 text-xs text-muted-foreground">Optional: paste image URLs if you already have hosted images</p>
             <textarea
               value={tripPhotosEditor}
               onChange={(event) => setTripPhotosEditor(event.target.value)}
