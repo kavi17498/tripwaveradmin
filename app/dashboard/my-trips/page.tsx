@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/common/page-header";
+import { SavingOverlay } from "@/components/common/saving-overlay";
 import { StatusBadge } from "@/components/common/status-badge";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/feedback/toast-provider";
@@ -82,10 +83,10 @@ export default function MyTripsPage() {
         ))}
       </div>
 
+      <SavingOverlay open={loading} title="Loading trips..." description="Fetching your trips." />
+
       <div className="overflow-x-auto border border-border">
-        {loading ? (
-          <div className="p-6 text-sm text-muted-foreground">Loading your trips...</div>
-        ) : error ? (
+        {loading ? null : error ? (
           <div className="p-6 text-sm text-destructive">{error}</div>
         ) : visibleTrips.length === 0 ? (
           <div className="p-6 text-sm text-muted-foreground">
