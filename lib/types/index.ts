@@ -178,9 +178,15 @@ export interface CreateTripApiPayload {
   tripName: string;
   tripCategory: "Solo Trip with guide" | "Family Trip with guide" | "Strangers Trip with guide" | "Private trip";
   destinations: TripDestinationPayload[];
+  mainDestinations?: Array<{
+    name: string;
+    lat: number;
+    lng: number;
+  }>;
   startDate: string;
   endDate: string;
   startTime?: string;
+  endTime?: string;
   startLocation: string;
   organizer: string;
   price: number;
