@@ -739,6 +739,11 @@ export default function CreateTripPage() {
     event.preventDefault();
     if (!validate()) return;
 
+    if (isEditMode && !editTripId) {
+      pushToast({ type: "error", title: "Missing trip id", description: "Cannot update trip without a trip id." });
+      return;
+    }
+
     const token = userSessionService.getToken();
     if (!token) {
       setErrors(["Missing auth token. Please login again."]);
@@ -853,8 +858,8 @@ export default function CreateTripPage() {
         maxParticipants: Number(maxParticipants),
       };
 
-      if (isEditMode && editTripId) {
-        await tripApiService.updateTrip(editTripId, payload, token);
+      if (isEditMode) {
+        await tripApiService.updateTrip(editTripId as string, payload, token);
         pushToast({ type: "success", title: "Trip updated", description: "Trip was updated successfully." });
       } else {
         await tripApiService.createTrip(payload, token);
