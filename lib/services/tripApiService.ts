@@ -80,4 +80,35 @@ export const tripApiService = {
       message: "Trips loaded successfully",
     };
   },
+
+  async getTripById(id: string, token: string): Promise<ServiceResponse<TripApiItem | null>> {
+    const response = await apiClient.authenticatedRequest<TripApiItem | ServiceResponse<TripApiItem | null>>(`/trips/${id}`, token, {
+      method: "GET",
+    });
+
+    if (response && typeof response === "object" && "data" in response) {
+      return response as ServiceResponse<TripApiItem | null>;
+    }
+
+    return {
+      data: response ?? null,
+      message: "Trip loaded successfully",
+    };
+  },
+
+  async updateTrip(id: string, payload: CreateTripApiPayload, token: string): Promise<ServiceResponse<unknown>> {
+    const response = await apiClient.authenticatedRequest<unknown | ServiceResponse<unknown>>(`/trips/${id}`, token, {
+      method: "PUT",
+      body: payload,
+    });
+
+    if (response && typeof response === "object" && "data" in response) {
+      return response as ServiceResponse<unknown>;
+    }
+
+    return {
+      data: response,
+      message: "Trip updated successfully",
+    };
+  },
 };

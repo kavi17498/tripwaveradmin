@@ -1,7 +1,7 @@
 "use client";
 
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/common/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -144,6 +144,10 @@ const getOrganizerName = (profile: StoredUserProfile | null) => {
 export default function CreateTripPage() {
   const { pushToast } = useToast();
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const isEditMode = searchParams?.get("mode") === "edit";
+  const editTripId = searchParams?.get("id") ?? null;
 
   const [tripName, setTripName] = useState("");
   const [tripCategory, setTripCategory] = useState<TripCategory>("Solo Trip with guide");
@@ -221,6 +225,94 @@ export default function CreateTripPage() {
 
     setOrganizerName(getOrganizerName(profile));
   }, []);
+
+  useEffect(() => {
+    if (!isEditMode || !editTripId) return;
+
+    const loadTrip = async () => {
+      const token = userSessionService.getToken();
+      if (!token) {
+        pushToast({ type: "error", title: "Missing auth", description: "Please login to edit trips." });
+        return;
+      }
+
+      try {
+        const result = await tripApiService.getTripById(editTripId, token);
+        const trip = result.data;
+        if (!trip) {
+          pushToast({ type: "error", title: "Not found", description: "Trip not found." });
+          return;
+        }
+
+        setTripName(trip.tripName ?? "");
+        setTripCategory((trip.tripCategory as any) ?? tripCategory);
+        setDescription(trip.description ?? "");
+        setStartDate(trip.startDate ?? "");
+        setEndDate(trip.endDate ?? "");
+        setStartTime(trip.startTime ?? "");
+        setStartLocation(trip.startLocation ?? "");
+        setPrice(String(trip.price ?? ""));
+        setMaxParticipants(String(trip.maxParticipants ?? ""));
+        if (trip.included) {
+          setHotelFacilitiesEditor((trip.included.hotelFacilities || []).join("\n"));
+          setOtherInclusionsEditor((trip.included.otherInclusions || []).join("\n"));
+          setExclusionsEditor((trip.included.exclusions || []).join("\n"));
+        }
+
+        // map destinations
+        if (trip.destinations && trip.destinations.length > 0) {
+          const mapped = trip.destinations.map((d) => ({
+            name: d.name ?? "",
+            description: d.description ?? "",
+            latitude: String(d.geoCode?.latitude ?? ""),
+            longitude: String(d.geoCode?.longitude ?? ""),
+            photosEditor: (d.photos || []).join("\n"),
+          }));
+          setDestinations(mapped.length ? mapped : [emptyDestination()]);
+        }
+
+        // itinerary => activitiesByDay
+        if (trip.itinerary?.days && trip.itinerary.days.length > 0) {
+          const activities = trip.itinerary.days.map((day) => {
+            const items: ActivityFormItem[] = (day.activities || []).map((act) => ({
+              title: act ?? "",
+              startTime: day.timeSlot?.startTime ? day.timeSlot.startTime : "08:00",
+              endTime: day.timeSlot?.endTime ? day.timeSlot.endTime : "10:00",
+              notesEditor: "",
+            }));
+            return items.length ? items : [emptyActivity()];
+          });
+          setActivitiesByDay(activities);
+        }
+
+        // participants
+        if (trip.participants && Array.isArray(trip.participants)) {
+          const ppl = trip.participants.map((p: any) => ({
+            name: p.name ?? "",
+            address: p.address ?? "",
+            phone: p.phone ?? "",
+            email: p.email ?? "",
+          }));
+          setParticipants(ppl.length ? ppl : [emptyParticipant()]);
+        }
+
+        // photos
+        if (trip.photos && trip.photos.length > 0) {
+          setTripPhotosEditor(trip.photos.join("\n"));
+          setTripPhotoPreviews(trip.photos);
+          setTripPhotoFiles([]);
+        }
+
+        setOrganizerId(trip.organizer ?? "");
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Failed to load trip.";
+        pushToast({ type: "error", title: "Load failed", description: message });
+      }
+    };
+
+    void loadTrip();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEditMode, editTripId]);
 
   useEffect(() => {
     const role = userSessionService.getRole();
@@ -727,13 +819,18 @@ export default function CreateTripPage() {
         maxParticipants: Number(maxParticipants),
       };
 
-      await tripApiService.createTrip(payload, token);
-      pushToast({ type: "success", title: "Trip created", description: "Trip was submitted to /trips endpoint." });
+      if (isEditMode && editTripId) {
+        await tripApiService.updateTrip(editTripId, payload, token);
+        pushToast({ type: "success", title: "Trip updated", description: "Trip was updated successfully." });
+      } else {
+        await tripApiService.createTrip(payload, token);
+        pushToast({ type: "success", title: "Trip created", description: "Trip was submitted to /trips endpoint." });
+      }
       setErrors([]);
       router.push("/dashboard");
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to create trip.";
-      pushToast({ type: "error", title: "Create trip failed", description: message });
+      const message = error instanceof Error ? error.message : isEditMode ? "Failed to update trip." : "Failed to create trip.";
+      pushToast({ type: "error", title: isEditMode ? "Update failed" : "Create trip failed", description: message });
     } finally {
       setSaving(false);
     }
@@ -756,8 +853,12 @@ export default function CreateTripPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Create Trip"
-        description="Create and submit a trip to API with destinations, itinerary, inclusions, participants, and photos."
+        title={isEditMode ? "Edit Trip" : "Create Trip"}
+        description={
+          isEditMode
+            ? "Edit and update trip details: schedule, itinerary, participants, and photos."
+            : "Create and submit a trip to API with destinations, itinerary, inclusions, participants, and photos."
+        }
       />
 
       <form onSubmit={submit} className="space-y-6 border border-border bg-card p-5">
@@ -1282,7 +1383,7 @@ export default function CreateTripPage() {
         ) : null}
 
         <div className="flex gap-2">
-          <Button type="submit" disabled={saving}>{saving ? "Saving..." : "Create Trip"}</Button>
+          <Button type="submit" disabled={saving}>{saving ? "Saving..." : isEditMode ? "Update Trip" : "Create Trip"}</Button>
           <Button type="button" variant="outline">Save as local draft</Button>
         </div>
       </form>
