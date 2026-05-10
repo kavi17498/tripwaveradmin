@@ -1,6 +1,7 @@
 "use client";
 
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/common/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +19,7 @@ import { tripImageUploadService } from "@/lib/services/tripImageUploadService";
 import { tripPlanService, TripPlanLocationResult } from "@/lib/services/tripPlanService";
 import LocationPicker from "@/components/common/locationpicker";
 import TripwaverAIPopup from "@/components/common/tripwaver-ai-popup";
+import { SavingOverlay } from "@/components/common/saving-overlay";
 
 type TripCategory = CreateTripApiPayload["tripCategory"];
 
@@ -141,6 +143,7 @@ const getOrganizerName = (profile: StoredUserProfile | null) => {
 
 export default function CreateTripPage() {
   const { pushToast } = useToast();
+  const router = useRouter();
 
   const [tripName, setTripName] = useState("");
   const [tripCategory, setTripCategory] = useState<TripCategory>("Solo Trip with guide");
@@ -616,124 +619,118 @@ export default function CreateTripPage() {
       return;
     }
 
-    const destinationsPayload: TripDestinationPayload[] = [
-      ...destinations
-        .filter((destination) => {
-          const hasAnyInput = [destination.name, destination.description, destination.latitude, destination.longitude, destination.photosEditor].some((value) =>
-            value.trim(),
-          );
-
-          if (!hasAnyInput) return false;
-
-          return (
-            destination.name.trim() &&
-            destination.description.trim() &&
-            destination.latitude.trim() &&
-            destination.longitude.trim() &&
-            !Number.isNaN(Number(destination.latitude)) &&
-            !Number.isNaN(Number(destination.longitude)) &&
-            toLines(destination.photosEditor).length > 0
-          );
-        })
-        .map((destination) => ({
-          name: destination.name.trim(),
-          description: destination.description.trim(),
-          geoCode: {
-            latitude: Number(destination.latitude),
-            longitude: Number(destination.longitude),
-          },
-          photos: toLines(destination.photosEditor),
-        })),
-      ...selectedTravelDestinations.map((destination) => ({
-        name: destination.name,
-        description: destination.description,
-        geoCode: {
-          latitude: destination.lat,
-          longitude: destination.lng,
-        },
-        photos: destination.imageUrl ? [destination.imageUrl] : [],
-      })),
-    ];
-
-    const itineraryDaysPayload: TripItineraryDayPayload[] = activitiesByDay.map((dayActivities, index) => {
-      const first = dayActivities[0];
-      const last = dayActivities[dayActivities.length - 1];
-      const activities = dayActivities.flatMap((activity) => {
-        const notes = toLines(activity.notesEditor);
-        if (notes.length === 0) {
-          return [`${activity.title.trim()} (${to12Hour(activity.startTime)} - ${to12Hour(activity.endTime)})`];
-        }
-        return notes.map((note) => `${activity.title.trim()} (${to12Hour(activity.startTime)} - ${to12Hour(activity.endTime)}): ${note}`);
-      });
-
-      return {
-        day: index + 1,
-        title: `Day ${index + 1}`,
-        timeSlot: {
-          startTime: to12Hour(first.startTime),
-          endTime: to12Hour(last.endTime),
-        },
-        activities,
-      };
-    });
-
-    const participantsPayload: TripParticipantPayload[] = participants
-      .filter((participant) => [participant.name, participant.address, participant.phone, participant.email].some((value) => value.trim()))
-      .map((participant) => ({
-        name: participant.name.trim(),
-        address: participant.address.trim(),
-        phone: participant.phone.trim(),
-        email: participant.email.trim(),
-      }));
-
-    let uploadedTripPhotos: string[] = [];
-    if (tripPhotoFiles.length > 0) {
-      try {
-        const result = await tripImageUploadService.uploadTripImages(tripPhotoFiles, tripUploadDraftId);
-        uploadedTripPhotos = result.downloadUrls;
-      } catch (error) {
-        const message = error instanceof Error ? error.message : "Failed to upload trip photos.";
-        pushToast({ type: "error", title: "Photo upload failed", description: message });
-        setSaving(false);
-        return;
-      }
-    }
-
-    const manualTripPhotos = toLines(tripPhotosEditor);
-    const tripPhotos = [...uploadedTripPhotos, ...manualTripPhotos];
-
-    const payload: CreateTripApiPayload = {
-      tripName: tripName.trim(),
-      tripCategory,
-      destinations: destinationsPayload,
-      startDate,
-      endDate,
-      startTime,
-      startLocation: startLocation.trim(),
-      organizer: organizerId.trim(),
-      price: Number(price),
-      itinerary: {
-        days: itineraryDaysPayload,
-      },
-      included: {
-        hotelFacilities: dayCount > 1 ? toLines(hotelFacilitiesEditor) : [],
-        transportFacilities: travelBy ? [travelBy] : [],
-        otherInclusions: toLines(otherInclusionsEditor),
-        exclusions: toLines(exclusionsEditor),
-      },
-      participants: participantsPayload,
-      photos: tripPhotos,
-      coverImage: tripPhotos[0],
-      description: description.trim(),
-      maxParticipants: Number(maxParticipants),
-    };
-
     setSaving(true);
 
     try {
+      const destinationsPayload: TripDestinationPayload[] = [
+        ...destinations
+          .filter((destination) => {
+            const hasAnyInput = [destination.name, destination.description, destination.latitude, destination.longitude, destination.photosEditor].some((value) =>
+              value.trim(),
+            );
+
+            if (!hasAnyInput) return false;
+
+            return (
+              destination.name.trim() &&
+              destination.description.trim() &&
+              destination.latitude.trim() &&
+              destination.longitude.trim() &&
+              !Number.isNaN(Number(destination.latitude)) &&
+              !Number.isNaN(Number(destination.longitude)) &&
+              toLines(destination.photosEditor).length > 0
+            );
+          })
+          .map((destination) => ({
+            name: destination.name.trim(),
+            description: destination.description.trim(),
+            geoCode: {
+              latitude: Number(destination.latitude),
+              longitude: Number(destination.longitude),
+            },
+            photos: toLines(destination.photosEditor),
+          })),
+        ...selectedTravelDestinations.map((destination) => ({
+          name: destination.name,
+          description: destination.description,
+          geoCode: {
+            latitude: destination.lat,
+            longitude: destination.lng,
+          },
+          photos: destination.imageUrl ? [destination.imageUrl] : [],
+        })),
+      ];
+
+      const itineraryDaysPayload: TripItineraryDayPayload[] = activitiesByDay.map((dayActivities, index) => {
+        const first = dayActivities[0];
+        const last = dayActivities[dayActivities.length - 1];
+        const activities = dayActivities.flatMap((activity) => {
+          const notes = toLines(activity.notesEditor);
+          if (notes.length === 0) {
+            return [`${activity.title.trim()} (${to12Hour(activity.startTime)} - ${to12Hour(activity.endTime)})`];
+          }
+          return notes.map((note) => `${activity.title.trim()} (${to12Hour(activity.startTime)} - ${to12Hour(activity.endTime)}): ${note}`);
+        });
+
+        return {
+          day: index + 1,
+          title: `Day ${index + 1}`,
+          timeSlot: {
+            startTime: to12Hour(first.startTime),
+            endTime: to12Hour(last.endTime),
+          },
+          activities,
+        };
+      });
+
+      const participantsPayload: TripParticipantPayload[] = participants
+        .filter((participant) => [participant.name, participant.address, participant.phone, participant.email].some((value) => value.trim()))
+        .map((participant) => ({
+          name: participant.name.trim(),
+          address: participant.address.trim(),
+          phone: participant.phone.trim(),
+          email: participant.email.trim(),
+        }));
+
+      let uploadedTripPhotos: string[] = [];
+      if (tripPhotoFiles.length > 0) {
+        const result = await tripImageUploadService.uploadTripImages(tripPhotoFiles, tripUploadDraftId);
+        uploadedTripPhotos = result.downloadUrls;
+      }
+
+      const manualTripPhotos = toLines(tripPhotosEditor);
+      const tripPhotos = [...uploadedTripPhotos, ...manualTripPhotos];
+
+      const payload: CreateTripApiPayload = {
+        tripName: tripName.trim(),
+        tripCategory,
+        destinations: destinationsPayload,
+        startDate,
+        endDate,
+        startTime,
+        startLocation: startLocation.trim(),
+        organizer: organizerId.trim(),
+        price: Number(price),
+        itinerary: {
+          days: itineraryDaysPayload,
+        },
+        included: {
+          hotelFacilities: dayCount > 1 ? toLines(hotelFacilitiesEditor) : [],
+          transportFacilities: travelBy ? [travelBy] : [],
+          otherInclusions: toLines(otherInclusionsEditor),
+          exclusions: toLines(exclusionsEditor),
+        },
+        participants: participantsPayload,
+        photos: tripPhotos,
+        coverImage: tripPhotos[0],
+        description: description.trim(),
+        maxParticipants: Number(maxParticipants),
+      };
+
       await tripApiService.createTrip(payload, token);
       pushToast({ type: "success", title: "Trip created", description: "Trip was submitted to /trips endpoint." });
       setErrors([]);
+      router.push("/dashboard");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to create trip.";
       pushToast({ type: "error", title: "Create trip failed", description: message });
@@ -1285,10 +1282,16 @@ export default function CreateTripPage() {
         ) : null}
 
         <div className="flex gap-2">
-          <Button type="submit" disabled={saving}>{saving ? "Submitting..." : "Create Trip"}</Button>
+          <Button type="submit" disabled={saving}>{saving ? "Saving..." : "Create Trip"}</Button>
           <Button type="button" variant="outline">Save as local draft</Button>
         </div>
       </form>
+
+      <SavingOverlay
+        open={saving}
+        title="Saving trip..."
+        description="Uploading photos, preparing trip data, and submitting everything now."
+      />
 
       <TripwaverAIPopup
         isOpen={isTripwaverAIOpen}
