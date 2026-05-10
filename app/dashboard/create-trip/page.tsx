@@ -532,14 +532,44 @@ export default function CreateTripPage() {
     if (Number(price) <= 0) issues.push("Price must be greater than 0.");
     if (Number(maxParticipants) <= 0) issues.push("Max participants must be greater than 0.");
 
-    const hasInvalidDestination = destinations.some((destination) => {
-      if (!destination.name.trim() || !destination.description.trim()) return true;
-      if (!destination.latitude.trim() || !destination.longitude.trim()) return true;
-      if (Number.isNaN(Number(destination.latitude)) || Number.isNaN(Number(destination.longitude))) return true;
-      return toLines(destination.photosEditor).length === 0;
-    });
-    if (hasInvalidDestination) {
-      issues.push("Each destination needs name, description, latitude, longitude, and at least one photo URL.");
+    const hasSelectedDestinations = selectedTravelDestinations.length > 0;
+    const hasManualDestinationInput = destinations.some((destination) =>
+      [destination.name, destination.description, destination.latitude, destination.longitude, destination.photosEditor].some((value) => value.trim()),
+    );
+
+    if (!hasSelectedDestinations) {
+      const hasValidManualDestination = destinations.some((destination) => {
+        if (!destination.name.trim() || !destination.description.trim()) return false;
+        if (!destination.latitude.trim() || !destination.longitude.trim()) return false;
+        if (Number.isNaN(Number(destination.latitude)) || Number.isNaN(Number(destination.longitude))) return false;
+        return toLines(destination.photosEditor).length > 0;
+      });
+
+      const hasInvalidManualDestination = hasManualDestinationInput && destinations.some((destination) => {
+        const isBlankRow =
+          !destination.name.trim() &&
+          !destination.description.trim() &&
+          !destination.latitude.trim() &&
+          !destination.longitude.trim() &&
+          !destination.photosEditor.trim();
+
+        if (isBlankRow) return false;
+
+        const hasAllFields =
+          destination.name.trim() &&
+          destination.description.trim() &&
+          destination.latitude.trim() &&
+          destination.longitude.trim() &&
+          !Number.isNaN(Number(destination.latitude)) &&
+          !Number.isNaN(Number(destination.longitude)) &&
+          toLines(destination.photosEditor).length > 0;
+
+        return !hasAllFields;
+      });
+
+      if (!hasValidManualDestination || hasInvalidManualDestination) {
+        issues.push("Each destination needs name, description, latitude, longitude, and at least one photo URL.");
+      }
     }
 
     const hasInvalidActivities = activitiesByDay.some((day) =>
@@ -549,10 +579,21 @@ export default function CreateTripPage() {
       issues.push("Each activity needs title, start/end time, and at least one note.");
     }
 
-    const hasInvalidParticipant = participants.some(
-      (participant) => !participant.name.trim() || !participant.address.trim() || !participant.phone.trim() || !participant.email.trim(),
+    const hasParticipantInput = participants.some((participant) =>
+      [participant.name, participant.address, participant.phone, participant.email].some((value) => value.trim()),
     );
-    if (hasInvalidParticipant) {
+    const hasInvalidParticipant = participants.some((participant) => {
+      const isBlankRow =
+        !participant.name.trim() &&
+        !participant.address.trim() &&
+        !participant.phone.trim() &&
+        !participant.email.trim();
+
+      if (isBlankRow) return false;
+
+      return !participant.name.trim() || !participant.address.trim() || !participant.phone.trim() || !participant.email.trim();
+    });
+    if (hasParticipantInput && hasInvalidParticipant) {
       issues.push("Each participant must include name, address, phone number, and email.");
     }
 
@@ -575,15 +616,44 @@ export default function CreateTripPage() {
       return;
     }
 
-    const destinationsPayload: TripDestinationPayload[] = destinations.map((destination) => ({
-      name: destination.name.trim(),
-      description: destination.description.trim(),
-      geoCode: {
-        latitude: Number(destination.latitude),
-        longitude: Number(destination.longitude),
-      },
-      photos: toLines(destination.photosEditor),
-    }));
+    const destinationsPayload: TripDestinationPayload[] = [
+      ...destinations
+        .filter((destination) => {
+          const hasAnyInput = [destination.name, destination.description, destination.latitude, destination.longitude, destination.photosEditor].some((value) =>
+            value.trim(),
+          );
+
+          if (!hasAnyInput) return false;
+
+          return (
+            destination.name.trim() &&
+            destination.description.trim() &&
+            destination.latitude.trim() &&
+            destination.longitude.trim() &&
+            !Number.isNaN(Number(destination.latitude)) &&
+            !Number.isNaN(Number(destination.longitude)) &&
+            toLines(destination.photosEditor).length > 0
+          );
+        })
+        .map((destination) => ({
+          name: destination.name.trim(),
+          description: destination.description.trim(),
+          geoCode: {
+            latitude: Number(destination.latitude),
+            longitude: Number(destination.longitude),
+          },
+          photos: toLines(destination.photosEditor),
+        })),
+      ...selectedTravelDestinations.map((destination) => ({
+        name: destination.name,
+        description: destination.description,
+        geoCode: {
+          latitude: destination.lat,
+          longitude: destination.lng,
+        },
+        photos: destination.imageUrl ? [destination.imageUrl] : [],
+      })),
+    ];
 
     const itineraryDaysPayload: TripItineraryDayPayload[] = activitiesByDay.map((dayActivities, index) => {
       const first = dayActivities[0];
@@ -607,12 +677,14 @@ export default function CreateTripPage() {
       };
     });
 
-    const participantsPayload: TripParticipantPayload[] = participants.map((participant) => ({
-      name: participant.name.trim(),
-      address: participant.address.trim(),
-      phone: participant.phone.trim(),
-      email: participant.email.trim(),
-    }));
+    const participantsPayload: TripParticipantPayload[] = participants
+      .filter((participant) => [participant.name, participant.address, participant.phone, participant.email].some((value) => value.trim()))
+      .map((participant) => ({
+        name: participant.name.trim(),
+        address: participant.address.trim(),
+        phone: participant.phone.trim(),
+        email: participant.email.trim(),
+      }));
 
     let uploadedTripPhotos: string[] = [];
     if (tripPhotoFiles.length > 0) {
@@ -644,7 +716,7 @@ export default function CreateTripPage() {
         days: itineraryDaysPayload,
       },
       included: {
-        hotelFacilities: toLines(hotelFacilitiesEditor),
+        hotelFacilities: dayCount > 1 ? toLines(hotelFacilitiesEditor) : [],
         transportFacilities: travelBy ? [travelBy] : [],
         otherInclusions: toLines(otherInclusionsEditor),
         exclusions: toLines(exclusionsEditor),
