@@ -141,6 +141,18 @@ const getOrganizerName = (profile: StoredUserProfile | null) => {
   return profile.name || "Organizer";
 };
 
+const toMainDestinationValue = (destination: { name?: string; lat?: number; lng?: number } | null) => {
+  if (!destination) return null;
+
+  const lat = destination.lat;
+  const lng = destination.lng;
+  const address = destination.name?.trim() || "";
+
+  if (typeof lat !== "number" || typeof lng !== "number" || !address) return null;
+
+  return { lat, lng, address };
+};
+
 export default function CreateTripPage() {
   const { pushToast } = useToast();
   const router = useRouter();
@@ -250,6 +262,7 @@ export default function CreateTripPage() {
         setStartDate(trip.startDate ?? "");
         setEndDate(trip.endDate ?? "");
         setStartTime(trip.startTime ?? "");
+        setEndTime(trip.endTime ?? "");
         setStartLocation(trip.startLocation ?? "");
         setPrice(String(trip.price ?? ""));
         setMaxParticipants(String(trip.maxParticipants ?? ""));
@@ -257,6 +270,20 @@ export default function CreateTripPage() {
           setHotelFacilitiesEditor((trip.included.hotelFacilities || []).join("\n"));
           setOtherInclusionsEditor((trip.included.otherInclusions || []).join("\n"));
           setExclusionsEditor((trip.included.exclusions || []).join("\n"));
+          setTravelBy(trip.included.transportFacilities?.[0] ?? "");
+        }
+
+        if (trip.mainDestinations && trip.mainDestinations.length > 0) {
+          const mappedMainDestinations = trip.mainDestinations
+            .map((destination) => toMainDestinationValue({
+              name: destination.name,
+              lat: destination.lat,
+              lng: destination.lng,
+            }))
+            .filter((destination): destination is MainDestination => destination !== null);
+
+          setMainDestinations(mappedMainDestinations);
+          setMainDestination(mappedMainDestinations[0] ?? null);
         }
 
         // map destinations
@@ -274,12 +301,15 @@ export default function CreateTripPage() {
         // itinerary => activitiesByDay
         if (trip.itinerary?.days && trip.itinerary.days.length > 0) {
           const activities = trip.itinerary.days.map((day) => {
-            const items: ActivityFormItem[] = (day.activities || []).map((act) => ({
-              title: act ?? "",
-              startTime: day.timeSlot?.startTime ? day.timeSlot.startTime : "08:00",
-              endTime: day.timeSlot?.endTime ? day.timeSlot.endTime : "10:00",
-              notesEditor: "",
-            }));
+            const items: ActivityFormItem[] = (day.activities || []).map((act) => {
+              return {
+                title: act.title ?? "",
+                startTime: parse12HourTo24(act.timeSlot?.startTime ?? "08:00"),
+                endTime: parse12HourTo24(act.timeSlot?.endTime ?? "10:00"),
+                notesEditor: (act.notes || []).join("\n"),
+                isAIGenerated: act.isAIGenerated,
+              };
+            });
             return items.length ? items : [emptyActivity()];
           });
           setActivitiesByDay(activities);
@@ -359,6 +389,10 @@ export default function CreateTripPage() {
 
   const removeDestination = (index: number) => {
     if (destinations.length === 1) return;
+    setDestinations((prev) => prev.filter((_, currentIndex) => currentIndex !== index));
+  };
+
+  const removeDestinationInEdit = (index: number) => {
     setDestinations((prev) => prev.filter((_, currentIndex) => currentIndex !== index));
   };
 
@@ -754,24 +788,18 @@ export default function CreateTripPage() {
       ];
 
       const itineraryDaysPayload: TripItineraryDayPayload[] = activitiesByDay.map((dayActivities, index) => {
-        const first = dayActivities[0];
-        const last = dayActivities[dayActivities.length - 1];
-        const activities = dayActivities.flatMap((activity) => {
-          const notes = toLines(activity.notesEditor);
-          if (notes.length === 0) {
-            return [`${activity.title.trim()} (${to12Hour(activity.startTime)} - ${to12Hour(activity.endTime)})`];
-          }
-          return notes.map((note) => `${activity.title.trim()} (${to12Hour(activity.startTime)} - ${to12Hour(activity.endTime)}): ${note}`);
-        });
-
         return {
           day: index + 1,
           title: `Day ${index + 1}`,
-          timeSlot: {
-            startTime: to12Hour(first.startTime),
-            endTime: to12Hour(last.endTime),
-          },
-          activities,
+          activities: dayActivities.map((activity) => ({
+            title: activity.title.trim(),
+            timeSlot: {
+              startTime: to12Hour(activity.startTime),
+              endTime: to12Hour(activity.endTime),
+            },
+            notes: toLines(activity.notesEditor),
+            isAIGenerated: activity.isAIGenerated ?? false,
+          })),
         };
       });
 
@@ -856,6 +884,13 @@ export default function CreateTripPage() {
     setIsTripwaverAIOpen(false);
   };
 
+  const editModePhotoUrls = useMemo(() => toLines(tripPhotosEditor), [tripPhotosEditor]);
+
+  const removeEditModePhotoUrl = (index: number) => {
+    const nextUrls = editModePhotoUrls.filter((_, currentIndex) => currentIndex !== index);
+    setTripPhotosEditor(nextUrls.join("\n"));
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -932,6 +967,7 @@ export default function CreateTripPage() {
             <div>
               <label className="mb-1 block text-sm font-medium">Start location</label>
               <LocationPicker
+                value={startLocation ? { address: startLocation, lat: mainDestination?.lat ?? 0, lng: mainDestination?.lng ?? 0 } : undefined}
                 onChange={(location) => {
                   setStartLocation(location.address);
                 }}
@@ -1067,81 +1103,43 @@ export default function CreateTripPage() {
           )}
         </section>
 
-        {/* <section className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold">Destinations</h2>
-            <Button type="button" variant="outline" onClick={addDestination}>Add destination</Button>
-             <Button type="button" variant="outline" onClick={openTripwaverAIpopup}>Use TripWaver AI to List Destinations</Button>
-          </div>
-          {tripwaverAIError ? (
-            <div className="rounded border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
-              {tripwaverAIError}
+        {isEditMode ? (
+          <section className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold">Selected Destinations</h2>
+              <span className="text-xs text-muted-foreground">{destinations.length} selected</span>
             </div>
-          ) : null}
 
-          <div className="space-y-3">
-            {destinations.map((destination, index) => (
-              <div key={index} className="space-y-3 border border-border p-3">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium">Destination {index + 1}</p>
-                  <Button type="button" variant="ghost" onClick={() => removeDestination(index)} disabled={destinations.length === 1}>
-                    Remove
-                  </Button>
-                </div>
-
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                  <Input
-                    value={destination.name}
-                    onChange={(event) => updateDestination(index, "name", event.target.value)}
-                    placeholder="Galle Fort"
-                  />
-                  <Input
-                    value={destination.description}
-                    onChange={(event) => updateDestination(index, "description", event.target.value)}
-                    placeholder="Historic colonial fort and museum walk"
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                  <Input
-                    type="number"
-                    step="any"
-                    value={destination.latitude}
-                    onChange={(event) => updateDestination(index, "latitude", event.target.value)}
-                    placeholder="Latitude (e.g. 6.0261)"
-                  />
-                  <Input
-                    type="number"
-                    step="any"
-                    value={destination.longitude}
-                    onChange={(event) => updateDestination(index, "longitude", event.target.value)}
-                    placeholder="Longitude (e.g. 80.2168)"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-xs font-medium">Destination photos (one URL per line)</label>
-                  <textarea
-                    value={destination.photosEditor}
-                    onChange={(event) => updateDestination(index, "photosEditor", event.target.value)}
-                    className="min-h-20 w-full border border-input bg-background px-3 py-2 text-sm"
-                    placeholder={"https://example.com/destinations/galle-1.jpg\nhttps://example.com/destinations/galle-2.jpg"}
-                  />
-                </div>
+            {destinations.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No selected destinations available.</p>
+            ) : (
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {destinations.map((destination, index) => {
+                  const firstPhoto = toLines(destination.photosEditor)[0];
+                  return (
+                    <div key={`${destination.name}-${index}`} className="relative rounded border border-border bg-card p-3">
+                      <button
+                        type="button"
+                        onClick={() => removeDestinationInEdit(index)}
+                        className="absolute right-2 top-2 rounded border border-border bg-background px-2 py-0.5 text-xs"
+                        aria-label={`Remove destination ${destination.name || index + 1}`}
+                      >
+                        x
+                      </button>
+                      {firstPhoto ? (
+                        <img src={firstPhoto} alt={destination.name || "Destination"} className="mb-2 h-24 w-full rounded object-cover" />
+                      ) : null}
+                      <p className="pr-8 text-sm font-medium">{destination.name || "Unnamed destination"}</p>
+                      <p className="text-xs text-muted-foreground">{destination.description || "No description"}</p>
+                    </div>
+                  );
+                })}
               </div>
-            ))}
-          </div>
+            )}
+          </section>
+        ) : null}
 
-          <div className="border border-border p-3">
-            <h3 className="mb-2 text-sm font-medium">Map preview</h3>
-            <iframe
-              title="Destinations map"
-              className="h-64 w-full border border-border"
-              src={`https://maps.google.com/maps?q=${encodeURIComponent(mapQuery)}&z=6&output=embed`}
-              loading="lazy"
-            />
-          </div>
-        </section> */}
+  
 
         <section className="space-y-4">
           <div className="flex items-center justify-between">
@@ -1285,13 +1283,35 @@ export default function CreateTripPage() {
               </div>
             ) : null}
 
-            <p className="mt-3 mb-1 text-xs text-muted-foreground">Optional: paste image URLs if you already have hosted images</p>
-            <textarea
-              value={tripPhotosEditor}
-              onChange={(event) => setTripPhotosEditor(event.target.value)}
-              className="min-h-24 w-full border border-input bg-background px-3 py-2 text-sm"
-              placeholder={"https://example.com/trips/sri-lanka-1.jpg\nhttps://example.com/trips/sri-lanka-2.jpg"}
-            />
+            {isEditMode && editModePhotoUrls.length > 0 ? (
+              <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-3">
+                {editModePhotoUrls.map((photoUrl, index) => (
+                  <div key={`${photoUrl}-${index}`} className="relative rounded border border-border p-2">
+                    <button
+                      type="button"
+                      onClick={() => removeEditModePhotoUrl(index)}
+                      className="absolute right-2 top-2 rounded border border-border bg-background px-2 py-0.5 text-xs"
+                      aria-label={`Remove photo ${index + 1}`}
+                    >
+                      x
+                    </button>
+                    <img src={photoUrl} alt={`Trip photo ${index + 1}`} className="h-28 w-full rounded object-cover" />
+                  </div>
+                ))}
+              </div>
+            ) : null}
+
+            {!isEditMode ? (
+              <>
+                <p className="mt-3 mb-1 text-xs text-muted-foreground">Optional: paste image URLs if you already have hosted images</p>
+                <textarea
+                  value={tripPhotosEditor}
+                  onChange={(event) => setTripPhotosEditor(event.target.value)}
+                  className="min-h-24 w-full border border-input bg-background px-3 py-2 text-sm"
+                  placeholder={"https://example.com/trips/sri-lanka-1.jpg\nhttps://example.com/trips/sri-lanka-2.jpg"}
+                />
+              </>
+            ) : null}
           </div>
         </section>
 

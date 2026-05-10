@@ -153,11 +153,15 @@ export interface TripDestinationPayload {
 export interface TripItineraryDayPayload {
   day: number;
   title: string;
-  timeSlot: {
-    startTime: string;
-    endTime: string;
-  };
-  activities: string[];
+  activities: Array<{
+    title: string;
+    timeSlot: {
+      startTime: string;
+      endTime: string;
+    };
+    notes?: string[];
+    isAIGenerated?: boolean;
+  }>;
 }
 
 export interface TripIncludedPayload {

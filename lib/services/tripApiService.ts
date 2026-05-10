@@ -16,9 +16,15 @@ export type TripApiItem = {
   tripName: string;
   tripCategory: CreateTripApiPayload["tripCategory"] | string;
   destinations: TripApiDestination[];
+  mainDestinations?: Array<{
+    name: string;
+    lat: number;
+    lng: number;
+  }>;
   startDate: string;
   endDate: string;
   startTime?: string;
+  endTime?: string;
   startLocation: string;
   organizer: string;
   price: number;
@@ -26,11 +32,15 @@ export type TripApiItem = {
     days?: Array<{
       day: number;
       title: string;
-      timeSlot?: {
-        startTime?: string;
-        endTime?: string;
-      };
-      activities?: string[];
+      activities?: Array<{
+        title: string;
+        timeSlot: {
+          startTime: string;
+          endTime: string;
+        };
+        notes?: string[];
+        isAIGenerated?: boolean;
+      }>;
     }>;
   };
   included?: {
