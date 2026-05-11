@@ -19,13 +19,25 @@ const roleByEmail = mockUsers.reduce<Record<string, UserRole>>((acc, user) => {
   return acc;
 }, {});
 
+const resolveUserRole = (value: unknown): UserRole | null => {
+  if (value === "traveler" || value === "organizer" || value === "admin" || value === "superadmin") {
+    return value;
+  }
+
+  return null;
+};
+
 const toAppUser = (firebaseUser: { uid: string; displayName: string | null; email: string | null }): User => {
   const email = firebaseUser.email ?? "";
+  const savedProfile = userSessionService.getUserProfile<{ role?: string }>();
+  const savedRole = savedProfile?.role?.toLowerCase();
+  const sessionRole = userSessionService.getRole();
+
   return {
     id: firebaseUser.uid,
     name: firebaseUser.displayName || email.split("@")[0] || "TripWaver User",
     email,
-    role: roleByEmail[email.toLowerCase()] ?? "traveler",
+    role: resolveUserRole(savedRole) ?? resolveUserRole(sessionRole) ?? roleByEmail[email.toLowerCase()] ?? "traveler",
     verifiedOrganizer: false,
     status: "active",
     joinedAt: new Date().toISOString(),

@@ -21,6 +21,8 @@ export default function LoginPage() {
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState("");
 
+  const resolvePostLoginPath = (role?: string) => (role === "admin" || role === "superadmin" ? "/admin" : "/dashboard");
+
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
     setError("");
@@ -35,7 +37,7 @@ export default function LoginPage() {
       userSessionService.saveUserProfile(userResult.data);
       userSessionService.saveToken(authResult.data.token);
       pushToast({ type: "success", title: "Welcome back", description: "You are now logged in." });
-      router.push("/dashboard");
+      router.push(resolvePostLoginPath((userResult.data as { role?: string }).role));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to login.");
     } finally {
@@ -52,7 +54,7 @@ export default function LoginPage() {
       userSessionService.saveUserProfile(userResult.data);
       userSessionService.saveToken(authResult.data.token);
       pushToast({ type: "success", title: "Google sign in successful", description: "Welcome to TripWaver." });
-      router.push("/dashboard");
+      router.push(resolvePostLoginPath((userResult.data as { role?: string }).role));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Google sign in failed.");
     } finally {

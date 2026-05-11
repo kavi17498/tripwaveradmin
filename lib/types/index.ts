@@ -1,4 +1,4 @@
-export type UserRole = "traveler" | "organizer" | "admin";
+export type UserRole = "traveler" | "organizer" | "admin" | "superadmin";
 
 export type EntityStatus = "active" | "inactive" | "pending" | "approved" | "rejected";
 
