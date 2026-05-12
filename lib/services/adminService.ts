@@ -71,14 +71,18 @@ export const adminService = {
     return unwrapListResponse(response);
   },
 
-  async updateTripStatus(tripId: string, status: Exclude<AdminTripStatus, "draft">): Promise<ServiceResponse<AdminTripRecord>> {
+  async updateTripStatus(
+    tripId: string,
+    status: Exclude<AdminTripStatus, "draft">,
+    reason?: string,
+  ): Promise<ServiceResponse<AdminTripRecord>> {
     const token = await waitForAuthToken();
     const response = await apiClient.authenticatedRequest<AdminTripRecord | ServiceResponse<AdminTripRecord>>(
       `/admin/trips/${tripId}`,
       token,
       {
         method: "PATCH",
-        body: { status },
+        body: { status, ...(reason ? { reason } : {}) },
       },
     );
 
