@@ -1,40 +1,41 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { SearchInput } from "@/components/common/search-input";
 import { StatusBadge } from "@/components/common/status-badge";
-import { Button } from "@/components/ui/button";
-import { mockUsers } from "@/lib/data/users";
+import { useAdminDataStore } from "@/lib/stores/useAdminDataStore";
+import { formatFirestoreTimestamp } from "@/lib/utils";
 
 export default function AdminUsersPage() {
+  const { users: adminUsers, fetchUsers, loadingUsers } = useAdminDataStore();
   const [query, setQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
 
-  const users = useMemo(
+  useEffect(() => {
+    void fetchUsers();
+  }, [fetchUsers]);
+
+  const filteredUsers = useMemo(
     () =>
-      mockUsers.filter((user) => {
-        const matchQuery = user.name.toLowerCase().includes(query.toLowerCase()) || user.email.toLowerCase().includes(query.toLowerCase());
-        const matchStatus = statusFilter === "all" ? true : user.status === statusFilter;
-        return matchQuery && matchStatus;
+      adminUsers.filter((user) => {
+        const fullName = `${user.firstName} ${user.lastName}`.toLowerCase();
+        const matchQuery = fullName.includes(query.toLowerCase()) || user.email.toLowerCase().includes(query.toLowerCase()) || user.phone.includes(query);
+        return matchQuery;
       }),
-    [query, statusFilter],
+    [adminUsers, query],
   );
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold">Users Management</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Search, filter, and moderate platform users.</p>
+        <p className="mt-1 text-sm text-muted-foreground">Search and review platform users loaded from the API.</p>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         <SearchInput value={query} onChange={setQuery} placeholder="Search users" />
-        <select className="h-9 border border-input bg-background px-3 text-sm" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
-          <option value="all">All statuses</option>
-          <option value="active">Active</option>
-          <option value="pending">Pending</option>
-          <option value="inactive">Inactive</option>
-        </select>
+        <div className="flex items-center rounded-md border border-border bg-muted/20 px-3 text-sm text-muted-foreground">
+          {loadingUsers ? "Loading users..." : `${filteredUsers.length} users loaded`}
+        </div>
       </div>
 
       <div className="overflow-x-auto border border-border">
@@ -43,26 +44,34 @@ export default function AdminUsersPage() {
             <tr>
               <th className="p-3 text-left font-medium">Name</th>
               <th className="p-3 text-left font-medium">Email</th>
-              <th className="p-3 text-left font-medium">Role</th>
+              <th className="p-3 text-left font-medium">Phone</th>
+              <th className="p-3 text-left font-medium">Location</th>
               <th className="p-3 text-left font-medium">Status</th>
+              <th className="p-3 text-left font-medium">Created</th>
               <th className="p-3 text-right font-medium">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {users.map((user) => (
+            {filteredUsers.map((user) => (
               <tr key={user.id} className="border-t border-border">
-                <td className="p-3">{user.name}</td>
+                <td className="p-3">{user.firstName} {user.lastName}</td>
                 <td className="p-3">{user.email}</td>
-                <td className="p-3"><StatusBadge status={user.role} /></td>
-                <td className="p-3"><StatusBadge status={user.status} /></td>
-                <td className="p-3 text-right">
-                  <div className="flex justify-end gap-2">
-                    <Button size="sm" variant="outline">Suspend</Button>
-                    <Button size="sm" variant="destructive">Deactivate</Button>
-                  </div>
+                <td className="p-3">{user.phone}</td>
+                <td className="p-3">{user.city}, {user.country}</td>
+                <td className="p-3"><StatusBadge status={user.isVerified ? "active" : "pending"} /></td>
+                <td className="p-3">{formatFirestoreTimestamp(user.createdAt)}</td>
+                <td className="p-3 text-right text-xs text-muted-foreground">
+                  Review only
                 </td>
               </tr>
             ))}
+            {!filteredUsers.length ? (
+              <tr>
+                <td className="p-4 text-center text-muted-foreground" colSpan={7}>
+                  No users found.
+                </td>
+              </tr>
+            ) : null}
           </tbody>
         </table>
       </div>

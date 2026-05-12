@@ -1,14 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import {
   CheckCircle2,
   ChevronDown,
   CreditCard,
+  FileText,
   LogOut,
-  PanelLeft,
   Route,
   ShieldCheck,
   UserCircle2,
@@ -16,6 +16,7 @@ import {
   Users,
   XCircle,
   Clock3,
+  type LucideIcon,
 } from "lucide-react";
 
 import { authService } from "@/lib/services/authService";
@@ -49,17 +50,18 @@ type AdminSidebarItem =
       label: string;
       href: string;
       activePath: string;
-      icon: typeof Users;
+      status?: "pending" | "approved" | "rejected" | "draft";
+      icon: LucideIcon;
     }
   | {
       kind: "placeholder";
       label: string;
-      icon: typeof CreditCard;
+      icon: LucideIcon;
     };
 
 type AdminSidebarSection = {
   title: string;
-  icon: typeof UserCog;
+  icon: LucideIcon;
   defaultOpen: boolean;
   items: AdminSidebarItem[];
 };
@@ -89,6 +91,7 @@ const adminSections: AdminSidebarSection[] = [
         label: "Pending Trips",
         href: "/admin/trips?status=pending",
         activePath: "/admin/trips",
+        status: "pending",
         icon: Clock3,
       },
       {
@@ -96,6 +99,7 @@ const adminSections: AdminSidebarSection[] = [
         label: "Approved trips",
         href: "/admin/trips?status=approved",
         activePath: "/admin/trips",
+        status: "approved",
         icon: CheckCircle2,
       },
       {
@@ -103,7 +107,16 @@ const adminSections: AdminSidebarSection[] = [
         label: "Rejected Trips",
         href: "/admin/trips?status=rejected",
         activePath: "/admin/trips",
+        status: "rejected",
         icon: XCircle,
+      },
+      {
+        kind: "link",
+        label: "Draft Trips",
+        href: "/admin/trips?status=draft",
+        activePath: "/admin/trips",
+        status: "draft",
+        icon: FileText,
       },
     ],
   },
@@ -138,6 +151,7 @@ export function AdminSidebarShell({ children }: { children: React.ReactNode }) {
 
 function AdminSidebar() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const router = useRouter();
   const { state } = useSidebar();
   const isCollapsed = state === "collapsed";
@@ -177,7 +191,7 @@ function AdminSidebar() {
 
       <SidebarContent className="gap-1 px-2 py-2">
         {adminSections.map((section) => (
-          <AdminSection key={section.title} pathname={pathname} section={section} collapsed={isCollapsed} />
+          <AdminSection key={section.title} pathname={pathname} searchParams={searchParams} section={section} collapsed={isCollapsed} />
         ))}
         <p className="px-4 pt-2 text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">
           {sectionCount} sections
@@ -223,10 +237,12 @@ function AdminSidebar() {
 function AdminSection({
   section,
   pathname,
+  searchParams,
   collapsed,
 }: {
   section: AdminSidebarSection;
   pathname: string;
+  searchParams: ReturnType<typeof useSearchParams>;
   collapsed: boolean;
 }) {
   const [open, setOpen] = useState(section.defaultOpen);
@@ -255,7 +271,10 @@ function AdminSection({
                 {section.items.map((item) => (
                   <SidebarMenuSubItem key={item.label}>
                     {item.kind === "link" ? (
-                      <SidebarMenuSubButton asChild isActive={pathname.startsWith(item.activePath)}>
+                      <SidebarMenuSubButton
+                        asChild
+                        isActive={pathname.startsWith(item.activePath) && (item.status ? searchParams.get("status") === item.status : true)}
+                      >
                         <Link href={item.href}>
                           <item.icon />
                           <span>{item.label}</span>

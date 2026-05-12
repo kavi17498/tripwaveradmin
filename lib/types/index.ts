@@ -204,3 +204,85 @@ export interface CreateTripApiPayload {
   description: string;
   maxParticipants: number;
 }
+
+export interface FirestoreTimestamp {
+  _seconds: number;
+  _nanoseconds: number;
+}
+
+export interface AdminUserRecord {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  bio: string;
+  street: string;
+  city: string;
+  state: string;
+  postalCode: string;
+  country: string;
+  isVerified: boolean;
+  createdAt: FirestoreTimestamp;
+  updatedAt: FirestoreTimestamp;
+}
+
+export type AdminTripStatus = "pending" | "approved" | "rejected" | "draft";
+
+export interface AdminTripDestination {
+  name: string;
+  description: string;
+  geoCode?: {
+    latitude: number;
+    longitude: number;
+  };
+  photos?: string[];
+}
+
+export interface AdminTripRecord {
+  id: string;
+  tripName: string;
+  tripCategory: string;
+  destinations: AdminTripDestination[];
+  mainDestinations?: Array<{
+    name: string;
+    lat: number;
+    lng: number;
+  }>;
+  startDate: string;
+  endDate: string;
+  startTime?: string;
+  endTime?: string;
+  startLocation: string;
+  organizer: string;
+  price: number;
+  itinerary?: {
+    days: Array<{
+      day: number;
+      title: string;
+      activities: Array<{
+        title: string;
+        timeSlot: {
+          startTime: string;
+          endTime: string;
+        };
+        notes?: string[];
+        isAIGenerated?: boolean;
+      }>;
+    }>;
+  };
+  included?: {
+    hotelFacilities: string[];
+    transportFacilities: string[];
+    otherInclusions: string[];
+    exclusions: string[];
+  };
+  participants?: TripParticipantPayload[];
+  photos: string[];
+  coverImage: string;
+  description: string;
+  maxParticipants: number;
+  status: AdminTripStatus;
+  createdAt: FirestoreTimestamp;
+  updatedAt: FirestoreTimestamp;
+}
