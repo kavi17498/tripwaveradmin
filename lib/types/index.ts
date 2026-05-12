@@ -77,6 +77,18 @@ export interface ChatMessage {
   createdAt: string;
 }
 
+export interface ChatGroup {
+  id: string;
+  name: string;
+  tripId?: string;
+  adminId?: string;
+  adminName?: string;
+  description?: string;
+  members?: string[];
+  createdAt?: FirestoreTimestamp | string;
+  updatedAt?: FirestoreTimestamp | string;
+}
+
 export interface Booking {
   id: string;
   tripId: string;
