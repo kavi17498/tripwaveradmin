@@ -181,6 +181,7 @@ export interface TripParticipantPayload {
 export interface CreateTripApiPayload {
   tripName: string;
   tripCategory: "Solo Trip with guide" | "Family Trip with guide" | "Strangers Trip with guide" | "Private trip";
+  status?: "pending" | "draft";
   destinations: TripDestinationPayload[];
   mainDestinations?: Array<{
     name: string;

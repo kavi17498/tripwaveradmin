@@ -735,9 +735,112 @@ export default function CreateTripPage() {
     return issues.length === 0;
   };
 
-  const submit = async (event: FormEvent) => {
-    event.preventDefault();
-    if (!validate()) return;
+  const buildTripPayload = (status: "pending" | "draft"): CreateTripApiPayload => {
+    const destinationsPayload: TripDestinationPayload[] = [
+      ...destinations
+        .filter((destination) => {
+          const hasAnyInput = [destination.name, destination.description, destination.latitude, destination.longitude, destination.photosEditor].some((value) =>
+            value.trim(),
+          );
+
+          if (!hasAnyInput) return false;
+
+          return (
+            destination.name.trim() &&
+            destination.description.trim() &&
+            destination.latitude.trim() &&
+            destination.longitude.trim() &&
+            !Number.isNaN(Number(destination.latitude)) &&
+            !Number.isNaN(Number(destination.longitude)) &&
+            toLines(destination.photosEditor).length > 0
+          );
+        })
+        .map((destination) => ({
+          name: destination.name.trim(),
+          description: destination.description.trim(),
+          geoCode: {
+            latitude: Number(destination.latitude),
+            longitude: Number(destination.longitude),
+          },
+          photos: toLines(destination.photosEditor),
+        })),
+      ...selectedTravelDestinations.map((destination) => ({
+        name: destination.name,
+        description: destination.description,
+        geoCode: {
+          latitude: destination.lat,
+          longitude: destination.lng,
+        },
+        photos: destination.imageUrl ? [destination.imageUrl] : [],
+      })),
+    ];
+
+    const itineraryDaysPayload: TripItineraryDayPayload[] = activitiesByDay.map((dayActivities, index) => {
+      return {
+        day: index + 1,
+        title: `Day ${index + 1}`,
+        activities: dayActivities.map((activity) => ({
+          title: activity.title.trim(),
+          timeSlot: {
+            startTime: to12Hour(activity.startTime),
+            endTime: to12Hour(activity.endTime),
+          },
+          notes: toLines(activity.notesEditor),
+          isAIGenerated: activity.isAIGenerated ?? false,
+        })),
+      };
+    });
+
+    const participantsPayload: TripParticipantPayload[] = participants
+      .filter((participant) => [participant.name, participant.address, participant.phone, participant.email].some((value) => value.trim()))
+      .map((participant) => ({
+        name: participant.name.trim(),
+        address: participant.address.trim(),
+        phone: participant.phone.trim(),
+        email: participant.email.trim(),
+      }));
+
+    const manualTripPhotos = toLines(tripPhotosEditor);
+    const tripPhotos = [...manualTripPhotos];
+
+    return {
+      status,
+      tripName: tripName.trim(),
+      tripCategory,
+      destinations: destinationsPayload,
+      mainDestinations: mainDestinations.map((destination) => ({
+        name: destination.address.trim(),
+        lat: destination.lat,
+        lng: destination.lng,
+      })),
+      startDate,
+      endDate,
+      startTime,
+      endTime,
+      startLocation: startLocation.trim(),
+      organizer: organizerId.trim(),
+      price: Number(price),
+      itinerary: {
+        days: itineraryDaysPayload,
+      },
+      included: {
+        hotelFacilities: dayCount > 1 ? toLines(hotelFacilitiesEditor) : [],
+        transportFacilities: travelBy ? [travelBy] : [],
+        otherInclusions: toLines(otherInclusionsEditor),
+        exclusions: toLines(exclusionsEditor),
+      },
+      participants: participantsPayload,
+      photos: tripPhotos,
+      coverImage: tripPhotos[0] ?? "",
+      description: description.trim(),
+      maxParticipants: Number(maxParticipants),
+    };
+  };
+
+  const submit = async (event?: { preventDefault: () => void }, status: "pending" | "draft" = "pending") => {
+    event?.preventDefault();
+
+    if (status === "pending" && !validate()) return;
 
     if (isEditMode && !editTripId) {
       pushToast({ type: "error", title: "Missing trip id", description: "Cannot update trip without a trip id." });
@@ -753,123 +856,36 @@ export default function CreateTripPage() {
     setSaving(true);
 
     try {
-      const destinationsPayload: TripDestinationPayload[] = [
-        ...destinations
-          .filter((destination) => {
-            const hasAnyInput = [destination.name, destination.description, destination.latitude, destination.longitude, destination.photosEditor].some((value) =>
-              value.trim(),
-            );
-
-            if (!hasAnyInput) return false;
-
-            return (
-              destination.name.trim() &&
-              destination.description.trim() &&
-              destination.latitude.trim() &&
-              destination.longitude.trim() &&
-              !Number.isNaN(Number(destination.latitude)) &&
-              !Number.isNaN(Number(destination.longitude)) &&
-              toLines(destination.photosEditor).length > 0
-            );
-          })
-          .map((destination) => ({
-            name: destination.name.trim(),
-            description: destination.description.trim(),
-            geoCode: {
-              latitude: Number(destination.latitude),
-              longitude: Number(destination.longitude),
-            },
-            photos: toLines(destination.photosEditor),
-          })),
-        ...selectedTravelDestinations.map((destination) => ({
-          name: destination.name,
-          description: destination.description,
-          geoCode: {
-            latitude: destination.lat,
-            longitude: destination.lng,
-          },
-          photos: destination.imageUrl ? [destination.imageUrl] : [],
-        })),
-      ];
-
-      const itineraryDaysPayload: TripItineraryDayPayload[] = activitiesByDay.map((dayActivities, index) => {
-        return {
-          day: index + 1,
-          title: `Day ${index + 1}`,
-          activities: dayActivities.map((activity) => ({
-            title: activity.title.trim(),
-            timeSlot: {
-              startTime: to12Hour(activity.startTime),
-              endTime: to12Hour(activity.endTime),
-            },
-            notes: toLines(activity.notesEditor),
-            isAIGenerated: activity.isAIGenerated ?? false,
-          })),
-        };
-      });
-
-      const participantsPayload: TripParticipantPayload[] = participants
-        .filter((participant) => [participant.name, participant.address, participant.phone, participant.email].some((value) => value.trim()))
-        .map((participant) => ({
-          name: participant.name.trim(),
-          address: participant.address.trim(),
-          phone: participant.phone.trim(),
-          email: participant.email.trim(),
-        }));
-
       let uploadedTripPhotos: string[] = [];
       if (tripPhotoFiles.length > 0) {
         const result = await tripImageUploadService.uploadTripImages(tripPhotoFiles, tripUploadDraftId);
         uploadedTripPhotos = result.downloadUrls;
       }
 
-      const manualTripPhotos = toLines(tripPhotosEditor);
-      const tripPhotos = [...uploadedTripPhotos, ...manualTripPhotos];
-
-      const payload: CreateTripApiPayload = {
-        tripName: tripName.trim(),
-        tripCategory,
-        destinations: destinationsPayload,
-        mainDestinations: mainDestinations.map((destination) => ({
-          name: destination.address.trim(),
-          lat: destination.lat,
-          lng: destination.lng,
-        })),
-        startDate,
-        endDate,
-        startTime,
-        endTime,
-        startLocation: startLocation.trim(),
-        organizer: organizerId.trim(),
-        price: Number(price),
-        itinerary: {
-          days: itineraryDaysPayload,
-        },
-        included: {
-          hotelFacilities: dayCount > 1 ? toLines(hotelFacilitiesEditor) : [],
-          transportFacilities: travelBy ? [travelBy] : [],
-          otherInclusions: toLines(otherInclusionsEditor),
-          exclusions: toLines(exclusionsEditor),
-        },
-        participants: participantsPayload,
-        photos: tripPhotos,
-        coverImage: tripPhotos[0],
-        description: description.trim(),
-        maxParticipants: Number(maxParticipants),
-      };
+      const payload = buildTripPayload(status);
+      payload.photos = [...uploadedTripPhotos, ...payload.photos];
+      payload.coverImage = payload.photos[0] ?? "";
 
       if (isEditMode) {
         await tripApiService.updateTrip(editTripId as string, payload, token);
         pushToast({ type: "success", title: "Trip updated", description: "Trip was updated successfully." });
       } else {
         await tripApiService.createTrip(payload, token);
-        pushToast({ type: "success", title: "Trip created", description: "Trip was submitted to /trips endpoint." });
+        pushToast({
+          type: "success",
+          title: status === "draft" ? "Draft saved" : "Trip created",
+          description: status === "draft" ? "Trip draft was saved successfully." : "Trip was submitted to /trips endpoint.",
+        });
       }
       setErrors([]);
       router.push("/dashboard");
     } catch (error) {
-      const message = error instanceof Error ? error.message : isEditMode ? "Failed to update trip." : "Failed to create trip.";
-      pushToast({ type: "error", title: isEditMode ? "Update failed" : "Create trip failed", description: message });
+      const message = error instanceof Error ? error.message : isEditMode ? "Failed to update trip." : status === "draft" ? "Failed to save draft." : "Failed to create trip.";
+      pushToast({
+        type: "error",
+        title: isEditMode ? "Update failed" : status === "draft" ? "Draft save failed" : "Create trip failed",
+        description: message,
+      });
     } finally {
       setSaving(false);
     }
@@ -907,7 +923,7 @@ export default function CreateTripPage() {
         }
       />
 
-      <form onSubmit={submit} className="space-y-6 border border-border bg-card p-5">
+      <form onSubmit={(event) => void submit(event, "pending")} className="space-y-6 border border-border bg-card p-5">
         <section className="space-y-4">
           <h2 className="text-lg font-semibold">Basic Details</h2>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -1415,7 +1431,9 @@ export default function CreateTripPage() {
 
         <div className="flex gap-2">
           <Button type="submit" disabled={saving}>{saving ? "Saving..." : isEditMode ? "Update Trip" : "Create Trip"}</Button>
-          <Button type="button" variant="outline">Save as local draft</Button>
+          <Button type="button" variant="outline" onClick={() => void submit(undefined, "draft")} disabled={saving}>
+            Save as local draft
+          </Button>
         </div>
       </form>
 
