@@ -163,7 +163,7 @@ export default function CreateTripPage() {
 
   const [tripName, setTripName] = useState("");
   const [tripCategory, setTripCategory] = useState<TripCategory>("Solo Trip with guide");
-  const [canSelectTravelWithGuide, setCanSelectTravelWithGuide] = useState(false);
+  const [canSelectAllCategories, setCanSelectAllCategories] = useState(false);
   const [description, setDescription] = useState("");
 
   const [startDate, setStartDate] = useState("");
@@ -334,6 +334,12 @@ export default function CreateTripPage() {
         }
 
         setOrganizerId(trip.organizer ?? "");
+
+        const role = userSessionService.getRole();
+        const canSelectAnyCategory = role === "guide" || role === "admin" || role === "superadmin";
+        if (!canSelectAnyCategory) {
+          setTripCategory("Private trip");
+        }
       } catch (err) {
         const message = err instanceof Error ? err.message : "Failed to load trip.";
         pushToast({ type: "error", title: "Load failed", description: message });
@@ -346,13 +352,15 @@ export default function CreateTripPage() {
 
   useEffect(() => {
     const role = userSessionService.getRole();
-    const isGuide = role === "guide";
-    setCanSelectTravelWithGuide(isGuide);
+    const canSelectAnyCategory = role === "guide" || role === "admin" || role === "superadmin";
+    setCanSelectAllCategories(canSelectAnyCategory);
 
-    if (!isGuide) {
-      setTripCategory((current) => (current === "Solo Trip with guide" ? "Family Trip with guide" : current));
+    if (!canSelectAnyCategory) {
+      setTripCategory("Private trip");
     }
   }, []);
+
+  const allowedTripCategory: TripCategory = canSelectAllCategories ? tripCategory : "Private trip";
 
   const dayCount = useMemo(() => getDayCount(startDate, endDate), [startDate, endDate]);
 
@@ -561,7 +569,7 @@ export default function CreateTripPage() {
 
     const payload = {
       tripName: tripName.trim(),
-      tripCategory,
+      tripCategory: allowedTripCategory,
       destinations: destinationsPayload,
       startDate,
       endDate,
@@ -806,7 +814,7 @@ export default function CreateTripPage() {
     return {
       status,
       tripName: tripName.trim(),
-      tripCategory,
+      tripCategory: allowedTripCategory,
       destinations: destinationsPayload,
       mainDestinations: mainDestinations.map((destination) => ({
         name: destination.address.trim(),
@@ -937,16 +945,19 @@ export default function CreateTripPage() {
                 value={tripCategory}
                 onChange={(event) => {
                   const nextCategory = event.target.value as TripCategory;
-                  if (nextCategory === "Solo Trip with guide" && !canSelectTravelWithGuide) return;
+                  if (!canSelectAllCategories) {
+                    setTripCategory("Private trip");
+                    return;
+                  }
                   setTripCategory(nextCategory);
                 }}
                 className="h-9 w-full border border-input bg-background px-3 text-sm"
               >
-                {categories.map((categoryItem) => (
+                {(canSelectAllCategories ? categories : ["Private trip"]).map((categoryItem) => (
                   <option
                     key={categoryItem}
                     value={categoryItem}
-                    disabled={categoryItem === "Strangers Trip with guide" && !canSelectTravelWithGuide}
+                    disabled={!canSelectAllCategories && categoryItem !== "Private trip"}
                   >
                     {categoryItem}
                   </option>
