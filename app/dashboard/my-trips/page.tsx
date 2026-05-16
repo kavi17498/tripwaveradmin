@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/common/page-header";
+import { Modal } from "@/components/common/modal";
 import { SavingOverlay } from "@/components/common/saving-overlay";
 import { StatusBadge } from "@/components/common/status-badge";
 import { Button } from "@/components/ui/button";
@@ -30,6 +31,8 @@ const toTripRow = (trip: TripApiItem): TripRow => ({
 
 export default function MyTripsPage() {
   const { pushToast } = useToast();
+  const [shareOpen, setShareOpen] = useState(false);
+  const [shareUrl, setShareUrl] = useState("");
   const [tab, setTab] = useState<Tab>("created");
   const [trips, setTrips] = useState<TripRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -118,7 +121,23 @@ export default function MyTripsPage() {
                     <div className="flex justify-end gap-2">
                       <Button size="sm" variant="outline" asChild><Link href={`/dashboard/trips/${trip.id}/edit`}>Edit</Link></Button>
                       <Button size="sm" variant="outline" asChild><Link href={`/dashboard/trips/${trip.id}/participants`}>Participants</Link></Button>
-                      <Button size="sm" asChild><Link href={`/invite/sample-${trip.id}`}>Share Invite</Link></Button>
+                      {trip.status === "approved" ? (
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            // build public trip URL using current origin
+                            const url = typeof window !== "undefined" ? `${window.location.origin}/trips/${trip.id}` : `/trips/${trip.id}`;
+                            setShareUrl(url);
+                            setShareOpen(true);
+                          }}
+                        >
+                          Share Invite
+                        </Button>
+                      ) : (
+                        <Button size="sm" variant="outline" disabled title="Trip not approved">
+                          Share Invite
+                        </Button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -127,6 +146,53 @@ export default function MyTripsPage() {
           </table>
         )}
       </div>
+
+      <Modal
+        open={shareOpen}
+        title="Share Invite"
+        description="Share the public trip URL with participants."
+        onClose={() => setShareOpen(false)}
+      >
+        <div className="space-y-3">
+          <input readOnly className="w-full rounded border border-border bg-muted/10 p-2 text-sm" value={shareUrl} />
+          <div className="flex items-center gap-2 justify-end">
+            <Button
+              variant="outline"
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(shareUrl);
+                  pushToast({ type: "success", title: "Copied", description: "Invite URL copied to clipboard." });
+                } catch (e) {
+                  pushToast({ type: "error", title: "Copy failed", description: "Could not copy to clipboard." });
+                }
+              }}
+            >
+              Copy URL
+            </Button>
+            {typeof navigator !== "undefined" && (navigator as any).share ? (
+              <Button
+                onClick={async () => {
+                  try {
+                    await (navigator as any).share({ title: "Join my trip", url: shareUrl });
+                  } catch (e) {
+                    pushToast({ type: "error", title: "Share failed", description: String(e) });
+                  }
+                }}
+              >
+                Native Share
+              </Button>
+            ) : null}
+            <Button
+              onClick={() => {
+                // open in new tab
+                if (typeof window !== "undefined") window.open(shareUrl, "_blank");
+              }}
+            >
+              Open
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
