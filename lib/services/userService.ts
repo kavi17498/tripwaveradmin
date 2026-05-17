@@ -1,7 +1,9 @@
 import { apiClient } from "@/lib/services/apiClient";
-import { ServiceResponse, UserModulePayload } from "@/lib/types";
+import { AdminUserRecord, ServiceResponse, UserModulePayload } from "@/lib/types";
 
-export type UserProfileRecord = Record<string, unknown>;
+export type UserProfileRecord = AdminUserRecord;
+
+export type UpdateUserProfilePayload = Partial<Omit<AdminUserRecord, "id" | "email" | "createdAt" | "isVerified">>;
 
 export const userService = {
   async createUserProfile(payload: UserModulePayload, token: string): Promise<ServiceResponse<UserModulePayload>> {
@@ -36,6 +38,30 @@ export const userService = {
     return {
       data: response as UserProfileRecord,
       message: "User profile fetched successfully",
+    };
+  },
+
+  async updateUserProfile(
+    userId: string,
+    payload: UpdateUserProfilePayload,
+    token: string,
+  ): Promise<ServiceResponse<UserProfileRecord>> {
+    const response = await apiClient.authenticatedRequest<UserProfileRecord | ServiceResponse<UserProfileRecord>>(
+      `/users/${userId}`,
+      token,
+      {
+        method: "PUT",
+        body: payload,
+      },
+    );
+
+    if (response && typeof response === "object" && "data" in response) {
+      return response as ServiceResponse<UserProfileRecord>;
+    }
+
+    return {
+      data: response as UserProfileRecord,
+      message: "User profile updated successfully",
     };
   },
 };

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { UserCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { authService } from "@/lib/services/authService";
 import { User } from "@/lib/types";
@@ -111,7 +112,10 @@ export function Navbar() {
           {currentUser ? (
             <>
               <Button variant="outline" asChild>
-                <Link href="/dashboard">{currentUser.name}</Link>
+                <Link href="/profile">
+                  <UserCircle2 className="size-4" />
+                  Profile
+                </Link>
               </Button>
               <Button onClick={handleLogout} disabled={loggingOut}>
                 {loggingOut ? "Logging out..." : "Logout"}
