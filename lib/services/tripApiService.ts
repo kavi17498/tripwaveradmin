@@ -1,4 +1,5 @@
 import { apiClient } from "@/lib/services/apiClient";
+import { userSessionService } from "@/lib/services/userSessionService";
 import { CreateTripApiPayload, ServiceResponse } from "@/lib/types";
 
 export type TripApiDestination = {
@@ -135,8 +136,12 @@ export const tripApiService = {
       : "";
 
     const path = `/trips/approvedpublictrips${qs}`;
-    const response = token
-      ? await apiClient.authenticatedRequest<TripApiItem[] | ServiceResponse<TripApiItem[]>>(path, token, { method: "GET" })
+    
+    // Auto-retrieve token from session if not provided
+    const authToken = token || userSessionService.getToken();
+    
+    const response = authToken
+      ? await apiClient.authenticatedRequest<TripApiItem[] | ServiceResponse<TripApiItem[]>>(path, authToken, { method: "GET" })
       : await apiClient.request<TripApiItem[] | ServiceResponse<TripApiItem[]>>(path, { method: "GET" });
 
     if (response && typeof response === "object" && "data" in response) {
