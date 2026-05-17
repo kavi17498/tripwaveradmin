@@ -72,7 +72,25 @@ function mapApiToTrip(item: TripApiItem): Trip {
   const end = item.endDate ? new Date(item.endDate) : null;
   const durationDays = start && end ? Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1) : 1;
 
-  const mainDest = item.mainDestinations && item.mainDestinations.length > 0 ? item.mainDestinations[0].name : item.startLocation || "";
+  let mainDest = "";
+  let mainLat = 0;
+  let mainLng = 0;
+  let mainCountry = "";
+
+  if (item.mainDestinations && item.mainDestinations.length > 0) {
+    const first = item.mainDestinations[0] as any;
+    if (typeof first === "string") {
+      const parts = first.split(",").map((s: string) => s.trim());
+      mainDest = parts[0] ?? first;
+      mainCountry = parts[1] ?? "";
+    } else if (first && typeof first === "object") {
+      mainDest = first.name ?? item.startLocation ?? "";
+      mainLat = first.lat ?? 0;
+      mainLng = first.lng ?? 0;
+    }
+  } else {
+    mainDest = item.startLocation ?? "";
+  }
 
   return {
     id: item.id,
@@ -92,10 +110,10 @@ function mapApiToTrip(item: TripApiItem): Trip {
     organizerName: (item as any).organizerName || String(item.organizer ?? ""),
     organizerRating: 4.5,
     location: {
-      city: item.startLocation ?? "",
-      country: "",
-      lat: (item.mainDestinations && item.mainDestinations[0]?.lat) || 0,
-      lng: (item.mainDestinations && item.mainDestinations[0]?.lng) || 0,
+      city: mainDest || item.startLocation || "",
+      country: mainCountry || "",
+      lat: mainLat || 0,
+      lng: mainLng || 0,
     },
     included: Array.isArray(item.included) ? (item.included as any).hotelFacilities ?? [] : [],
     excluded: [],
