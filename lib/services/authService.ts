@@ -10,6 +10,7 @@ import {
 } from "firebase/auth";
 import { auth, googleProvider } from "@/lib/config/firebase";
 import { mockUsers } from "@/lib/data/users";
+import { useAuthCacheStore } from "@/lib/stores/useAuthCacheStore";
 import { AuthSession, ServiceResponse, User, UserRole } from "@/lib/types";
 import { sleep, sometimesFail } from "@/lib/services/serviceUtils";
 import { userSessionService } from "@/lib/services/userSessionService";
@@ -186,6 +187,7 @@ export const authService = {
     await signOut(auth);
     userSessionService.clearUserProfile();
     userSessionService.clearToken();
+    useAuthCacheStore.getState().clearSession();
     return { data: true, message: "Logged out" };
   },
 };

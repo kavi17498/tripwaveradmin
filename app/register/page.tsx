@@ -9,10 +9,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/feedback/toast-provider";
 import { useUserRegistrationStore } from "@/lib/stores/useUserRegistrationStore";
+import { useAuthCacheStore } from "@/lib/stores/useAuthCacheStore";
+import { userSessionService } from "@/lib/services/userSessionService";
 
 export default function RegisterPage() {
   const router = useRouter();
   const { pushToast } = useToast();
+  const setSession = useAuthCacheStore((state) => state.setSession);
   const { form, loading, googleLoading, error, setField, registerManual, registerWithGoogle, clearError, resetForm } =
     useUserRegistrationStore();
   const [password, setPassword] = useState("");
@@ -24,6 +27,11 @@ export default function RegisterPage() {
 
     try {
       await registerManual(password, confirmPassword);
+      const profile = userSessionService.getUserProfile<Record<string, unknown>>();
+      const token = userSessionService.getToken();
+      if (profile && token) {
+        setSession(profile, token);
+      }
       pushToast({ type: "success", title: "Account created", description: "Your TripWaver account is ready." });
       resetForm();
       setPassword("");
@@ -36,6 +44,11 @@ export default function RegisterPage() {
     clearError();
     try {
       await registerWithGoogle();
+      const profile = userSessionService.getUserProfile<Record<string, unknown>>();
+      const token = userSessionService.getToken();
+      if (profile && token) {
+        setSession(profile, token);
+      }
       pushToast({ type: "success", title: "Google signup successful", description: "Profile submitted successfully." });
       resetForm();
       router.push("/dashboard");

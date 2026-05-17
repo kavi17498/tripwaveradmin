@@ -190,6 +190,16 @@ export interface TripParticipantPayload {
   email: string;
 }
 
+export interface BookingParticipantPayload {
+  parentUserId?: string | null;
+  name: string;
+  gender: "male" | "female" | "other";
+  age: number;
+  address?: string;
+  phone?: string;
+  email?: string;
+}
+
 export interface CreateTripApiPayload {
   tripName: string;
   tripCategory: "Solo Trip with guide" | "Family Trip with guide" | "Strangers Trip with guide" | "Private trip";
