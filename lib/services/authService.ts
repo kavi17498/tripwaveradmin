@@ -10,6 +10,7 @@ import {
 } from "firebase/auth";
 import { auth, googleProvider } from "@/lib/config/firebase";
 import { mockUsers } from "@/lib/data/users";
+import { useAuthCacheStore } from "@/lib/stores/useAuthCacheStore";
 import { AuthSession, ServiceResponse, User, UserRole } from "@/lib/types";
 import { sleep, sometimesFail } from "@/lib/services/serviceUtils";
 import { userSessionService } from "@/lib/services/userSessionService";
@@ -19,13 +20,25 @@ const roleByEmail = mockUsers.reduce<Record<string, UserRole>>((acc, user) => {
   return acc;
 }, {});
 
+const resolveUserRole = (value: unknown): UserRole | null => {
+  if (value === "traveler" || value === "organizer" || value === "admin" || value === "superadmin") {
+    return value;
+  }
+
+  return null;
+};
+
 const toAppUser = (firebaseUser: { uid: string; displayName: string | null; email: string | null }): User => {
   const email = firebaseUser.email ?? "";
+  const savedProfile = userSessionService.getUserProfile<{ role?: string }>();
+  const savedRole = savedProfile?.role?.toLowerCase();
+  const sessionRole = userSessionService.getRole();
+
   return {
     id: firebaseUser.uid,
     name: firebaseUser.displayName || email.split("@")[0] || "TripWaver User",
     email,
-    role: roleByEmail[email.toLowerCase()] ?? "traveler",
+    role: resolveUserRole(savedRole) ?? resolveUserRole(sessionRole) ?? roleByEmail[email.toLowerCase()] ?? "traveler",
     verifiedOrganizer: false,
     status: "active",
     joinedAt: new Date().toISOString(),
@@ -174,6 +187,7 @@ export const authService = {
     await signOut(auth);
     userSessionService.clearUserProfile();
     userSessionService.clearToken();
+    useAuthCacheStore.getState().clearSession();
     return { data: true, message: "Logged out" };
   },
 };

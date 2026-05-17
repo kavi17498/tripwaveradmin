@@ -26,7 +26,7 @@ export function ProtectedRoute({ children, allowRoles, redirectTo = "/login" }: 
         return;
       }
       if (allowRoles && !allowRoles.includes(user.role)) {
-        router.replace("/dashboard");
+        router.replace(redirectTo);
         return;
       }
 

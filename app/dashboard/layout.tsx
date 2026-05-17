@@ -5,7 +5,7 @@ import { ProtectedRoute } from "@/components/wrappers/protected-route";
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   return (
-    <ProtectedRoute allowRoles={["traveler", "organizer", "admin"]}>
+    <ProtectedRoute>
       <Navbar />
       <div className="mx-auto flex max-w-7xl flex-col md:flex-row">
         <DashboardSidebar />

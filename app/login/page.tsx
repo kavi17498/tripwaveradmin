@@ -10,16 +10,20 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/feedback/toast-provider";
 import { authService } from "@/lib/services/authService";
 import { userService } from "@/lib/services/userService";
+import { useAuthCacheStore } from "@/lib/stores/useAuthCacheStore";
 import { userSessionService } from "@/lib/services/userSessionService";
 
 export default function LoginPage() {
   const router = useRouter();
   const { pushToast } = useToast();
+  const setSession = useAuthCacheStore((state) => state.setSession);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState("");
+
+  const resolvePostLoginPath = (role?: string) => (role === "admin" || role === "superadmin" ? "/admin" : "/dashboard");
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -34,8 +38,9 @@ export default function LoginPage() {
       const userResult = await userService.getUserProfileById(authResult.data.uid, authResult.data.token);
       userSessionService.saveUserProfile(userResult.data);
       userSessionService.saveToken(authResult.data.token);
+      setSession(userResult.data, authResult.data.token);
       pushToast({ type: "success", title: "Welcome back", description: "You are now logged in." });
-      router.push("/dashboard");
+      router.push(resolvePostLoginPath((userResult.data as { role?: string }).role));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to login.");
     } finally {
@@ -51,8 +56,9 @@ export default function LoginPage() {
       const userResult = await userService.getUserProfileById(authResult.data.uid, authResult.data.token);
       userSessionService.saveUserProfile(userResult.data);
       userSessionService.saveToken(authResult.data.token);
+      setSession(userResult.data, authResult.data.token);
       pushToast({ type: "success", title: "Google sign in successful", description: "Welcome to TripWaver." });
-      router.push("/dashboard");
+      router.push(resolvePostLoginPath((userResult.data as { role?: string }).role));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Google sign in failed.");
     } finally {

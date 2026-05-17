@@ -1,6 +1,7 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/common/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,9 +15,11 @@ import {
 } from "@/lib/types";
 import { tripApiService } from "@/lib/services/tripApiService";
 import { userSessionService } from "@/lib/services/userSessionService";
+import { tripImageUploadService } from "@/lib/services/tripImageUploadService";
 import { tripPlanService, TripPlanLocationResult } from "@/lib/services/tripPlanService";
 import LocationPicker from "@/components/common/locationpicker";
 import TripwaverAIPopup from "@/components/common/tripwaver-ai-popup";
+import { SavingOverlay } from "@/components/common/saving-overlay";
 
 type TripCategory = CreateTripApiPayload["tripCategory"];
 
@@ -33,6 +36,7 @@ type ActivityFormItem = {
   startTime: string;
   endTime: string;
   notesEditor: string;
+  isAIGenerated?: boolean;
 };
 
 type ParticipantFormItem = {
@@ -117,6 +121,7 @@ const toLines = (value: string) =>
     .map((line) => line.trim())
     .filter(Boolean);
 
+
 const to12Hour = (time24: string) => {
   const [hourString, minute] = time24.split(":");
   const hour = Number(hourString);
@@ -136,16 +141,35 @@ const getOrganizerName = (profile: StoredUserProfile | null) => {
   return profile.name || "Organizer";
 };
 
+const toMainDestinationValue = (destination: { name?: string; lat?: number; lng?: number } | null) => {
+  if (!destination) return null;
+
+  const lat = destination.lat;
+  const lng = destination.lng;
+  const address = destination.name?.trim() || "";
+
+  if (typeof lat !== "number" || typeof lng !== "number" || !address) return null;
+
+  return { lat, lng, address };
+};
+
 export default function CreateTripPage() {
   const { pushToast } = useToast();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const isEditMode = searchParams?.get("mode") === "edit";
+  const editTripId = searchParams?.get("id") ?? null;
 
   const [tripName, setTripName] = useState("");
   const [tripCategory, setTripCategory] = useState<TripCategory>("Solo Trip with guide");
-  const [canSelectTravelWithGuide, setCanSelectTravelWithGuide] = useState(false);
+  const [canSelectAllCategories, setCanSelectAllCategories] = useState(false);
   const [description, setDescription] = useState("");
 
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [startTime, setStartTime] = useState("");
+  const [endTime, setEndTime] = useState("");
   const [startLocation, setStartLocation] = useState("");
   const [mainDestination, setMainDestination] = useState<MainDestination | null>(null);
   const [mainDestinations, setMainDestinations] = useState<MainDestination[]>([]);
@@ -163,6 +187,34 @@ export default function CreateTripPage() {
   const [exclusionsEditor, setExclusionsEditor] = useState("");
 
   const [tripPhotosEditor, setTripPhotosEditor] = useState("");
+  const [tripPhotoFiles, setTripPhotoFiles] = useState<File[]>([]);
+  const [tripPhotoPreviews, setTripPhotoPreviews] = useState<string[]>([]);
+  const [tripUploadDraftId] = useState(() => crypto.randomUUID());
+
+  const handleTripPhotosChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files ? Array.from(event.target.files) : [];
+    if (files.length === 0) return;
+    setTripPhotoFiles((prev) => [...prev, ...files]);
+    event.target.value = "";
+  };
+
+  const removeTripPhotoFile = (index: number) => {
+    setTripPhotoFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  useEffect(() => {
+    if (tripPhotoFiles.length === 0) {
+      setTripPhotoPreviews([]);
+      return;
+    }
+
+    const previewUrls = tripPhotoFiles.map((file) => URL.createObjectURL(file));
+    setTripPhotoPreviews(previewUrls);
+
+    return () => {
+      previewUrls.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, [tripPhotoFiles]);
 
   const [price, setPrice] = useState("");
   const [maxParticipants, setMaxParticipants] = useState("");
@@ -187,14 +239,128 @@ export default function CreateTripPage() {
   }, []);
 
   useEffect(() => {
-    const role = userSessionService.getRole();
-    const isGuide = role === "guide";
-    setCanSelectTravelWithGuide(isGuide);
+    if (!isEditMode || !editTripId) return;
 
-    if (!isGuide) {
-      setTripCategory((current) => (current === "Solo Trip with guide" ? "Family Trip with guide" : current));
+    const loadTrip = async () => {
+      const token = userSessionService.getToken();
+      if (!token) {
+        pushToast({ type: "error", title: "Missing auth", description: "Please login to edit trips." });
+        return;
+      }
+
+      try {
+        const result = await tripApiService.getTripById(editTripId, token);
+        const trip = result.data;
+        if (!trip) {
+          pushToast({ type: "error", title: "Not found", description: "Trip not found." });
+          return;
+        }
+
+        setTripName(trip.tripName ?? "");
+        setTripCategory((trip.tripCategory as any) ?? tripCategory);
+        setDescription(trip.description ?? "");
+        setStartDate(trip.startDate ?? "");
+        setEndDate(trip.endDate ?? "");
+        setStartTime(trip.startTime ?? "");
+        setEndTime(trip.endTime ?? "");
+        setStartLocation(trip.startLocation ?? "");
+        setPrice(String(trip.price ?? ""));
+        setMaxParticipants(String(trip.maxParticipants ?? ""));
+        if (trip.included) {
+          setHotelFacilitiesEditor((trip.included.hotelFacilities || []).join("\n"));
+          setOtherInclusionsEditor((trip.included.otherInclusions || []).join("\n"));
+          setExclusionsEditor((trip.included.exclusions || []).join("\n"));
+          setTravelBy(trip.included.transportFacilities?.[0] ?? "");
+        }
+
+        if (trip.mainDestinations && trip.mainDestinations.length > 0) {
+          const mappedMainDestinations = trip.mainDestinations
+            .map((destination) => toMainDestinationValue({
+              name: destination.name,
+              lat: destination.lat,
+              lng: destination.lng,
+            }))
+            .filter((destination): destination is MainDestination => destination !== null);
+
+          setMainDestinations(mappedMainDestinations);
+          setMainDestination(mappedMainDestinations[0] ?? null);
+        }
+
+        // map destinations
+        if (trip.destinations && trip.destinations.length > 0) {
+          const mapped = trip.destinations.map((d) => ({
+            name: d.name ?? "",
+            description: d.description ?? "",
+            latitude: String(d.geoCode?.latitude ?? ""),
+            longitude: String(d.geoCode?.longitude ?? ""),
+            photosEditor: (d.photos || []).join("\n"),
+          }));
+          setDestinations(mapped.length ? mapped : [emptyDestination()]);
+        }
+
+        // itinerary => activitiesByDay
+        if (trip.itinerary?.days && trip.itinerary.days.length > 0) {
+          const activities = trip.itinerary.days.map((day) => {
+            const items: ActivityFormItem[] = (day.activities || []).map((act) => {
+              return {
+                title: act.title ?? "",
+                startTime: parse12HourTo24(act.timeSlot?.startTime ?? "08:00"),
+                endTime: parse12HourTo24(act.timeSlot?.endTime ?? "10:00"),
+                notesEditor: (act.notes || []).join("\n"),
+                isAIGenerated: act.isAIGenerated,
+              };
+            });
+            return items.length ? items : [emptyActivity()];
+          });
+          setActivitiesByDay(activities);
+        }
+
+        // participants
+        if (trip.participants && Array.isArray(trip.participants)) {
+          const ppl = trip.participants.map((p: any) => ({
+            name: p.name ?? "",
+            address: p.address ?? "",
+            phone: p.phone ?? "",
+            email: p.email ?? "",
+          }));
+          setParticipants(ppl.length ? ppl : [emptyParticipant()]);
+        }
+
+        // photos
+        if (trip.photos && trip.photos.length > 0) {
+          setTripPhotosEditor(trip.photos.join("\n"));
+          setTripPhotoPreviews(trip.photos);
+          setTripPhotoFiles([]);
+        }
+
+        setOrganizerId(trip.organizer ?? "");
+
+        const role = userSessionService.getRole();
+        const canSelectAnyCategory = role === "guide" || role === "admin" || role === "superadmin";
+        if (!canSelectAnyCategory) {
+          setTripCategory("Private trip");
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Failed to load trip.";
+        pushToast({ type: "error", title: "Load failed", description: message });
+      }
+    };
+
+    void loadTrip();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEditMode, editTripId]);
+
+  useEffect(() => {
+    const role = userSessionService.getRole();
+    const canSelectAnyCategory = role === "guide" || role === "admin" || role === "superadmin";
+    setCanSelectAllCategories(canSelectAnyCategory);
+
+    if (!canSelectAnyCategory) {
+      setTripCategory("Private trip");
     }
   }, []);
+
+  const allowedTripCategory: TripCategory = canSelectAllCategories ? tripCategory : "Private trip";
 
   const dayCount = useMemo(() => getDayCount(startDate, endDate), [startDate, endDate]);
 
@@ -234,6 +400,10 @@ export default function CreateTripPage() {
     setDestinations((prev) => prev.filter((_, currentIndex) => currentIndex !== index));
   };
 
+  const removeDestinationInEdit = (index: number) => {
+    setDestinations((prev) => prev.filter((_, currentIndex) => currentIndex !== index));
+  };
+
   const updateActivity = (dayIndex: number, activityIndex: number, key: keyof ActivityFormItem, value: string) => {
     setActivitiesByDay((prev) =>
       prev.map((day, currentDayIndex) => {
@@ -244,6 +414,8 @@ export default function CreateTripPage() {
       }),
     );
   };
+
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const addActivity = (dayIndex: number) => {
     setActivitiesByDay((prev) =>
@@ -324,6 +496,146 @@ export default function CreateTripPage() {
     }
   };
 
+  const validateForAuto = () => {
+    const issues: string[] = [];
+    if (!tripName.trim()) issues.push("Trip name is required.");
+    if (!tripCategory) issues.push("Trip category is required.");
+    const hasManualDest = destinations.some((d) => d.name.trim() && d.latitude.trim() && d.longitude.trim());
+    const hasSelectedDest = selectedTravelDestinations.length > 0;
+    if (!hasManualDest && !hasSelectedDest) {
+      issues.push("At least one destination with latitude and longitude is required. Add one in Destinations or pick from Travel Destinations.");
+    }
+    if (!startDate || !endDate) issues.push("Start date and end date are required.");
+    if (!startTime) issues.push("Start time is required.");
+    if (!endTime) issues.push("End time is required.");
+    if (!startLocation.trim()) issues.push("Start location is required.");
+    if (Number(maxParticipants) <= 0) issues.push("Max participants must be greater than 0.");
+    const hotel = toLines(hotelFacilitiesEditor);
+    if (hotel.length === 0) issues.push("At least one hotel facility is required in Included.");
+
+    if (issues.length > 0) {
+      pushToast({ type: "error", title: "Missing fields", description: issues.join(" ") });
+      return false;
+    }
+    return true;
+  };
+
+  const parse12HourTo24 = (time12: string) => {
+    // expects "08:00 AM" or "8:00 PM" -> returns "08:00"
+    if (!time12) return "";
+    const m = time12.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+    if (!m) return time12;
+    let hour = parseInt(m[1], 10);
+    const minute = m[2];
+    const suffix = m[3].toUpperCase();
+    if (suffix === "AM") {
+      if (hour === 12) hour = 0;
+    } else {
+      if (hour !== 12) hour += 12;
+    }
+    return `${String(hour).padStart(2, "0")}:${minute}`;
+  };
+
+  const generateItinerary = async () => {
+    if (!validateForAuto()) return;
+
+    const token = userSessionService.getToken();
+    if (!token) {
+      pushToast({ type: "error", title: "Missing auth token", description: "Please login again." });
+      return;
+    }
+
+    const manualPayload = destinations
+      .map((d) => {
+        if (!d.name.trim() || !d.latitude.trim() || !d.longitude.trim()) return null;
+        return {
+          name: d.name.trim(),
+          description: d.description.trim(),
+          geoCode: {
+            latitude: Number(d.latitude),
+            longitude: Number(d.longitude),
+          },
+        };
+      })
+      .filter(Boolean);
+
+    const selectedPayload = selectedTravelDestinations.map((s) => ({
+      name: s.name,
+      description: s.description || "",
+      geoCode: { latitude: Number(s.lat), longitude: Number(s.lng) },
+    }));
+
+    const destinationsPayload = [...manualPayload, ...selectedPayload];
+
+    const payload = {
+      tripName: tripName.trim(),
+      tripCategory: allowedTripCategory,
+      destinations: destinationsPayload,
+      startDate,
+      endDate,
+      startTime: to12Hour(startTime),
+      endTime: to12Hour(endTime),
+      startLocation: startLocation.trim(),
+      included: {
+        hotelFacilities: toLines(hotelFacilitiesEditor),
+        transportFacilities: travelBy ? [travelBy] : [],
+        otherInclusions: toLines(otherInclusionsEditor),
+        exclusions: toLines(exclusionsEditor),
+      },
+      maxParticipants: Number(maxParticipants),
+    };
+
+    setIsGenerating(true);
+    try {
+      const resp = await tripPlanService.generateAutoItinerary(payload, token);
+      const days: any[] = resp?.days ?? [];
+
+      const next: ActivityFormItem[][] = Array.from({ length: dayCount }, (_, i) => []);
+      for (let i = 0; i < dayCount; i++) {
+        const day = days[i];
+        if (!day || !Array.isArray(day.activities) || day.activities.length === 0) {
+          next[i] = [emptyActivity()];
+          continue;
+        }
+
+        next[i] = day.activities.map((act: any) => ({
+          title: act.activity || act.title || "",
+          startTime: parse12HourTo24(act.startTime || ""),
+          endTime: parse12HourTo24(act.endTime || ""),
+          notesEditor: act.description || "",
+          isAIGenerated: true,
+        }));
+      }
+
+      setActivitiesByDay(next);
+      pushToast({ type: "success", title: "Itinerary generated", description: "AI itinerary added to activities. You can edit them." });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to generate itinerary.";
+      pushToast({ type: "error", title: "Generate failed", description: message });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const clearAIGenerated = () => {
+    const confirmClear = window.confirm("Clear AI suggestions? This will remove AI-generated activities.");
+    if (!confirmClear) return;
+
+    setActivitiesByDay((prev) => prev.map((day) => {
+      const filtered = day.filter((item) => !item.isAIGenerated);
+      return filtered.length ? filtered : [emptyActivity()];
+    }));
+    pushToast({ type: "success", title: "AI suggestions cleared" });
+  };
+
+  const clearEntireGenerated = () => {
+    const confirmClear = window.confirm("Clear entire generated itinerary? This will reset all activities. Are you sure?");
+    if (!confirmClear) return;
+
+    setActivitiesByDay(() => Array.from({ length: dayCount }, () => [emptyActivity()]));
+    pushToast({ type: "success", title: "Generated itinerary cleared" });
+  };
+
   const addSelectedTravelDestination = (location: string, destination: TripPlanLocationResult["destinations"][number]) => {
     setSelectedTravelDestinations((prev) => {
       const exists = prev.some((item) => item.location === location && item.name === destination.name);
@@ -351,19 +663,50 @@ export default function CreateTripPage() {
 
     if (!tripName.trim()) issues.push("Trip name is required.");
     if (!startDate || !endDate) issues.push("Start date and end date are required.");
+    if (!startTime) issues.push("Start time is required.");
     if (!startLocation.trim()) issues.push("Start location is required.");
     if (!organizerId.trim()) issues.push("Organizer id (user id) is required.");
     if (Number(price) <= 0) issues.push("Price must be greater than 0.");
     if (Number(maxParticipants) <= 0) issues.push("Max participants must be greater than 0.");
 
-    const hasInvalidDestination = destinations.some((destination) => {
-      if (!destination.name.trim() || !destination.description.trim()) return true;
-      if (!destination.latitude.trim() || !destination.longitude.trim()) return true;
-      if (Number.isNaN(Number(destination.latitude)) || Number.isNaN(Number(destination.longitude))) return true;
-      return toLines(destination.photosEditor).length === 0;
-    });
-    if (hasInvalidDestination) {
-      issues.push("Each destination needs name, description, latitude, longitude, and at least one photo URL.");
+    const hasSelectedDestinations = selectedTravelDestinations.length > 0;
+    const hasManualDestinationInput = destinations.some((destination) =>
+      [destination.name, destination.description, destination.latitude, destination.longitude, destination.photosEditor].some((value) => value.trim()),
+    );
+
+    if (!hasSelectedDestinations) {
+      const hasValidManualDestination = destinations.some((destination) => {
+        if (!destination.name.trim() || !destination.description.trim()) return false;
+        if (!destination.latitude.trim() || !destination.longitude.trim()) return false;
+        if (Number.isNaN(Number(destination.latitude)) || Number.isNaN(Number(destination.longitude))) return false;
+        return toLines(destination.photosEditor).length > 0;
+      });
+
+      const hasInvalidManualDestination = hasManualDestinationInput && destinations.some((destination) => {
+        const isBlankRow =
+          !destination.name.trim() &&
+          !destination.description.trim() &&
+          !destination.latitude.trim() &&
+          !destination.longitude.trim() &&
+          !destination.photosEditor.trim();
+
+        if (isBlankRow) return false;
+
+        const hasAllFields =
+          destination.name.trim() &&
+          destination.description.trim() &&
+          destination.latitude.trim() &&
+          destination.longitude.trim() &&
+          !Number.isNaN(Number(destination.latitude)) &&
+          !Number.isNaN(Number(destination.longitude)) &&
+          toLines(destination.photosEditor).length > 0;
+
+        return !hasAllFields;
+      });
+
+      if (!hasValidManualDestination || hasInvalidManualDestination) {
+        issues.push("Each destination needs name, description, latitude, longitude, and at least one photo URL.");
+      }
     }
 
     const hasInvalidActivities = activitiesByDay.some((day) =>
@@ -373,79 +716,115 @@ export default function CreateTripPage() {
       issues.push("Each activity needs title, start/end time, and at least one note.");
     }
 
-    const hasInvalidParticipant = participants.some(
-      (participant) => !participant.name.trim() || !participant.address.trim() || !participant.phone.trim() || !participant.email.trim(),
+    const hasParticipantInput = participants.some((participant) =>
+      [participant.name, participant.address, participant.phone, participant.email].some((value) => value.trim()),
     );
-    if (hasInvalidParticipant) {
+    const hasInvalidParticipant = participants.some((participant) => {
+      const isBlankRow =
+        !participant.name.trim() &&
+        !participant.address.trim() &&
+        !participant.phone.trim() &&
+        !participant.email.trim();
+
+      if (isBlankRow) return false;
+
+      return !participant.name.trim() || !participant.address.trim() || !participant.phone.trim() || !participant.email.trim();
+    });
+    if (hasParticipantInput && hasInvalidParticipant) {
       issues.push("Each participant must include name, address, phone number, and email.");
     }
 
     const tripPhotos = toLines(tripPhotosEditor);
-    if (tripPhotos.length === 0) {
-      issues.push("Add at least one trip photo URL.");
+    if (tripPhotos.length === 0 && tripPhotoFiles.length === 0) {
+      issues.push("Add at least one trip photo (upload or URL).");
     }
 
     setErrors(issues);
     return issues.length === 0;
   };
 
-  const submit = async (event: FormEvent) => {
-    event.preventDefault();
-    if (!validate()) return;
+  const buildTripPayload = (status: "pending" | "draft"): CreateTripApiPayload => {
+    const destinationsPayload: TripDestinationPayload[] = [
+      ...destinations
+        .filter((destination) => {
+          const hasAnyInput = [destination.name, destination.description, destination.latitude, destination.longitude, destination.photosEditor].some((value) =>
+            value.trim(),
+          );
 
-    const token = userSessionService.getToken();
-    if (!token) {
-      setErrors(["Missing auth token. Please login again."]);
-      return;
-    }
+          if (!hasAnyInput) return false;
 
-    const destinationsPayload: TripDestinationPayload[] = destinations.map((destination) => ({
-      name: destination.name.trim(),
-      description: destination.description.trim(),
-      geoCode: {
-        latitude: Number(destination.latitude),
-        longitude: Number(destination.longitude),
-      },
-      photos: toLines(destination.photosEditor),
-    }));
+          return (
+            destination.name.trim() &&
+            destination.description.trim() &&
+            destination.latitude.trim() &&
+            destination.longitude.trim() &&
+            !Number.isNaN(Number(destination.latitude)) &&
+            !Number.isNaN(Number(destination.longitude)) &&
+            toLines(destination.photosEditor).length > 0
+          );
+        })
+        .map((destination) => ({
+          name: destination.name.trim(),
+          description: destination.description.trim(),
+          geoCode: {
+            latitude: Number(destination.latitude),
+            longitude: Number(destination.longitude),
+          },
+          photos: toLines(destination.photosEditor),
+        })),
+      ...selectedTravelDestinations.map((destination) => ({
+        name: destination.name,
+        description: destination.description,
+        geoCode: {
+          latitude: destination.lat,
+          longitude: destination.lng,
+        },
+        photos: destination.imageUrl ? [destination.imageUrl] : [],
+      })),
+    ];
 
     const itineraryDaysPayload: TripItineraryDayPayload[] = activitiesByDay.map((dayActivities, index) => {
-      const first = dayActivities[0];
-      const last = dayActivities[dayActivities.length - 1];
-      const activities = dayActivities.flatMap((activity) => {
-        const notes = toLines(activity.notesEditor);
-        if (notes.length === 0) {
-          return [`${activity.title.trim()} (${to12Hour(activity.startTime)} - ${to12Hour(activity.endTime)})`];
-        }
-        return notes.map((note) => `${activity.title.trim()} (${to12Hour(activity.startTime)} - ${to12Hour(activity.endTime)}): ${note}`);
-      });
-
       return {
         day: index + 1,
         title: `Day ${index + 1}`,
-        timeSlot: {
-          startTime: to12Hour(first.startTime),
-          endTime: to12Hour(last.endTime),
-        },
-        activities,
+        activities: dayActivities.map((activity) => ({
+          title: activity.title.trim(),
+          timeSlot: {
+            startTime: to12Hour(activity.startTime),
+            endTime: to12Hour(activity.endTime),
+          },
+          notes: toLines(activity.notesEditor),
+          isAIGenerated: activity.isAIGenerated ?? false,
+        })),
       };
     });
 
-    const participantsPayload: TripParticipantPayload[] = participants.map((participant) => ({
-      name: participant.name.trim(),
-      address: participant.address.trim(),
-      phone: participant.phone.trim(),
-      email: participant.email.trim(),
-    }));
+    const participantsPayload: TripParticipantPayload[] = participants
+      .filter((participant) => [participant.name, participant.address, participant.phone, participant.email].some((value) => value.trim()))
+      .map((participant) => ({
+        name: participant.name.trim(),
+        address: participant.address.trim(),
+        phone: participant.phone.trim(),
+        email: participant.email.trim(),
+      }));
 
-    const tripPhotos = toLines(tripPhotosEditor);
+    const manualTripPhotos = toLines(tripPhotosEditor);
+    const tripPhotos = [...manualTripPhotos];
 
-    const payload: CreateTripApiPayload = {
+    return {
+      status,
       tripName: tripName.trim(),
-      tripCategory,
+      tripCategory: allowedTripCategory,
       destinations: destinationsPayload,
+      mainDestinations: mainDestinations.map((destination) => ({
+        name: destination.address.trim(),
+        lat: destination.lat,
+        lng: destination.lng,
+      })),
       startDate,
       endDate,
+      startTime,
+      endTime,
       startLocation: startLocation.trim(),
       organizer: organizerId.trim(),
       price: Number(price),
@@ -453,27 +832,68 @@ export default function CreateTripPage() {
         days: itineraryDaysPayload,
       },
       included: {
-        hotelFacilities: toLines(hotelFacilitiesEditor),
+        hotelFacilities: dayCount > 1 ? toLines(hotelFacilitiesEditor) : [],
         transportFacilities: travelBy ? [travelBy] : [],
         otherInclusions: toLines(otherInclusionsEditor),
         exclusions: toLines(exclusionsEditor),
       },
       participants: participantsPayload,
       photos: tripPhotos,
-      coverImage: tripPhotos[0],
+      coverImage: tripPhotos[0] ?? "",
       description: description.trim(),
       maxParticipants: Number(maxParticipants),
     };
+  };
+
+  const submit = async (event?: { preventDefault: () => void }, status: "pending" | "draft" = "pending") => {
+    event?.preventDefault();
+
+    if (status === "pending" && !validate()) return;
+
+    if (isEditMode && !editTripId) {
+      pushToast({ type: "error", title: "Missing trip id", description: "Cannot update trip without a trip id." });
+      return;
+    }
+
+    const token = userSessionService.getToken();
+    if (!token) {
+      setErrors(["Missing auth token. Please login again."]);
+      return;
+    }
 
     setSaving(true);
 
     try {
-      await tripApiService.createTrip(payload, token);
-      pushToast({ type: "success", title: "Trip created", description: "Trip was submitted to /trips endpoint." });
+      let uploadedTripPhotos: string[] = [];
+      if (tripPhotoFiles.length > 0) {
+        const result = await tripImageUploadService.uploadTripImages(tripPhotoFiles, tripUploadDraftId);
+        uploadedTripPhotos = result.downloadUrls;
+      }
+
+      const payload = buildTripPayload(status);
+      payload.photos = [...uploadedTripPhotos, ...payload.photos];
+      payload.coverImage = payload.photos[0] ?? "";
+
+      if (isEditMode) {
+        await tripApiService.updateTrip(editTripId as string, payload, token);
+        pushToast({ type: "success", title: "Trip updated", description: "Trip was updated successfully." });
+      } else {
+        await tripApiService.createTrip(payload, token);
+        pushToast({
+          type: "success",
+          title: status === "draft" ? "Draft saved" : "Trip created",
+          description: status === "draft" ? "Trip draft was saved successfully." : "Trip was submitted to /trips endpoint.",
+        });
+      }
       setErrors([]);
+      router.push("/dashboard");
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to create trip.";
-      pushToast({ type: "error", title: "Create trip failed", description: message });
+      const message = error instanceof Error ? error.message : isEditMode ? "Failed to update trip." : status === "draft" ? "Failed to save draft." : "Failed to create trip.";
+      pushToast({
+        type: "error",
+        title: isEditMode ? "Update failed" : status === "draft" ? "Draft save failed" : "Create trip failed",
+        description: message,
+      });
     } finally {
       setSaving(false);
     }
@@ -493,14 +913,25 @@ export default function CreateTripPage() {
     setIsTripwaverAIOpen(false);
   };
 
+  const editModePhotoUrls = useMemo(() => toLines(tripPhotosEditor), [tripPhotosEditor]);
+
+  const removeEditModePhotoUrl = (index: number) => {
+    const nextUrls = editModePhotoUrls.filter((_, currentIndex) => currentIndex !== index);
+    setTripPhotosEditor(nextUrls.join("\n"));
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Create Trip"
-        description="Create and submit a trip to API with destinations, itinerary, inclusions, participants, and photos."
+        title={isEditMode ? "Edit Trip" : "Create Trip"}
+        description={
+          isEditMode
+            ? "Edit and update trip details: schedule, itinerary, participants, and photos."
+            : "Create and submit a trip to API with destinations, itinerary, inclusions, participants, and photos."
+        }
       />
 
-      <form onSubmit={submit} className="space-y-6 border border-border bg-card p-5">
+      <form onSubmit={(event) => void submit(event, "pending")} className="space-y-6 border border-border bg-card p-5">
         <section className="space-y-4">
           <h2 className="text-lg font-semibold">Basic Details</h2>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -514,16 +945,19 @@ export default function CreateTripPage() {
                 value={tripCategory}
                 onChange={(event) => {
                   const nextCategory = event.target.value as TripCategory;
-                  if (nextCategory === "Solo Trip with guide" && !canSelectTravelWithGuide) return;
+                  if (!canSelectAllCategories) {
+                    setTripCategory("Private trip");
+                    return;
+                  }
                   setTripCategory(nextCategory);
                 }}
                 className="h-9 w-full border border-input bg-background px-3 text-sm"
               >
-                {categories.map((categoryItem) => (
+                {(canSelectAllCategories ? categories : ["Private trip"]).map((categoryItem) => (
                   <option
                     key={categoryItem}
                     value={categoryItem}
-                    disabled={categoryItem === "Strangers Trip with guide" && !canSelectTravelWithGuide}
+                    disabled={!canSelectAllCategories && categoryItem !== "Private trip"}
                   >
                     {categoryItem}
                   </option>
@@ -555,8 +989,17 @@ export default function CreateTripPage() {
               <Input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
             </div>
             <div>
+              <label className="mb-1 block text-sm font-medium">Start time</label>
+              <Input type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium">End time</label>
+              <Input type="time" value={endTime} onChange={(event) => setEndTime(event.target.value)} />
+            </div>
+            <div>
               <label className="mb-1 block text-sm font-medium">Start location</label>
               <LocationPicker
+                value={startLocation ? { address: startLocation, lat: mainDestination?.lat ?? 0, lng: mainDestination?.lng ?? 0 } : undefined}
                 onChange={(location) => {
                   setStartLocation(location.address);
                 }}
@@ -692,81 +1135,43 @@ export default function CreateTripPage() {
           )}
         </section>
 
-        {/* <section className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold">Destinations</h2>
-            <Button type="button" variant="outline" onClick={addDestination}>Add destination</Button>
-             <Button type="button" variant="outline" onClick={openTripwaverAIpopup}>Use TripWaver AI to List Destinations</Button>
-          </div>
-          {tripwaverAIError ? (
-            <div className="rounded border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
-              {tripwaverAIError}
+        {isEditMode ? (
+          <section className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold">Selected Destinations</h2>
+              <span className="text-xs text-muted-foreground">{destinations.length} selected</span>
             </div>
-          ) : null}
 
-          <div className="space-y-3">
-            {destinations.map((destination, index) => (
-              <div key={index} className="space-y-3 border border-border p-3">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium">Destination {index + 1}</p>
-                  <Button type="button" variant="ghost" onClick={() => removeDestination(index)} disabled={destinations.length === 1}>
-                    Remove
-                  </Button>
-                </div>
-
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                  <Input
-                    value={destination.name}
-                    onChange={(event) => updateDestination(index, "name", event.target.value)}
-                    placeholder="Galle Fort"
-                  />
-                  <Input
-                    value={destination.description}
-                    onChange={(event) => updateDestination(index, "description", event.target.value)}
-                    placeholder="Historic colonial fort and museum walk"
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                  <Input
-                    type="number"
-                    step="any"
-                    value={destination.latitude}
-                    onChange={(event) => updateDestination(index, "latitude", event.target.value)}
-                    placeholder="Latitude (e.g. 6.0261)"
-                  />
-                  <Input
-                    type="number"
-                    step="any"
-                    value={destination.longitude}
-                    onChange={(event) => updateDestination(index, "longitude", event.target.value)}
-                    placeholder="Longitude (e.g. 80.2168)"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-xs font-medium">Destination photos (one URL per line)</label>
-                  <textarea
-                    value={destination.photosEditor}
-                    onChange={(event) => updateDestination(index, "photosEditor", event.target.value)}
-                    className="min-h-20 w-full border border-input bg-background px-3 py-2 text-sm"
-                    placeholder={"https://example.com/destinations/galle-1.jpg\nhttps://example.com/destinations/galle-2.jpg"}
-                  />
-                </div>
+            {destinations.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No selected destinations available.</p>
+            ) : (
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {destinations.map((destination, index) => {
+                  const firstPhoto = toLines(destination.photosEditor)[0];
+                  return (
+                    <div key={`${destination.name}-${index}`} className="relative rounded border border-border bg-card p-3">
+                      <button
+                        type="button"
+                        onClick={() => removeDestinationInEdit(index)}
+                        className="absolute right-2 top-2 rounded border border-border bg-background px-2 py-0.5 text-xs"
+                        aria-label={`Remove destination ${destination.name || index + 1}`}
+                      >
+                        x
+                      </button>
+                      {firstPhoto ? (
+                        <img src={firstPhoto} alt={destination.name || "Destination"} className="mb-2 h-24 w-full rounded object-cover" />
+                      ) : null}
+                      <p className="pr-8 text-sm font-medium">{destination.name || "Unnamed destination"}</p>
+                      <p className="text-xs text-muted-foreground">{destination.description || "No description"}</p>
+                    </div>
+                  );
+                })}
               </div>
-            ))}
-          </div>
+            )}
+          </section>
+        ) : null}
 
-          <div className="border border-border p-3">
-            <h3 className="mb-2 text-sm font-medium">Map preview</h3>
-            <iframe
-              title="Destinations map"
-              className="h-64 w-full border border-border"
-              src={`https://maps.google.com/maps?q=${encodeURIComponent(mapQuery)}&z=6&output=embed`}
-              loading="lazy"
-            />
-          </div>
-        </section> */}
+  
 
         <section className="space-y-4">
           <div className="flex items-center justify-between">
@@ -883,20 +1288,77 @@ export default function CreateTripPage() {
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium">Trip photos (one URL per line)</label>
-            <textarea
-              value={tripPhotosEditor}
-              onChange={(event) => setTripPhotosEditor(event.target.value)}
-              className="min-h-24 w-full border border-input bg-background px-3 py-2 text-sm"
-              placeholder={"https://example.com/trips/sri-lanka-1.jpg\nhttps://example.com/trips/sri-lanka-2.jpg"}
-            />
+            <label className="mb-1 block text-sm font-medium">Trip photos</label>
+            <div className="flex items-center gap-3">
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={handleTripPhotosChange}
+                className="text-sm"
+              />
+            </div>
+
+            {tripPhotoFiles.length > 0 ? (
+              <div className="mt-3 grid grid-cols-3 gap-2">
+                {tripPhotoFiles.map((file, idx) => (
+                  <div key={`${file.name}-${idx}`} className="flex flex-col items-center gap-1">
+                    <img src={tripPhotoPreviews[idx]} alt={file.name} className="h-20 w-28 rounded object-cover" />
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="truncate max-w-[120px]">{file.name}</span>
+                      <button type="button" className="text-primary text-xs" onClick={() => removeTripPhotoFile(idx)}>
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+
+            {isEditMode && editModePhotoUrls.length > 0 ? (
+              <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-3">
+                {editModePhotoUrls.map((photoUrl, index) => (
+                  <div key={`${photoUrl}-${index}`} className="relative rounded border border-border p-2">
+                    <button
+                      type="button"
+                      onClick={() => removeEditModePhotoUrl(index)}
+                      className="absolute right-2 top-2 rounded border border-border bg-background px-2 py-0.5 text-xs"
+                      aria-label={`Remove photo ${index + 1}`}
+                    >
+                      x
+                    </button>
+                    <img src={photoUrl} alt={`Trip photo ${index + 1}`} className="h-28 w-full rounded object-cover" />
+                  </div>
+                ))}
+              </div>
+            ) : null}
+
+            {!isEditMode ? (
+              <>
+                <p className="mt-3 mb-1 text-xs text-muted-foreground">Optional: paste image URLs if you already have hosted images</p>
+                <textarea
+                  value={tripPhotosEditor}
+                  onChange={(event) => setTripPhotosEditor(event.target.value)}
+                  className="min-h-24 w-full border border-input bg-background px-3 py-2 text-sm"
+                  placeholder={"https://example.com/trips/sri-lanka-1.jpg\nhttps://example.com/trips/sri-lanka-2.jpg"}
+                />
+              </>
+            ) : null}
           </div>
         </section>
 
         <section className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold">Activities</h2>
-            <span className="text-xs text-muted-foreground">{dayCount} day(s)</span>
+            <h2 className="text-lg font-semibold">itinerary</h2>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">{dayCount} day(s)</span>
+              <Button type="button" variant="outline" size="sm" onClick={generateItinerary} disabled={isGenerating}>
+                {isGenerating ? "Generating..." : "Generate itinerary"}
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={clearEntireGenerated}>
+                Clear generated
+              </Button>
+            </div>
           </div>
 
           {dayCount === 0 ? (
@@ -979,10 +1441,18 @@ export default function CreateTripPage() {
         ) : null}
 
         <div className="flex gap-2">
-          <Button type="submit" disabled={saving}>{saving ? "Submitting..." : "Create Trip"}</Button>
-          <Button type="button" variant="outline">Save as local draft</Button>
+          <Button type="submit" disabled={saving}>{saving ? "Saving..." : isEditMode ? "Update Trip" : "Create Trip"}</Button>
+          <Button type="button" variant="outline" onClick={() => void submit(undefined, "draft")} disabled={saving}>
+            Save as local draft
+          </Button>
         </div>
       </form>
+
+      <SavingOverlay
+        open={saving}
+        title="Saving trip..."
+        description="Uploading photos, preparing trip data, and submitting everything now."
+      />
 
       <TripwaverAIPopup
         isOpen={isTripwaverAIOpen}

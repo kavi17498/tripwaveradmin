@@ -11,40 +11,24 @@ import { tripService } from "@/lib/services/tripService";
 export default function TripEditPage() {
   const router = useRouter();
   const { id } = useParams<{ id: string }>();
-  const [title, setTitle] = useState("");
-  const [destination, setDestination] = useState("");
   const [openCancel, setOpenCancel] = useState(false);
 
   useEffect(() => {
-    const load = async () => {
-      const result = await tripService.getTripById(id);
-      if (!result.data) return;
-      setTitle(result.data.title);
-      setDestination(result.data.destination);
-    };
-    load();
-  }, [id]);
-
-  const update = async () => {
-    await tripService.updateTrip(id, { title, destination });
-  };
+    // Redirect to the Create Trip page in edit mode so users see the full create/edit UI
+    if (id) {
+      router.push(`/dashboard/create-trip?mode=edit&id=${encodeURIComponent(id)}`);
+    }
+  }, [id, router]);
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Edit Trip" description="Update trip data and management settings." />
+      <PageHeader title="Redirecting to edit" description="Opening the full edit form..." />
       <div className="space-y-4 border border-border bg-card p-5">
-        <div>
-          <label className="mb-1 block text-sm font-medium">Trip title</label>
-          <Input value={title} onChange={(event) => setTitle(event.target.value)} />
-        </div>
-        <div>
-          <label className="mb-1 block text-sm font-medium">Destination</label>
-          <Input value={destination} onChange={(event) => setDestination(event.target.value)} />
-        </div>
+        <p className="text-sm text-muted-foreground">Opening the edit form for trip id: {id}</p>
         <div className="flex gap-2">
-          <Button onClick={update}>Update Trip</Button>
-          <Button variant="outline" onClick={() => router.back()}>Back</Button>
-          <Button variant="destructive" onClick={() => setOpenCancel(true)}>Cancel Trip</Button>
+          <Button variant="outline" onClick={() => router.back()}>
+            Back
+          </Button>
         </div>
       </div>
       <Modal

@@ -1,5 +1,6 @@
 import { mockTrips } from "@/lib/data/trips";
-import { ServiceResponse, Trip, TripFilters } from "@/lib/types";
+import { apiClient } from "@/lib/services/apiClient";
+import { BookingParticipantPayload, ServiceResponse, Trip, TripFilters } from "@/lib/types";
 import { sleep, sometimesFail } from "@/lib/services/serviceUtils";
 
 const applyFilters = (trips: Trip[], filters: TripFilters): Trip[] => {
@@ -67,5 +68,28 @@ export const tripService = {
     const trip = mockTrips.find((item) => item.id === id);
     if (!trip) return { data: null, message: "Trip not found" };
     return { data: { ...trip, ...payload }, message: "Trip updated" };
+  },
+
+  async submitTripParticipants(
+    tripId: string,
+    participants: BookingParticipantPayload[],
+    token?: string,
+  ): Promise<ServiceResponse<unknown>> {
+    const response = await apiClient.request<unknown>(`/trips/${tripId}/participants`, {
+      method: "POST",
+      token,
+      body: {
+        participants,
+      },
+    });
+
+    if (response && typeof response === "object" && "data" in response) {
+      return response as ServiceResponse<unknown>;
+    }
+
+    return {
+      data: response,
+      message: "Participants submitted successfully",
+    };
   },
 };

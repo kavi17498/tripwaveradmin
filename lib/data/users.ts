@@ -29,6 +29,15 @@ export const mockUsers: User[] = [
     joinedAt: "2024-01-01",
   },
   {
+    id: "u5",
+    name: "TripWaver Super Admin",
+    email: "superadmin@tripwaver.com",
+    role: "superadmin",
+    verifiedOrganizer: false,
+    status: "active",
+    joinedAt: "2024-01-02",
+  },
+  {
     id: "u4",
     name: "Sofia Park",
     email: "sofia@tripwaver.com",

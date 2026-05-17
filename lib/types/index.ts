@@ -1,4 +1,4 @@
-export type UserRole = "traveler" | "organizer" | "admin";
+export type UserRole = "traveler" | "organizer" | "admin" | "superadmin";
 
 export type EntityStatus = "active" | "inactive" | "pending" | "approved" | "rejected";
 
@@ -77,6 +77,18 @@ export interface ChatMessage {
   createdAt: string;
 }
 
+export interface ChatGroup {
+  id: string;
+  name: string;
+  tripId?: string;
+  adminId?: string;
+  adminName?: string;
+  description?: string;
+  members?: string[];
+  createdAt?: FirestoreTimestamp | string;
+  updatedAt?: FirestoreTimestamp | string;
+}
+
 export interface Booking {
   id: string;
   tripId: string;
@@ -153,11 +165,15 @@ export interface TripDestinationPayload {
 export interface TripItineraryDayPayload {
   day: number;
   title: string;
-  timeSlot: {
-    startTime: string;
-    endTime: string;
-  };
-  activities: string[];
+  activities: Array<{
+    title: string;
+    timeSlot: {
+      startTime: string;
+      endTime: string;
+    };
+    notes?: string[];
+    isAIGenerated?: boolean;
+  }>;
 }
 
 export interface TripIncludedPayload {
@@ -174,12 +190,30 @@ export interface TripParticipantPayload {
   email: string;
 }
 
+export interface BookingParticipantPayload {
+  parentUserId?: string | null;
+  name: string;
+  gender: "male" | "female" | "other";
+  age: number;
+  address?: string;
+  phone?: string;
+  email?: string;
+}
+
 export interface CreateTripApiPayload {
   tripName: string;
   tripCategory: "Solo Trip with guide" | "Family Trip with guide" | "Strangers Trip with guide" | "Private trip";
+  status?: "pending" | "draft";
   destinations: TripDestinationPayload[];
+  mainDestinations?: Array<{
+    name: string;
+    lat: number;
+    lng: number;
+  }>;
   startDate: string;
   endDate: string;
+  startTime?: string;
+  endTime?: string;
   startLocation: string;
   organizer: string;
   price: number;
@@ -192,4 +226,86 @@ export interface CreateTripApiPayload {
   coverImage: string;
   description: string;
   maxParticipants: number;
+}
+
+export interface FirestoreTimestamp {
+  _seconds: number;
+  _nanoseconds: number;
+}
+
+export interface AdminUserRecord {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  bio: string;
+  street: string;
+  city: string;
+  state: string;
+  postalCode: string;
+  country: string;
+  isVerified: boolean;
+  createdAt: FirestoreTimestamp;
+  updatedAt: FirestoreTimestamp;
+}
+
+export type AdminTripStatus = "pending" | "approved" | "rejected" | "draft";
+
+export interface AdminTripDestination {
+  name: string;
+  description: string;
+  geoCode?: {
+    latitude: number;
+    longitude: number;
+  };
+  photos?: string[];
+}
+
+export interface AdminTripRecord {
+  id: string;
+  tripName: string;
+  tripCategory: string;
+  destinations: AdminTripDestination[];
+  mainDestinations?: Array<{
+    name: string;
+    lat: number;
+    lng: number;
+  }>;
+  startDate: string;
+  endDate: string;
+  startTime?: string;
+  endTime?: string;
+  startLocation: string;
+  organizer: string;
+  price: number;
+  itinerary?: {
+    days: Array<{
+      day: number;
+      title: string;
+      activities: Array<{
+        title: string;
+        timeSlot: {
+          startTime: string;
+          endTime: string;
+        };
+        notes?: string[];
+        isAIGenerated?: boolean;
+      }>;
+    }>;
+  };
+  included?: {
+    hotelFacilities: string[];
+    transportFacilities: string[];
+    otherInclusions: string[];
+    exclusions: string[];
+  };
+  participants?: TripParticipantPayload[];
+  photos: string[];
+  coverImage: string;
+  description: string;
+  maxParticipants: number;
+  status: AdminTripStatus;
+  createdAt: FirestoreTimestamp;
+  updatedAt: FirestoreTimestamp;
 }

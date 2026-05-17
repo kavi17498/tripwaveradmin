@@ -1,22 +1,74 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/common/page-header";
+import { Modal } from "@/components/common/modal";
+import { SavingOverlay } from "@/components/common/saving-overlay";
 import { StatusBadge } from "@/components/common/status-badge";
-import { mockTrips } from "@/lib/data/trips";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/feedback/toast-provider";
+import { userSessionService } from "@/lib/services/userSessionService";
+import { tripApiService, type TripApiItem } from "@/lib/services/tripApiService";
 
 type Tab = "created" | "joined" | "drafts";
 
-export default function MyTripsPage() {
-  const [tab, setTab] = useState<Tab>("created");
+type TripRow = {
+  id: string;
+  title: string;
+  destination: string;
+  startDate: string;
+  status: string;
+};
 
-  const trips = useMemo(() => {
-    if (tab === "drafts") return mockTrips.filter((trip) => trip.status === "draft");
-    if (tab === "joined") return mockTrips.slice(0, 2);
-    return mockTrips;
-  }, [tab]);
+const toTripRow = (trip: TripApiItem): TripRow => ({
+  id: trip.id,
+  title: trip.tripName,
+  destination: trip.destinations[0]?.name ?? trip.startLocation ?? "Unknown destination",
+  startDate: trip.startDate,
+  status: trip.status ?? "published",
+});
+
+export default function MyTripsPage() {
+  const { pushToast } = useToast();
+  const [shareOpen, setShareOpen] = useState(false);
+  const [shareUrl, setShareUrl] = useState("");
+  const [tab, setTab] = useState<Tab>("created");
+  const [trips, setTrips] = useState<TripRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const loadTrips = async () => {
+      const token = userSessionService.getToken();
+      if (!token) {
+        setError("Missing auth token. Please login again.");
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        setError("");
+        const response = await tripApiService.getMyTrips(token);
+        setTrips(response.data.map(toTripRow));
+      } catch (loadError) {
+        const message = loadError instanceof Error ? loadError.message : "Failed to load trips.";
+        setError(message);
+        pushToast({ type: "error", title: "Load failed", description: message });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    void loadTrips();
+  }, [pushToast]);
+
+  const visibleTrips = useMemo(() => {
+    if (tab === "joined") return [];
+    if (tab === "drafts") return trips.filter((trip) => trip.status === "draft");
+    return trips;
+  }, [tab, trips]);
 
   return (
     <div className="space-y-6">
@@ -34,36 +86,113 @@ export default function MyTripsPage() {
         ))}
       </div>
 
+      <SavingOverlay open={loading} title="Loading trips..." description="Fetching your trips." />
+
       <div className="overflow-x-auto border border-border">
-        <table className="w-full min-w-[800px] text-sm">
-          <thead className="bg-muted/30">
-            <tr>
-              <th className="p-3 text-left font-medium">Trip</th>
-              <th className="p-3 text-left font-medium">Destination</th>
-              <th className="p-3 text-left font-medium">Date</th>
-              <th className="p-3 text-left font-medium">Status</th>
-              <th className="p-3 text-right font-medium">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {trips.map((trip) => (
-              <tr key={trip.id} className="border-t border-border">
-                <td className="p-3">{trip.title}</td>
-                <td className="p-3">{trip.destination}</td>
-                <td className="p-3">{trip.startDate}</td>
-                <td className="p-3"><StatusBadge status={trip.status} /></td>
-                <td className="p-3 text-right">
-                  <div className="flex justify-end gap-2">
-                    <Button size="sm" variant="outline" asChild><Link href={`/dashboard/trips/${trip.id}/edit`}>Edit</Link></Button>
-                    <Button size="sm" variant="outline" asChild><Link href={`/dashboard/trips/${trip.id}/participants`}>Participants</Link></Button>
-                    <Button size="sm" asChild><Link href={`/invite/sample-${trip.id}`}>Share Invite</Link></Button>
-                  </div>
-                </td>
+        {loading ? null : error ? (
+          <div className="p-6 text-sm text-destructive">{error}</div>
+        ) : visibleTrips.length === 0 ? (
+          <div className="p-6 text-sm text-muted-foreground">
+            {tab === "joined"
+              ? "Joined trips are not returned by the current /trips endpoint."
+              : tab === "drafts"
+                ? "No draft trips found."
+                : "No trips found."}
+          </div>
+        ) : (
+          <table className="w-full min-w-[800px] text-sm">
+            <thead className="bg-muted/30">
+              <tr>
+                <th className="p-3 text-left font-medium">Trip</th>
+                <th className="p-3 text-left font-medium">Destination</th>
+                <th className="p-3 text-left font-medium">Date</th>
+                <th className="p-3 text-left font-medium">Status</th>
+                <th className="p-3 text-right font-medium">Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {visibleTrips.map((trip) => (
+                <tr key={trip.id} className="border-t border-border">
+                  <td className="p-3">{trip.title}</td>
+                  <td className="p-3">{trip.destination}</td>
+                  <td className="p-3">{trip.startDate}</td>
+                  <td className="p-3"><StatusBadge status={(trip.status || "published") as any} /></td>
+                  <td className="p-3 text-right">
+                    <div className="flex justify-end gap-2">
+                      <Button size="sm" variant="outline" asChild><Link href={`/dashboard/trips/${trip.id}/edit`}>Edit</Link></Button>
+                      <Button size="sm" variant="outline" asChild><Link href={`/dashboard/trips/${trip.id}/participants`}>Participants</Link></Button>
+                      {trip.status === "approved" ? (
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            // build public trip URL using current origin
+                            const url = typeof window !== "undefined" ? `${window.location.origin}/trips/${trip.id}` : `/trips/${trip.id}`;
+                            setShareUrl(url);
+                            setShareOpen(true);
+                          }}
+                        >
+                          Share Invite
+                        </Button>
+                      ) : (
+                        <Button size="sm" variant="outline" disabled title="Trip not approved">
+                          Share Invite
+                        </Button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
+
+      <Modal
+        open={shareOpen}
+        title="Share Invite"
+        description="Share the public trip URL with participants."
+        onClose={() => setShareOpen(false)}
+      >
+        <div className="space-y-3">
+          <input readOnly className="w-full rounded border border-border bg-muted/10 p-2 text-sm" value={shareUrl} />
+          <div className="flex items-center gap-2 justify-end">
+            <Button
+              variant="outline"
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(shareUrl);
+                  pushToast({ type: "success", title: "Copied", description: "Invite URL copied to clipboard." });
+                } catch (e) {
+                  pushToast({ type: "error", title: "Copy failed", description: "Could not copy to clipboard." });
+                }
+              }}
+            >
+              Copy URL
+            </Button>
+            {typeof navigator !== "undefined" && (navigator as any).share ? (
+              <Button
+                onClick={async () => {
+                  try {
+                    await (navigator as any).share({ title: "Join my trip", url: shareUrl });
+                  } catch (e) {
+                    pushToast({ type: "error", title: "Share failed", description: String(e) });
+                  }
+                }}
+              >
+                Native Share
+              </Button>
+            ) : null}
+            <Button
+              onClick={() => {
+                // open in new tab
+                if (typeof window !== "undefined") window.open(shareUrl, "_blank");
+              }}
+            >
+              Open
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

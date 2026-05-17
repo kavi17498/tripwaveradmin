@@ -1,49 +1,71 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
+import { useSearchParams } from "next/navigation";
 import { StatusBadge } from "@/components/common/status-badge";
 import { Button } from "@/components/ui/button";
-import { mockTrips } from "@/lib/data/trips";
+import { useAdminDataStore } from "@/lib/stores/useAdminDataStore";
+import { AdminTripStatus } from "@/lib/types";
+import { formatCurrencyRs, formatDateLabel } from "@/lib/utils";
 
 export default function AdminTripsPage() {
-  const [filter, setFilter] = useState("all");
+  const searchParams = useSearchParams();
+  const filter = (searchParams.get("status") ?? "pending") as AdminTripStatus;
+  const { tripsByStatus, fetchTrips, updateTripStatus, loadingTrips } = useAdminDataStore();
 
-  const trips = useMemo(
-    () => (filter === "all" ? mockTrips : mockTrips.filter((trip) => trip.status === filter)),
-    [filter],
-  );
+  useEffect(() => {
+    void fetchTrips(filter);
+  }, [fetchTrips, filter]);
+
+  const trips = useMemo(() => tripsByStatus[filter] ?? [], [filter, tripsByStatus]);
+
+  const canModerate = filter === "pending";
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold">Trips Management</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Moderate all trips and monitor trip lifecycle status.</p>
+        <p className="mt-1 text-sm text-muted-foreground">Review trip submissions and move pending trips to approved or rejected.</p>
       </div>
 
-      <select className="h-9 border border-input bg-background px-3 text-sm" value={filter} onChange={(event) => setFilter(event.target.value)}>
-        <option value="all">All statuses</option>
-        <option value="published">Published</option>
-        <option value="draft">Draft</option>
-        <option value="cancelled">Cancelled</option>
-      </select>
+      <div className="flex flex-wrap gap-2">
+        {(["pending", "approved", "rejected", "draft"] as AdminTripStatus[]).map((status) => (
+          <Button key={status} asChild variant={filter === status ? "default" : "outline"} size="sm">
+            <Link href={`/admin/trips?status=${status}`}>{status}</Link>
+          </Button>
+        ))}
+      </div>
 
       <div className="space-y-2">
         {trips.map((trip) => (
           <article key={trip.id} className="flex flex-col gap-3 border border-border bg-card p-4 md:flex-row md:items-center md:justify-between">
             <div>
-              <p className="font-medium">{trip.title}</p>
-              <p className="text-sm text-muted-foreground">{trip.destination} • {trip.startDate}</p>
+              <p className="font-medium">{trip.tripName}</p>
+              <p className="text-sm text-muted-foreground">{trip.startLocation} • {formatDateLabel(trip.startDate)}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{trip.tripCategory} • {formatCurrencyRs(trip.price)}</p>
             </div>
             <div className="flex items-center gap-2">
               <StatusBadge status={trip.status} />
               <Button size="sm" variant="outline" asChild>
-                <Link href={`/trips/${trip.id}`}>View details</Link>
+                <Link href={`/admin/trips/${trip.id}`}>Review details</Link>
               </Button>
-              <Button size="sm" variant="destructive">Moderate / Cancel</Button>
+              {canModerate ? (
+                <>
+                  <Button size="sm" onClick={() => void updateTripStatus(trip.id, "approved")} disabled={loadingTrips}>
+                    Approve
+                  </Button>
+                  <Button size="sm" variant="destructive" onClick={() => void updateTripStatus(trip.id, "rejected")} disabled={loadingTrips}>
+                    Reject
+                  </Button>
+                </>
+              ) : (
+                <span className="text-xs text-muted-foreground">Review only</span>
+              )}
             </div>
           </article>
         ))}
+        {!trips.length ? <p className="text-sm text-muted-foreground">No trips found for this status.</p> : null}
       </div>
     </div>
   );
