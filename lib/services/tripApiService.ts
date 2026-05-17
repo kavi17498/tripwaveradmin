@@ -121,4 +121,31 @@ export const tripApiService = {
       message: "Trip updated successfully",
     };
   },
+
+  async getApprovedPublicTrips(
+    filters?: Record<string, string | number | undefined>,
+    token?: string
+  ): Promise<ServiceResponse<TripApiItem[]>> {
+    const qs = filters
+      ? "?" +
+        Object.entries(filters)
+          .filter(([, v]) => v !== undefined && v !== "")
+          .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`)
+          .join("&")
+      : "";
+
+    const path = `/trips/approvedpublictrips${qs}`;
+    const response = token
+      ? await apiClient.authenticatedRequest<TripApiItem[] | ServiceResponse<TripApiItem[]>>(path, token, { method: "GET" })
+      : await apiClient.request<TripApiItem[] | ServiceResponse<TripApiItem[]>>(path, { method: "GET" });
+
+    if (response && typeof response === "object" && "data" in response) {
+      return response as ServiceResponse<TripApiItem[]>;
+    }
+
+    return {
+      data: response as TripApiItem[],
+      message: "Approved public trips loaded",
+    };
+  },
 };

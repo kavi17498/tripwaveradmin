@@ -7,6 +7,8 @@ import { Footer } from "@/components/layout/footer";
 import { Button } from "@/components/ui/button";
 import { TripCardEnhanced } from "@/components/trips/trip-card-enhanced";
 import { Trip } from "@/lib/types";
+import { tripApiService, type TripApiItem } from "@/lib/services/tripApiService";
+import { useAuthCacheStore } from "@/lib/stores/useAuthCacheStore";
 
 const heroSlides = [
   {
@@ -55,532 +57,67 @@ const categoryHighlights = [
   },
   {
     name: "Join Group Trip",
-    text: "Meet new people and explore iconic places like Ella, Mirissa, and Sigiriya together.",
-    image: "https://images.unsplash.com/photo-1469474968028-56623f02e42e?q=80&w=1400&auto=format&fit=crop",
+    text: "Join group trips across Sri Lanka and travel with like-minded people.",
+    image: "https://images.unsplash.com/photo-1529156069898-49953e39b3ac?q=80&w=1400&auto=format&fit=crop",
   },
   {
     name: "Family Trip with Guide",
-    text: "Comfort-focused itineraries for families with child-friendly activities and local support.",
-    image: "https://images.unsplash.com/photo-1472396961693-142e6e269027?q=80&w=1400&auto=format&fit=crop",
-  },
-  {
-    name: "AI Trip Planner for Teams",
-    text: "Build custom plans, share one trip link, and manage participant payments in one place.",
-    image: "https://images.unsplash.com/photo-1521737711867-e3b97375f902?q=80&w=1400&auto=format&fit=crop",
+    text: "Family-friendly itineraries with child-safe activities and verified accommodations.",
+    image: "https://images.unsplash.com/photo-1511895426328-dc8714191300?q=80&w=1400&auto=format&fit=crop",
   },
 ];
 
-const featuredTripsData: Record<string, Trip[]> = {
-  "Travel with Guide": [
-    {
-      id: "trip-1",
-      title: "Galle Fort Story Walk",
-      destination: "Galle",
-      description: "Explore the historic Galle Fort with an expert guide who brings centuries of colonial architecture and local stories to life. Walk through narrow cobblestone streets, visit hidden temples, and enjoy fresh seafood at sunset.",
-      startDate: "2026-04-01",
-      endDate: "2026-04-03",
-      price: 72000,
-      capacity: 12,
-      bookedCount: 8,
-      durationDays: 3,
-      tripType: "public",
-      status: "published",
-      coverImage: "https://images.unsplash.com/photo-1518509562904-e7ef99cdcc86?q=80&w=1400&auto=format&fit=crop",
-      organizerId: "org-1",
-      organizerName: "Lakshman Tours",
-      organizerRating: 4.8,
-      location: {
-        city: "Galle",
-        country: "Sri Lanka",
-        lat: 6.0535,
-        lng: 80.2210,
-      },
-      included: [
-        "Professional tour guide",
-        "Hotel accommodation (3 nights)",
-        "All meals",
-        "Fort entrance fee",
-        "Sunset boat cruise",
-        "Transport in AC vehicle",
-      ],
-      excluded: [
-        "International flights",
-        "Travel insurance",
-        "Personal shopping",
-        "Alcoholic beverages",
-      ],
-      itinerary: [
-        {
-          day: 1,
-          title: "Arrival & Fort Exploration",
-          description: "Arrive in Galle, check-in to hotel, and begin your guided walking tour of the historic Galle Fort. Explore colonial buildings and enjoy sunset from the ramparts.",
-        },
-        {
-          day: 2,
-          title: "Cultural Deep Dive",
-          description: "Visit local temples, meet artisans, and participate in a traditional cooking class. Learn about Sri Lankan spices and cuisine.",
-        },
-        {
-          day: 3,
-          title: "Boat Cruise & Departure",
-          description: "Sunrise croquet at the fort, enjoy a sunset boat cruise along the coast, and transfer to the airport.",
-        },
-      ],
+function mapApiToTrip(item: TripApiItem): Trip {
+  const start = item.startDate ? new Date(item.startDate) : null;
+  const end = item.endDate ? new Date(item.endDate) : null;
+  const durationDays = start && end ? Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1) : 1;
+
+  const mainDest = item.mainDestinations && item.mainDestinations.length > 0 ? item.mainDestinations[0].name : item.startLocation || "";
+
+  return {
+    id: item.id,
+    title: item.tripName,
+    destination: mainDest,
+    description: item.description || "",
+    startDate: item.startDate ?? "",
+    endDate: item.endDate ?? "",
+    price: item.price ?? 0,
+    capacity: item.maxParticipants ?? 10,
+    bookedCount: (item as any).bookedCount ?? 0,
+    durationDays,
+    tripType: (item.tripCategory as string) || "public",
+    status: item.status || "published",
+    coverImage: item.coverImage || (item.photos && item.photos[0]) || "",
+    organizerId: item.organizer ?? "",
+    organizerName: (item as any).organizerName || String(item.organizer ?? ""),
+    organizerRating: 4.5,
+    location: {
+      city: item.startLocation ?? "",
+      country: "",
+      lat: (item.mainDestinations && item.mainDestinations[0]?.lat) || 0,
+      lng: (item.mainDestinations && item.mainDestinations[0]?.lng) || 0,
     },
-    {
-      id: "trip-2",
-      title: "Ella Peaks and Tea Trails",
-      destination: "Ella",
-      description: "Trek through misty tea plantations in the central highlands. Stay in boutique mountain lodges, watch the sunrise from Ella Rock, and experience authentic village life with local tea pluckers.",
-      startDate: "2026-04-05",
-      endDate: "2026-04-08",
-      price: 84000,
-      capacity: 10,
-      bookedCount: 6,
-      durationDays: 4,
-      tripType: "public",
-      status: "published",
-      coverImage: "https://images.unsplash.com/photo-1470004914212-05527e49370b?q=80&w=1400&auto=format&fit=crop",
-      organizerId: "org-2",
-      organizerName: "Highland Adventures",
-      organizerRating: 4.9,
-      location: {
-        city: "Ella",
-        country: "Sri Lanka",
-        lat: 6.8633,
-        lng: 81.0454,
-      },
-      included: [
-        "Experienced mountain guide",
-        "Boutique lodge accommodation",
-        "Tea plantation trekking",
-        "Train ride to Kandy",
-        "All meals with local cuisine",
-        "Sunrise viewpoint access",
-      ],
-      excluded: [
-        "Domestic flights",
-        "Tips and gratuities",
-        "Personal medications",
-        "Additional activities",
-      ],
-      itinerary: [
-        {
-          day: 1,
-          title: "Arrival in Ella",
-          description: "Check-in to mountain lodge. Evening village walk and interaction with tea pluckers. Dinner with local family.",
-        },
-        {
-          day: 2,
-          title: "Tea Plantation Trek",
-          description: "Morning trek through emerald tea gardens. Meet tea pluckers, visit a tea factory, and learn about processing. Afternoon rest and local cuisine cooking.",
-        },
-        {
-          day: 3,
-          title: "Ella Rock & Train Journey",
-          description: "Sunrise trek to Ella Rock, journey on the scenic railway to Kandy, visit local market, experience mountain village life.",
-        },
-        {
-          day: 4,
-          title: "Departure",
-          description: "Final breakfast with host family, last-minute souvenir shopping, and transfer to airport.",
-        },
-      ],
-    },
-    {
-      id: "trip-3",
-      title: "Sigiriya Heritage Route",
-      destination: "Sigiriya",
-      description: "Climb the ancient rock fortress of Sigiriya and explore the surrounding cultural triangle. Visit ancient temples, understand Buddhist heritage, and enjoy views across lush valleys.",
-      startDate: "2026-04-10",
-      endDate: "2026-04-11",
-      price: 61000,
-      capacity: 15,
-      bookedCount: 9,
-      durationDays: 2,
-      tripType: "public",
-      status: "published",
-      coverImage: "https://images.unsplash.com/photo-1472396961693-142e6e269027?q=80&w=1400&auto=format&fit=crop",
-      organizerId: "org-3",
-      organizerName: "Heritage Express",
-      organizerRating: 4.7,
-      location: {
-        city: "Sigiriya",
-        country: "Sri Lanka",
-        lat: 7.9577,
-        lng: 80.7597,
-      },
-      included: [
-        "Knowledgeable heritage guide",
-        "Sigiriya Rock climb permit",
-        "Hotel accommodation",
-        "All breakfast and lunch",
-        "Temple visits and access",
-        "Scenic viewpoint stops",
-      ],
-      excluded: [
-        "Personal activities",
-        "Evening meals",
-        "Tips",
-        "Equipment rental",
-      ],
-      itinerary: [
-        {
-          day: 1,
-          title: "Sigiriya & Cultural Sites",
-          description: "Climb the legendary Sigiriya Rock, explore ancient fresco chambers, visit Cave Temple, and witness panoramic valley views.",
-        },
-        {
-          day: 2,
-          title: "Cultural Triangle Exploration",
-          description: "Visit Dambulla Cave Temple complex, explore local village markets, enjoy authentic Sri Lankan lunch, and transfer to airport.",
-        },
-      ],
-    },
-  ],
-  "Join Group Trip": [
-    {
-      id: "trip-4",
-      title: "Mirissa Social Coastline",
-      destination: "Mirissa",
-      description: "Join like-minded travelers for beach days and water activities in Mirissa. Whale watching, surfing lessons, beach volleyball, and evening bonfire with fellow travelers.",
-      startDate: "2026-04-12",
-      endDate: "2026-04-14",
-      price: 58000,
-      capacity: 20,
-      bookedCount: 14,
-      durationDays: 3,
-      tripType: "public",
-      status: "published",
-      coverImage: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=80&w=1400&auto=format&fit=crop",
-      organizerId: "org-4",
-      organizerName: "Beach Collective",
-      organizerRating: 4.6,
-      location: {
-        city: "Mirissa",
-        country: "Sri Lanka",
-        lat: 5.9497,
-        lng: 80.7749,
-      },
-      included: [
-        "Beach resort accommodation",
-        "Daily breakfast & dinner",
-        "Whale watching tour",
-        "Surfing lesson",
-        "Beach activities",
-        "Bonfire evening",
-      ],
-      excluded: [
-        "Lunch",
-        "Alcoholic beverages",
-        "Water sports equipment rental",
-        "Personal massages",
-      ],
-      itinerary: [
-        {
-          day: 1,
-          title: "Group Meet & Beach",
-          description: "Check-in and meet fellow travelers. Beach orientation, swimming, and group dinner introduction.",
-        },
-        {
-          day: 2,
-          title: "Water Activities",
-          description: "Early morning whale watching boat tour, afternoon surfing lessons, beach volleyball, and bonfire evening.",
-        },
-        {
-          day: 3,
-          title: "Last Beach Day",
-          description: "Sunrise yoga on beach, final swim, lunch, and group departure with memories and new friendships.",
-        },
-      ],
-    },
-    {
-      id: "trip-5",
-      title: "Kandy to Nuwara Eliya Group Escape",
-      destination: "Nuwara Eliya",
-      description: "Join a group adventure through misty mountain towns. Hike through botanical gardens, visit waterfalls, and enjoy cool mountain climate with other adventurers.",
-      startDate: "2026-04-15",
-      endDate: "2026-04-18",
-      price: 69000,
-      capacity: 16,
-      bookedCount: 10,
-      durationDays: 4,
-      tripType: "public",
-      status: "published",
-      coverImage: "https://images.unsplash.com/photo-1521295121783-8a321d551ad2?q=80&w=1400&auto=format&fit=crop",
-      organizerId: "org-5",
-      organizerName: "Mountain Wanderers",
-      organizerRating: 4.8,
-      location: {
-        city: "Nuwara Eliya",
-        country: "Sri Lanka",
-        lat: 6.9497,
-        lng: 80.7885,
-      },
-      included: [
-        "Mountain lodge stay",
-        "Group guide services",
-        "Botanical garden tour",
-        "Waterfalls trekking",
-        "All meals with views",
-        "Group activities",
-      ],
-      excluded: [
-        "Drinks and snacks",
-        "Adventure equipment",
-        "Photography sessions",
-        "Extra activities",
-      ],
-      itinerary: [
-        {
-          day: 1,
-          title: "Kandy to Nuwara Eliya",
-          description: "Travel to Nuwara Eliya, explore the colonial town, visit botanical gardens, group welcome dinner.",
-        },
-        {
-          day: 2,
-          title: "Waterfall Trek",
-          description: "Group hiking to several waterfalls, refreshing water activities, picnic lunch, afternoon free time.",
-        },
-        {
-          day: 3,
-          title: "Adventure Day",
-          description: "Mountain biking or hiking options, visit viewpoints, evening camp, group bonfire.",
-        },
-        {
-          day: 4,
-          title: "Departure",
-          description: "Sunrise hike to final viewpoint, group breakfast, shopping for souvenirs, transfer to airport.",
-        },
-      ],
-    },
-    {
-      id: "trip-6",
-      title: "Arugam Bay Weekend Crew",
-      destination: "Arugam Bay",
-      description: "Quick beach escape with fellow travelers. Relax on pristine beaches, enjoy street food, watch sunsets, and build connections in a laid-back environment.",
-      startDate: "2026-04-20",
-      endDate: "2026-04-21",
-      price: 47000,
-      capacity: 18,
-      bookedCount: 12,
-      durationDays: 2,
-      tripType: "public",
-      status: "published",
-      coverImage: "https://images.unsplash.com/photo-1528127269322-539801943592?q=80&w=1400&auto=format&fit=crop",
-      organizerId: "org-6",
-      organizerName: "Breezy Escapes",
-      organizerRating: 4.5,
-      location: {
-        city: "Arugam Bay",
-        country: "Sri Lanka",
-        lat: 7.7547,
-        lng: 81.8178,
-      },
-      included: [
-        "Beachfront accommodation",
-        "Breakfast & lunch",
-        "Beach activities",
-        "Sunset watching",
-        "Group guide",
-        "Street food tour",
-      ],
-      excluded: [
-        "Dinner & alcohol",
-        "Water sports gear",
-        "Photography",
-        "Extra outings",
-      ],
-      itinerary: [
-        {
-          day: 1,
-          title: "Arrive & Chill",
-          description: "Arrive in Arugam Bay, settle into beachfront rooms, beach time, street food walk, sunset watching.",
-        },
-        {
-          day: 2,
-          title: "Final Beach Day",
-          description: "Sunrise beach walk, breakfast, water activities, lunch, group shopping, afternoon departure.",
-        },
-      ],
-    },
-  ],
-  "Family Trip with Guide": [
-    {
-      id: "trip-7",
-      title: "Bentota Family Beach Days",
-      destination: "Bentota",
-      description: "Perfect family getaway with water sports, beach games, and cultural experiences. Safe for kids with experienced guides and family-friendly accommodations.",
-      startDate: "2026-04-22",
-      endDate: "2026-04-24",
-      price: 95000,
-      capacity: 10,
-      bookedCount: 4,
-      durationDays: 3,
-      tripType: "public",
-      status: "published",
-      coverImage: "https://images.unsplash.com/photo-1516483638261-f4dbaf036963?q=80&w=1400&auto=format&fit=crop",
-      organizerId: "org-7",
-      organizerName: "Family First Tours",
-      organizerRating: 4.9,
-      location: {
-        city: "Bentota",
-        country: "Sri Lanka",
-        lat: 6.4264,
-        lng: 80.2789,
-      },
-      included: [
-        "Family suite accommodation",
-        "All meals & snacks",
-        "Water sports for kids",
-        "Beach games & activities",
-        "Kids guide assistant",
-        "Turtle hatchery visit",
-      ],
-      excluded: [
-        "Personal services",
-        "Premium activities",
-        "Extra shopping",
-        "Tips",
-      ],
-      itinerary: [
-        {
-          day: 1,
-          title: "Family Arrival",
-          description: "Check-in, beach orientation for kids, safe swimming area, evening family dinner.",
-        },
-        {
-          day: 2,
-          title: "Water & Culture",
-          description: "Water sports for all ages, turtle hatchery conservation visit, local market exploration, beach bonfire.",
-        },
-        {
-          day: 3,
-          title: "Final Family Fun",
-          description: "Beach games tournament, group activities, lunch, souvenir shopping, transfer home with family photos.",
-        },
-      ],
-    },
-    {
-      id: "trip-8",
-      title: "Yala Family Safari Journey",
-      destination: "Yala",
-      description: "Thrilling wildlife safari for the whole family. See leopards, elephants, and exotic birds. Child-friendly safari vehicles with expert naturalist guides.",
-      startDate: "2026-04-25",
-      endDate: "2026-04-27",
-      price: 108000,
-      capacity: 8,
-      bookedCount: 3,
-      durationDays: 3,
-      tripType: "public",
-      status: "published",
-      coverImage: "https://images.unsplash.com/photo-1534180477871-5d6cc81f3920?q=80&w=1400&auto=format&fit=crop",
-      organizerId: "org-8",
-      organizerName: "Wild Family Adventures",
-      organizerRating: 4.8,
-      location: {
-        city: "Yala",
-        country: "Sri Lanka",
-        lat: 6.3736,
-        lng: 81.5142,
-      },
-      included: [
-        "Safari lodge accommodation",
-        "Expert naturalist guide",
-        "Morning & evening safaris",
-        "All meals",
-        "Binoculars & guides",
-        "Nature education",
-      ],
-      excluded: [
-        "Photography equipment",
-        "Customized safaris",
-        "Premium accommodations",
-        "Shopping",
-      ],
-      itinerary: [
-        {
-          day: 1,
-          title: "Safari Introduction",
-          description: "Arrive at safari lodge, safety briefing, evening wildlife orientation, early dinner for kids.",
-        },
-        {
-          day: 2,
-          title: "Full Safari Day",
-          description: "Early morning safari (elephants & birds), rest time, late afternoon safari (leopard spotting chances), nature talk.",
-        },
-        {
-          day: 3,
-          title: "Last Safari & Depart",
-          description: "Final sunrise safari, wildlife slideshow, lunch, visit interpretation center, family photos, transfer home.",
-        },
-      ],
-    },
-    {
-      id: "trip-9",
-      title: "Cultural Triangle for Families",
-      destination: "Dambulla",
-      description: "Educational family journey through ancient temples and historical sites. Learn about Buddhism, art, and culture. Interactive activities for kids at every stop.",
-      startDate: "2026-04-28",
-      endDate: "2026-05-01",
-      price: 126000,
-      capacity: 12,
-      bookedCount: 5,
-      durationDays: 4,
-      tripType: "public",
-      status: "published",
-      coverImage: "https://images.unsplash.com/photo-1548013146-72479768bada?q=80&w=1400&auto=format&fit=crop",
-      organizerId: "org-9",
-      organizerName: "Heritage Kids Education",
-      organizerRating: 4.7,
-      location: {
-        city: "Dambulla",
-        country: "Sri Lanka",
-        lat: 7.8667,
-        lng: 80.6667,
-      },
-      included: [
-        "Family hotel accommodation",
-        "Educational guide services",
-        "Temple entrance fees",
-        "All meals",
-        "Interactive activities",
-        "Learning materials",
-      ],
-      excluded: [
-        "Extra souvenir purchases",
-        "Premium classes",
-        "Personal guides",
-        "Customized tours",
-      ],
-      itinerary: [
-        {
-          day: 1,
-          title: "Dambulla Cave Temple",
-          description: "Arrive in Dambulla, visit the sacred cave temple complex with 500 Buddha statues, learn about Buddhist iconography.",
-        },
-        {
-          day: 2,
-          title: "Sigiriya & Heritage",
-          description: "Climb Sigiriya Rock, explore palace ruins, visit fresco chambers, learn ancient history with fun activities.",
-        },
-        {
-          day: 3,
-          title: "Local Life Experience",
-          description: "Visit pottery workshop, traditional cooking class with kids, local school visit, community engagement.",
-        },
-        {
-          day: 4,
-          title: "Final Culture & Depart",
-          description: "Museum visit, artisan market exploration, family reflection session, group photo, transfer to airport.",
-        },
-      ],
-    },
-  ],
-};
+    included: Array.isArray(item.included) ? (item.included as any).hotelFacilities ?? [] : [],
+    excluded: [],
+    itinerary: [],
+  } as Trip;
+}
 
 export default function HomePage() {
   const [activeSlide, setActiveSlide] = useState(0);
+  const [trips, setTrips] = useState<Trip[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const [filters, setFilters] = useState({
+    tripCategory: "",
+    tripName: "",
+    organizer: "",
+    startLocation: "",
+    startDate: "",
+    endDate: "",
+    minPrice: "",
+    maxPrice: "",
+  });
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -589,6 +126,46 @@ export default function HomePage() {
 
     return () => clearInterval(timer);
   }, []);
+
+  const token = useAuthCacheStore((s) => s.token);
+  const hydrated = useAuthCacheStore((s) => s.hydrated);
+  const hydrateFromLegacySession = useAuthCacheStore((s) => s.hydrateFromLegacySession);
+
+  useEffect(() => {
+    if (!hydrated) hydrateFromLegacySession();
+    // load trips when token/hydration changes (ensures auth header is sent when available)
+    loadTrips();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, hydrated]);
+
+  async function loadTrips(params?: Record<string, string | number | undefined>) {
+    try {
+      setLoading(true);
+      const res = await tripApiService.getApprovedPublicTrips(params, token ?? undefined);
+      if (res && res.data) {
+        setTrips(res.data.map(mapApiToTrip));
+      }
+    } catch (err) {
+      // swallow for now; UI can show empty state
+      setTrips([]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function handleInputChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
+    const { name, value } = e.target;
+    setFilters((prev) => ({ ...prev, [name]: value }));
+  }
+
+  function handleSearch(e?: React.FormEvent) {
+    e?.preventDefault();
+    const params: Record<string, string | number | undefined> = {};
+    Object.entries(filters).forEach(([k, v]) => {
+      if (v !== "") params[k] = v;
+    });
+    loadTrips(params);
+  }
 
   const currentSlide = heroSlides[activeSlide];
 
@@ -657,17 +234,35 @@ export default function HomePage() {
                 <Link href="/trips">View all trips</Link>
               </Button>
             </div>
-            <div className="space-y-8">
-              {Object.entries(featuredTripsData).map(([type, trips]) => (
-                <section key={type} className="space-y-3">
-                  <h3 className="text-lg font-semibold">{type}</h3>
-                  <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
-                    {trips.map((trip) => (
-                      <TripCardEnhanced key={trip.id} trip={trip} />
-                    ))}
-                  </div>
-                </section>
-              ))}
+
+            <form onSubmit={handleSearch} className="mb-6 grid gap-2 md:grid-cols-4">
+              <input name="tripName" placeholder="Trip name" value={filters.tripName} onChange={handleInputChange} className="input" />
+              <input name="startLocation" placeholder="Start location" value={filters.startLocation} onChange={handleInputChange} className="input" />
+              <input name="startDate" type="date" placeholder="Start date" value={filters.startDate} onChange={handleInputChange} className="input" />
+              <div className="flex gap-2">
+                <input name="minPrice" placeholder="Min price" value={filters.minPrice} onChange={handleInputChange} className="input" />
+                <input name="maxPrice" placeholder="Max price" value={filters.maxPrice} onChange={handleInputChange} className="input" />
+              </div>
+              <div className="md:col-span-4 flex gap-2">
+                <Button type="submit">Search</Button>
+                <Button variant="outline" onClick={() => { setFilters({ tripCategory: "", tripName: "", organizer: "", startLocation: "", startDate: "", endDate: "", minPrice: "", maxPrice: "" }); loadTrips(); }}>
+                  Reset
+                </Button>
+              </div>
+            </form>
+
+            <div>
+              {loading ? (
+                <p>Loading trips…</p>
+              ) : trips.length === 0 ? (
+                <p className="text-muted-foreground">No trips found.</p>
+              ) : (
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+                  {trips.map((t) => (
+                    <TripCardEnhanced key={t.id} trip={t} />
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </section>
