@@ -227,7 +227,11 @@ export default function BookingPage() {
           userId: parentUserId,
           method: "card",
           amount,
-          metadata: { participants: participantsPayload },
+          // pass explicit user fields to avoid relying on server-side guessing
+          firstName: currentUser?.firstName ?? (currentUser?.name ? currentUser.name.split(" ")[0] : ""),
+          lastName: currentUser?.lastName ?? (currentUser?.name ? currentUser.name.split(" ").slice(1).join(" ") : ""),
+          email: currentUser?.email?.trim() ?? "",
+          phone: currentUser?.phone?.trim() ?? "",
         }, token ?? undefined);
 
         const payment = createRes.data;

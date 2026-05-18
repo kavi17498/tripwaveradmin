@@ -12,7 +12,6 @@ export type CreatePaymentPayload = {
   lastName?: string;
   email?: string;
   phone?: string;
-  metadata?: Record<string, unknown>;
 };
 
 export type CreatePaymentResult = {
@@ -27,11 +26,23 @@ export const paymentService = {
   async createPayment(payload: CreatePaymentPayload, token?: string): Promise<ServiceResponse<CreatePaymentResult>> {
     const authToken = token || userSessionService.getToken() || undefined;
 
+    // Build request body in the shape expected by the backend / payment provider
+    const sessionProfile = userSessionService.getUserProfile<Record<string, any>>();
+    const requestBody: Record<string, unknown> = {
+      amount: payload.amount,
+      first_name: payload.firstName ?? sessionProfile?.firstName ?? sessionProfile?.name ?? "",
+      last_name: payload.lastName ?? sessionProfile?.lastName ?? "",
+      email: payload.email ?? sessionProfile?.email ?? "",
+      phone: payload.phone ?? sessionProfile?.phone ?? "",
+    };
+
+    // intentionally do not send a `metadata` property — backend expects top-level payment fields only
+
     const response = await apiClient.request<CreatePaymentResult | ServiceResponse<CreatePaymentResult>>(
       "/payments/create",
       {
         method: "POST",
-        body: payload,
+        body: requestBody,
         token: authToken,
       },
     );
