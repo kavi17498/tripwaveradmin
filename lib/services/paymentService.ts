@@ -1,24 +1,64 @@
-import { mockPayments } from "@/lib/data/payments";
+import { apiClient } from "@/lib/services/apiClient";
+import { userSessionService } from "@/lib/services/userSessionService";
 import { Payment, ServiceResponse } from "@/lib/types";
-import { sleep } from "@/lib/services/serviceUtils";
+
+export type CreatePaymentPayload = {
+  tripId?: string;
+  bookingId?: string;
+  userId?: string;
+  method: Payment["method"];
+  amount: number;
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  phone?: string;
+  metadata?: Record<string, unknown>;
+};
+
+export type CreatePaymentResult = {
+  id: string;
+  status: string;
+  provider?: string;
+  checkoutUrl?: string;
+  [k: string]: unknown;
+};
 
 export const paymentService = {
-  async createPayment(payload: Omit<Payment, "id" | "paidAt" | "status">): Promise<ServiceResponse<Payment>> {
-    await sleep(900);
-    const status = Math.random() > 0.2 ? "success" : "failed";
-    return {
-      data: {
-        ...payload,
-        id: `p-${Date.now()}`,
-        status,
-        paidAt: new Date().toISOString(),
+  async createPayment(payload: CreatePaymentPayload, token?: string): Promise<ServiceResponse<CreatePaymentResult>> {
+    const authToken = token || userSessionService.getToken() || undefined;
+
+    const response = await apiClient.request<CreatePaymentResult | ServiceResponse<CreatePaymentResult>>(
+      "/payments/create",
+      {
+        method: "POST",
+        body: payload,
+        token: authToken,
       },
-      message: status === "success" ? "Payment successful" : "Payment failed",
+    );
+
+    if (response && typeof response === "object" && "data" in response) {
+      return response as ServiceResponse<CreatePaymentResult>;
+    }
+
+    return {
+      data: response as CreatePaymentResult,
+      message: "Payment created",
     };
   },
 
-  async getPaymentById(id: string): Promise<ServiceResponse<Payment | null>> {
-    await sleep(400);
-    return { data: mockPayments.find((payment) => payment.id === id) ?? null };
+  async getPaymentById(id: string, token?: string): Promise<ServiceResponse<CreatePaymentResult | null>> {
+    const authToken = token || userSessionService.getToken() || undefined;
+    const response = await apiClient.request<CreatePaymentResult | ServiceResponse<CreatePaymentResult | null>>(
+      `/payments/${id}`,
+      { method: "GET", token: authToken },
+    );
+
+    if (response && typeof response === "object" && "data" in response) {
+      return response as ServiceResponse<CreatePaymentResult | null>;
+    }
+
+    return { data: response as CreatePaymentResult | null, message: "Payment loaded" };
   },
 };
+
+export default paymentService;

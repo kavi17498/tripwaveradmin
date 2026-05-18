@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuthCacheStore, type CachedUserProfile } from "@/lib/stores/useAuthCacheStore";
 import { tripService } from "@/lib/services/tripService";
+import { paymentService } from "@/lib/services/paymentService";
 import { tripApiService, type TripApiItem } from "@/lib/services/tripApiService";
 import { formatCurrencyRs } from "@/lib/utils";
 
@@ -77,7 +78,7 @@ export default function BookingPage() {
   const [participantsCount, setParticipantsCount] = useState("1");
   const [participants, setParticipants] = useState<ParticipantForm[]>([emptyParticipant()]);
   const [loadingSubmission, setLoadingSubmission] = useState(false);
-  const [status, setStatus] = useState<"idle" | "success" | "failed">("idle");
+  const [status, setStatus] = useState<"idle" | "processing" | "success" | "failed">("idle");
   const [error, setError] = useState("");
 
   const bookedParticipantsCount = trip?.participants?.length ?? 0;
@@ -194,7 +195,7 @@ export default function BookingPage() {
       return;
     }
 
-    const payload = participants.map((participant, index) => {
+    const participantsPayload = participants.map((participant, index) => {
       const baseParticipant = {
         parentUserId: participants.length === 1 ? null : parentUserId,
         name: participant.name.trim(),
@@ -214,22 +215,67 @@ export default function BookingPage() {
       return baseParticipant;
     });
 
-    setLoadingSubmission(true);
-    setError("");
-    setStatus("idle");
+    (async () => {
+      setLoadingSubmission(true);
+      setError("");
+      setStatus("processing");
 
-    void tripService
-      .submitTripParticipants(tripId, payload, token ?? undefined)
-      .then(() => {
-        setStatus("success");
-      })
-      .catch((submissionError: unknown) => {
+      try {
+        const amount = pricePerPerson * participantsPayload.length;
+        const createRes = await paymentService.createPayment({
+          tripId,
+          userId: parentUserId,
+          method: "card",
+          amount,
+          metadata: { participants: participantsPayload },
+        }, token ?? undefined);
+
+        const payment = createRes.data;
+
+        const payhere = (window as Window & { payhere?: {
+          startPayment: (payload: typeof payment) => void;
+          onCompleted?: (orderId: string) => void;
+          onDismissed?: () => void;
+          onError?: (error: unknown) => void;
+        } }).payhere;
+
+        if (!payhere) {
+          throw new Error("PayHere script is not loaded.");
+        }
+
+        payhere.onCompleted = async () => {
+          try {
+            await tripService.submitTripParticipants(tripId, participantsPayload, token ?? undefined);
+            setStatus("success");
+          } catch (submitError: unknown) {
+            setStatus("failed");
+            setError(submitError instanceof Error ? submitError.message : "Failed to submit participants after payment.");
+          } finally {
+            setLoadingSubmission(false);
+          }
+        };
+
+        payhere.onDismissed = () => {
+          setStatus("failed");
+          setError("Payment was dismissed before completion.");
+          setLoadingSubmission(false);
+        };
+
+        payhere.onError = (payhereError: unknown) => {
+          setStatus("failed");
+          setError(payhereError instanceof Error ? payhereError.message : "Payment failed to initialize.");
+          setLoadingSubmission(false);
+        };
+
+        payhere.startPayment(payment);
+      } catch (err: unknown) {
         setStatus("failed");
-        setError(submissionError instanceof Error ? submissionError.message : "Failed to submit participants.");
-      })
-      .finally(() => {
+        setError(err instanceof Error ? err.message : String(err));
         setLoadingSubmission(false);
-      });
+      } finally {
+        // Keep the button disabled until the PayHere callback completes.
+      }
+    })();
   };
 
   return (
