@@ -56,6 +56,17 @@ const getUserAddress = (user: CachedUserProfile | null) => {
   ]);
 };
 
+const computeAgeFromDOB = (dob?: string | null) => {
+  if (!dob) return "";
+  const date = new Date(dob);
+  if (Number.isNaN(date.getTime())) return "";
+  const now = new Date();
+  let age = now.getFullYear() - date.getFullYear();
+  const m = now.getMonth() - date.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < date.getDate())) age--;
+  return String(Math.max(0, age));
+};
+
 export default function BookingPage() {
   const { tripId } = useParams<{ tripId: string }>();
   const [trip, setTrip] = useState<Trip | null>(null);
@@ -99,6 +110,8 @@ export default function BookingPage() {
       email: currentUser.email?.trim() ?? "",
       phone: currentUser.phone?.trim() ?? "",
       address: getUserAddress(currentUser),
+      gender: (currentUser.gender as ParticipantGender) ?? "",
+      age: computeAgeFromDOB(currentUser.dateOfBirth),
     };
 
     setParticipants((currentParticipants) => {
@@ -113,6 +126,8 @@ export default function BookingPage() {
         email: firstParticipant.email.trim() || primaryParticipant.email,
         phone: firstParticipant.phone.trim() || primaryParticipant.phone,
         address: firstParticipant.address.trim() || primaryParticipant.address,
+        gender: (firstParticipant.gender.trim() || primaryParticipant.gender) as ParticipantGender,
+        age: firstParticipant.age.trim() || primaryParticipant.age,
       };
 
       return nextParticipants;

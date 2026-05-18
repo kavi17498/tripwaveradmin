@@ -7,6 +7,8 @@ import { UserModulePayload } from "@/lib/types";
 type CachedUserProfile = Partial<UserModulePayload> & {
   name?: string;
   role?: string;
+  dateOfBirth?: string;
+  gender?: "male" | "female" | "other";
 };
 
 type AuthCacheState = {
@@ -26,9 +28,20 @@ export const useAuthCacheStore = create<AuthCacheState>()(
       hydrated: false,
       setSession(user, token) {
         set({ currentUser: user, token, hydrated: true });
+        try {
+          userSessionService.saveUserProfile(user);
+          userSessionService.saveToken(token);
+        } catch {
+          // non-fatal: persistence best-effort
+        }
       },
       clearSession() {
         set({ currentUser: null, token: null, hydrated: true });
+        try {
+          userSessionService.clearSession();
+        } catch {
+          // ignore
+        }
       },
       hydrateFromLegacySession() {
         const profile = userSessionService.getUserProfile<CachedUserProfile>();
