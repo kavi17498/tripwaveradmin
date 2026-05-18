@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuthCacheStore, type CachedUserProfile } from "@/lib/stores/useAuthCacheStore";
 import { tripService } from "@/lib/services/tripService";
-import { Trip } from "@/lib/types";
+import { tripApiService, type TripApiItem } from "@/lib/services/tripApiService";
 import { formatCurrencyRs } from "@/lib/utils";
 
 type ParticipantGender = "male" | "female" | "other" | "";
@@ -69,7 +69,7 @@ const computeAgeFromDOB = (dob?: string | null) => {
 
 export default function BookingPage() {
   const { tripId } = useParams<{ tripId: string }>();
-  const [trip, setTrip] = useState<Trip | null>(null);
+  const [trip, setTrip] = useState<TripApiItem | null>(null);
   const currentUser = useAuthCacheStore((state) => state.currentUser);
   const hydrated = useAuthCacheStore((state) => state.hydrated);
   const hydrateFromLegacySession = useAuthCacheStore((state) => state.hydrateFromLegacySession);
@@ -80,13 +80,38 @@ export default function BookingPage() {
   const [status, setStatus] = useState<"idle" | "success" | "failed">("idle");
   const [error, setError] = useState("");
 
+  const bookedParticipantsCount = trip?.participants?.length ?? 0;
+  const allowedBookingCount = Math.max(0, (trip?.maxParticipants ?? 0) - bookedParticipantsCount);
+  const mainDestination = trip?.mainDestinations?.[0]?.name || trip?.destinations?.[0]?.name || trip?.startLocation || "Not specified";
+  const pricePerPerson = trip?.price ?? 0;
+  const coverImage = trip?.coverImage || trip?.photos?.[0] || trip?.destinations?.[0]?.photos?.[0] || "";
+
   useEffect(() => {
-    tripService.getTripById(tripId).then((result) => setTrip(result.data));
-  }, [tripId]);
+    const loadTrip = async () => {
+      try {
+        const result = await tripApiService.getTripById(tripId, token ?? "");
+        setTrip(result.data ?? null);
+      } catch {
+        setTrip(null);
+      }
+    };
+
+    loadTrip();
+  }, [tripId, token]);
 
   useEffect(() => {
     hydrateFromLegacySession();
   }, [hydrateFromLegacySession]);
+
+  useEffect(() => {
+    if (!trip) return;
+
+    const nextCount = Math.min(Math.max(1, Number(participantsCount) || 1), Math.max(allowedBookingCount, 1));
+    const nextCountText = String(nextCount);
+    if (nextCountText !== participantsCount) {
+      setParticipantsCount(nextCountText);
+    }
+  }, [allowedBookingCount, participantsCount, trip]);
 
   useEffect(() => {
     const count = Math.max(1, Number(participantsCount) || 1);
@@ -145,6 +170,11 @@ export default function BookingPage() {
   const submit = (event: FormEvent) => {
     event.preventDefault();
 
+    if (allowedBookingCount <= 0) {
+      setError("This trip has reached its maximum participant limit.");
+      return;
+    }
+
     const parentUserId = typeof currentUser?.id === "string" ? currentUser.id.trim() : "";
 
     if (!parentUserId) {
@@ -193,7 +223,7 @@ export default function BookingPage() {
       .then(() => {
         setStatus("success");
       })
-      .catch((submissionError) => {
+      .catch((submissionError: unknown) => {
         setStatus("failed");
         setError(submissionError instanceof Error ? submissionError.message : "Failed to submit participants.");
       })
@@ -214,7 +244,19 @@ export default function BookingPage() {
           <form onSubmit={submit} className="space-y-4">
             <div className="grid gap-2 md:max-w-sm">
               <label className="text-sm font-medium">Total participants</label>
-              <Input type="number" min={1} value={participantsCount} onChange={(event) => setParticipantsCount(event.target.value)} />
+              <Input
+                type="number"
+                min={1}
+                max={allowedBookingCount}
+                value={participantsCount}
+                onChange={(event) => setParticipantsCount(event.target.value)}
+                disabled={allowedBookingCount <= 0}
+              />
+              <p className="text-xs text-muted-foreground">
+                {allowedBookingCount > 0
+                  ? `You can book up to ${allowedBookingCount} participant${allowedBookingCount === 1 ? "" : "s"} for this trip.`
+                  : "This trip is fully booked."}
+              </p>
             </div>
 
             {!hydrated ? <p className="text-sm text-muted-foreground">Loading cached profile...</p> : null}
@@ -272,17 +314,35 @@ export default function BookingPage() {
               </article>
             ))}
 
+            {allowedBookingCount <= 0 ? (
+              <p className="text-sm text-destructive">Booking is closed because this trip has no remaining participant slots.</p>
+            ) : null}
             {error ? <p className="text-sm text-destructive">{error}</p> : null}
             {status === "success" ? <p className="text-sm text-emerald-600">Participants submitted successfully.</p> : null}
-            <Button disabled={loadingSubmission}>{loadingSubmission ? "Submitting..." : "Submit booking participants"}</Button>
+            <Button disabled={loadingSubmission || allowedBookingCount <= 0}>
+              {loadingSubmission ? "Submitting..." : "Submit booking participants"}
+            </Button>
           </form>
         </section>
         <aside className="border border-border bg-card p-5">
           <h2 className="font-semibold">Trip summary</h2>
-          <p className="mt-2 text-sm">{trip?.title ?? "Loading..."}</p>
-          <p className="mt-1 text-sm text-muted-foreground">{trip?.destination}</p>
-          <p className="mt-4 text-sm text-muted-foreground">Participants: {participants.length}</p>
-          <p className="mt-1 text-lg font-semibold">{formatCurrencyRs(trip ? trip.price * participants.length : 0)}</p>
+          {coverImage ? (
+            <img src={coverImage} alt={trip?.tripName ?? "Trip cover"} className="mt-4 h-36 w-full rounded-md object-cover" />
+          ) : null}
+          <p className="mt-3 text-lg font-semibold">{trip?.tripName ?? "Loading trip..."}</p>
+          <p className="mt-1 text-sm text-muted-foreground">{trip?.tripCategory ?? "Trip category not available"}</p>
+          <div className="mt-4 space-y-2 text-sm text-muted-foreground">
+            <p>Destination: {mainDestination}</p>
+            <p>
+              Dates: {trip?.startDate ?? "--"} to {trip?.endDate ?? "--"}
+            </p>
+            <p>Organizer: {trip?.organizer ?? "--"}</p>
+            <p>
+              Slots left: {allowedBookingCount} of {trip?.maxParticipants ?? "--"}
+            </p>
+            <p>Participants: {participants.length}</p>
+          </div>
+          <p className="mt-4 text-lg font-semibold">{formatCurrencyRs(pricePerPerson * participants.length)}</p>
           <Button variant="outline" className="mt-4 w-full" asChild>
             <Link href={`/trips/${tripId}`}>Back to Trip</Link>
           </Button>
