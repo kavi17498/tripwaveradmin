@@ -87,6 +87,29 @@ export default function RegisterPage() {
               </div>
             </div>
 
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-sm font-medium">Date of birth</label>
+                <Input
+                  type="date"
+                  value={form.dateOfBirth}
+                  onChange={(event) => setField("dateOfBirth", event.target.value)}
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium">Gender</label>
+                <select
+                  className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  value={form.gender}
+                  onChange={(event) => setField("gender", event.target.value as "male" | "female" | "other")}
+                >
+                  <option value="male">Male</option>
+                  <option value="female">Female</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+            </div>
+
             <div>
               <label className="mb-1 block text-sm font-medium">Profile image URL (optional)</label>
               <Input

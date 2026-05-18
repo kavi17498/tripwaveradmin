@@ -21,6 +21,8 @@ const initialFormState: UserModuleRegistrationInput = {
   lastName: "",
   email: "",
   phone: "",
+  dateOfBirth: "",
+  gender: "male",
   profileImage: "",
   bio: "",
   street: "",
@@ -40,6 +42,7 @@ const validateProfileForm = (form: UserModuleRegistrationInput): string | null =
   if (form.lastName.trim().length < 2) return "Last name should have at least 2 characters.";
   if (!form.email.includes("@")) return "Please enter a valid email.";
   if (form.phone.trim().length < 6) return "Please enter a valid phone number.";
+  if (!form.dateOfBirth.trim()) return "Date of birth is required.";
   if (!form.bio.trim()) return "Bio is required.";
   if (!form.street.trim()) return "Street is required.";
 
@@ -56,6 +59,8 @@ const buildUserPayload = (
   lastName: form.lastName.trim(),
   email: fallbackEmail ?? form.email.trim(),
   phone: form.phone.trim(),
+  dateOfBirth: form.dateOfBirth.trim(),
+  gender: form.gender,
   profileImage: normalizeOptional(form.profileImage),
   bio: form.bio.trim(),
   street: form.street.trim(),

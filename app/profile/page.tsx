@@ -36,6 +36,8 @@ const profileFields: Array<{
   { key: "state", label: "State", placeholder: "Enter state" },
   { key: "postalCode", label: "Postal code", placeholder: "Enter postal code" },
   { key: "country", label: "Country", placeholder: "Enter country" },
+  { key: "dateOfBirth", label: "Date of birth", placeholder: "YYYY-MM-DD", type: "date" },
+  { key: "gender", label: "Gender", placeholder: "Select gender" },
 ];
 
 export default function ProfilePage() {
@@ -99,6 +101,8 @@ export default function ProfilePage() {
       state: profile.state,
       postalCode: profile.postalCode,
       country: profile.country,
+      dateOfBirth: profile.dateOfBirth,
+      gender: profile.gender as UpdateUserProfilePayload["gender"],
     };
 
     try {
@@ -154,6 +158,24 @@ export default function ProfilePage() {
                             placeholder={field.placeholder}
                             className="min-h-32 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none transition-[color,box-shadow] placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
                           />
+                        ) : field.key === "dateOfBirth" ? (
+                          <Input
+                            type="date"
+                            value={(profile.dateOfBirth as string | undefined) ?? ""}
+                            onChange={(event) => handleChange("dateOfBirth", event.target.value)}
+                            placeholder={field.placeholder}
+                          />
+                        ) : field.key === "gender" ? (
+                          <select
+                            value={(profile.gender as string | undefined) ?? ""}
+                            onChange={(event) => handleChange("gender", event.target.value)}
+                            className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none"
+                          >
+                            <option value="">Select gender</option>
+                            <option value="male">Male</option>
+                            <option value="female">Female</option>
+                            <option value="other">Other</option>
+                          </select>
                         ) : (
                           <Input
                             value={(profile[field.key] as string | undefined) ?? ""}
@@ -202,6 +224,14 @@ export default function ProfilePage() {
                     <p className="font-medium">Verification</p>
                     <p className="text-muted-foreground">{profile ? (profile.isVerified ? "Verified" : "Not verified") : "Unknown"}</p>
                   </div>
+                </div>
+                <div className="rounded-md border border-border p-3">
+                  <p className="font-medium">Gender</p>
+                  <p className="text-muted-foreground">{profile?.gender ?? "Unknown"}</p>
+                </div>
+                <div className="rounded-md border border-border p-3">
+                  <p className="font-medium">Date of birth</p>
+                  <p className="text-muted-foreground">{profile ? toDateLabel(profile.dateOfBirth) : "Unknown"}</p>
                 </div>
                 <div className="rounded-md border border-border p-3">
                   <p className="font-medium">Created</p>

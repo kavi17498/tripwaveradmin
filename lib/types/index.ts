@@ -138,6 +138,8 @@ export interface UserModuleRegistrationInput {
   lastName: string;
   email: string;
   phone: string;
+  dateOfBirth: string;
+  gender: "male" | "female" | "other";
   profileImage?: string;
   bio: string;
   street: string;
@@ -245,6 +247,8 @@ export interface AdminUserRecord {
   state: string;
   postalCode: string;
   country: string;
+  dateOfBirth?: string;
+  gender?: "male" | "female" | "other";
   isVerified: boolean;
   createdAt: FirestoreTimestamp;
   updatedAt: FirestoreTimestamp;
