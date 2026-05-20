@@ -13,6 +13,13 @@ import { userSessionService } from "@/lib/services/userSessionService";
 import { formatCurrencyRs } from "@/lib/utils";
 import { MapPin, Calendar, Users, MapPinIcon, Clock } from "lucide-react";
 
+const isTripExpired = (trip: TripApiItem) => {
+  const endOfDay = new Date(`${trip.endDate}T23:59:59.999`);
+  return Number.isNaN(endOfDay.getTime()) ? false : new Date() > endOfDay;
+};
+
+const canBookTrip = (trip: TripApiItem) => trip.status === "approved" && !isTripExpired(trip);
+
 export default function TripDetailsPage() {
   const router = useRouter();
   const { id } = useParams<{ id: string }>();
@@ -106,6 +113,13 @@ export default function TripDetailsPage() {
   const mainDestination = trip.mainDestinations?.[0]?.name || trip.destinations?.[0]?.name || trip.startLocation;
   const endTime = trip.endTime || "Not specified";
   const startTime = trip.startTime || "Not specified";
+  const expired = isTripExpired(trip);
+  const bookingAllowed = canBookTrip(trip);
+  const bookingMessage = expired
+    ? "This trip has expired."
+    : trip.status !== "approved"
+      ? "Booking is available after the trip is approved."
+      : "Booking is currently unavailable.";
 
   return (
     <div>
@@ -160,6 +174,11 @@ export default function TripDetailsPage() {
                 <span className="font-medium text-foreground">Category: </span>
                 {trip.tripCategory}
               </p>
+              {!bookingAllowed && (
+                <p className="mt-3 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                  {bookingMessage}
+                </p>
+              )}
             </div>
           </div>
 
@@ -167,9 +186,15 @@ export default function TripDetailsPage() {
           <div className="border border-border bg-card p-6 rounded-lg h-fit">
             <p className="text-sm text-muted-foreground">Price per person</p>
             <p className="text-3xl font-semibold">{formatCurrencyRs(trip.price)}</p>
-            <Button className="mt-6 w-full" asChild>
-              <Link href={`/booking/${trip.id}`}>Book Now</Link>
-            </Button>
+            {bookingAllowed ? (
+              <Button className="mt-6 w-full" asChild>
+                <Link href={`/booking/${trip.id}`}>Book Now</Link>
+              </Button>
+            ) : (
+              <Button className="mt-6 w-full" disabled title={bookingMessage}>
+                Book Now
+              </Button>
+            )}
           </div>
         </section>
 

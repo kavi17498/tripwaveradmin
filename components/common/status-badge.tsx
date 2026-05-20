@@ -16,6 +16,7 @@ const statusClassMap: Record<string, string> = {
   published: "bg-emerald-50 text-emerald-700 border-emerald-200",
   draft: "bg-zinc-100 text-zinc-700 border-zinc-200",
   cancelled: "bg-rose-50 text-rose-700 border-rose-200",
+  expired: "bg-zinc-100 text-zinc-600 border-zinc-300",
 };
 
 export function StatusBadge({ status }: StatusBadgeProps) {

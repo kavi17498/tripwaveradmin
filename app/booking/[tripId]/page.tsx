@@ -68,6 +68,17 @@ const computeAgeFromDOB = (dob?: string | null) => {
   return String(Math.max(0, age));
 };
 
+const isTripExpired = (trip: TripApiItem) => {
+  const endOfDay = new Date(`${trip.endDate}T23:59:59.999`);
+  return Number.isNaN(endOfDay.getTime()) ? false : new Date() > endOfDay;
+};
+
+const getBookingBlockedMessage = (trip: TripApiItem) => {
+  if (isTripExpired(trip)) return "This trip has expired.";
+  if (trip.status !== "approved") return "Booking is available after the trip is approved.";
+  return "This trip cannot be booked right now.";
+};
+
 export default function BookingPage() {
   const { tripId } = useParams<{ tripId: string }>();
   const [trip, setTrip] = useState<TripApiItem | null>(null);
@@ -91,7 +102,12 @@ export default function BookingPage() {
     const loadTrip = async () => {
       try {
         const result = await tripApiService.getTripById(tripId, token ?? "");
-        setTrip(result.data ?? null);
+        const loadedTrip = result.data ?? null;
+        setTrip(loadedTrip);
+
+        if (loadedTrip && (loadedTrip.status !== "approved" || isTripExpired(loadedTrip))) {
+          setError(getBookingBlockedMessage(loadedTrip));
+        }
       } catch {
         setTrip(null);
       }
@@ -170,6 +186,11 @@ export default function BookingPage() {
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
+
+    if (!trip || trip.status !== "approved" || isTripExpired(trip)) {
+      setError(trip ? getBookingBlockedMessage(trip) : "This trip is not available for booking.");
+      return;
+    }
 
     if (allowedBookingCount <= 0) {
       setError("This trip has reached its maximum participant limit.");
