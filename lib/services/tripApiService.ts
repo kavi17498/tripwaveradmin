@@ -16,6 +16,7 @@ export type TripApiItem = {
   id: string;
   tripName: string;
   tripCategory: CreateTripApiPayload["tripCategory"] | string;
+  paymentMethods?: CreateTripApiPayload["paymentMethods"];
   destinations: TripApiDestination[];
   mainDestinations?: Array<{
     name: string;

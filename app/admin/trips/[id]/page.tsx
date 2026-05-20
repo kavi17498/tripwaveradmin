@@ -90,6 +90,7 @@ export default function AdminTripDetailPage() {
           <h2 className="font-semibold">Trip Summary</h2>
           <div className="mt-3 grid gap-3 text-sm md:grid-cols-2">
             <p><span className="text-muted-foreground">Category:</span> {trip.tripCategory}</p>
+            <p><span className="text-muted-foreground">Payment methods:</span> {trip.paymentMethods?.length ? trip.paymentMethods.join(", ") : "-"}</p>
             <p><span className="text-muted-foreground">Price:</span> {formatCurrencyRs(trip.price)}</p>
             <p><span className="text-muted-foreground">Start:</span> {formatDateLabel(trip.startDate)} {trip.startTime ? `at ${trip.startTime}` : ""}</p>
             <p><span className="text-muted-foreground">End:</span> {formatDateLabel(trip.endDate)} {trip.endTime ? `at ${trip.endTime}` : ""}</p>

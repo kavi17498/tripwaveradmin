@@ -113,7 +113,7 @@ export default function TripDetailsPage() {
       <main className="mx-auto max-w-7xl space-y-8 px-4 py-8 md:px-6">
         {/* Cover Image */}
         {trip.coverImage && (
-          <img src={trip.coverImage} alt={trip.tripName} className="h-[320px] w-full border border-border rounded-lg object-cover" />
+          <img src={trip.coverImage} alt={trip.tripName} className="h-80 w-full border border-border rounded-lg object-cover" />
         )}
 
         {/* Header Section */}

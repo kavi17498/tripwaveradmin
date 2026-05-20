@@ -206,6 +206,7 @@ export interface CreateTripApiPayload {
   tripName: string;
   tripCategory: "Solo Trip with guide" | "Family Trip with guide" | "Strangers Trip with guide" | "Private trip";
   status?: "pending" | "draft";
+  paymentMethods: ("Pay Online" | "Pay to Guide on Trip Day")[];
   destinations: TripDestinationPayload[];
   mainDestinations?: Array<{
     name: string;
@@ -270,6 +271,7 @@ export interface AdminTripRecord {
   id: string;
   tripName: string;
   tripCategory: string;
+  paymentMethods?: ("Pay Online" | "Pay to Guide on Trip Day")[];
   destinations: AdminTripDestination[];
   mainDestinations?: Array<{
     name: string;
