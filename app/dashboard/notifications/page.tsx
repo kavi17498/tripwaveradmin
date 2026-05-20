@@ -6,16 +6,40 @@ import { Button } from "@/components/ui/button";
 import { NotificationItem } from "@/components/notifications/notification-item";
 import { notificationService } from "@/lib/services/notificationService";
 import { Notification } from "@/lib/types";
+import { useAuthCacheStore } from "@/lib/stores/useAuthCacheStore";
+import { userSessionService } from "@/lib/services/userSessionService";
 
 type Tab = "all" | "unread" | "payment";
 
 export default function NotificationsPage() {
   const [tab, setTab] = useState<Tab>("all");
   const [items, setItems] = useState<Notification[]>([]);
+  const currentUser = useAuthCacheStore((state) => state.currentUser);
 
   useEffect(() => {
-    notificationService.getNotifications("u1").then((result) => setItems(result.data));
-  }, []);
+    let mounted = true;
+
+    const load = async () => {
+      const token = userSessionService.getToken();
+      if (!token && !currentUser) {
+        setItems([]);
+        return;
+      }
+
+      const result = await notificationService.getNotifications(currentUser?.id);
+      if (mounted) setItems(result.data);
+    };
+
+    void load();
+    const intervalId = window.setInterval(() => {
+      void load();
+    }, 30000);
+
+    return () => {
+      mounted = false;
+      window.clearInterval(intervalId);
+    };
+  }, [currentUser]);
 
   const filteredItems = useMemo(() => {
     if (tab === "unread") return items.filter((item) => !item.read);

@@ -3,6 +3,7 @@ import { Notification } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const iconMap = {
+  "trip-approved": BadgeCheck,
   "join-request": BadgeCheck,
   payment: CreditCard,
   reminder: Clock3,

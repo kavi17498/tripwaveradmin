@@ -3,9 +3,11 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { UserCircle2 } from "lucide-react";
+import { Bell, UserCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { authService } from "@/lib/services/authService";
+import { notificationService } from "@/lib/services/notificationService";
+import { userSessionService } from "@/lib/services/userSessionService";
 import { User } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -37,6 +39,7 @@ export function Navbar() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
   const [mode, setMode] = useState<AppMode>(getInitialMode);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
     const unsubscribe = authService.subscribeToAuthChanges((user) => {
@@ -45,6 +48,49 @@ export function Navbar() {
 
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const refreshNotifications = async () => {
+      if (!currentUser) {
+        if (mounted) setUnreadCount(0);
+        return;
+      }
+
+      const token = userSessionService.getToken();
+      if (!token) {
+        if (mounted) setUnreadCount(0);
+        return;
+      }
+
+      try {
+        const result = await notificationService.getUnreadCount(currentUser.id);
+        if (mounted) setUnreadCount(result.data ?? 0);
+      } catch {
+        if (mounted) setUnreadCount(0);
+      }
+    };
+
+    void refreshNotifications();
+    const intervalId = window.setInterval(() => {
+      void refreshNotifications();
+    }, 30000);
+
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        void refreshNotifications();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      mounted = false;
+      window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [currentUser]);
 
   const links = useMemo(() => {
     return mode === "explorer" ? explorerLinks : creatorLinks;
@@ -109,6 +155,18 @@ export function Navbar() {
           ))}
         </nav>
         <div className="flex items-center gap-2">
+          {currentUser ? (
+            <Button variant="ghost" size="icon" asChild className="relative">
+              <Link href="/dashboard/notifications" aria-label="Notifications">
+                <Bell className="size-5" />
+                {unreadCount > 0 ? (
+                  <span className="absolute -right-1 -top-1 inline-flex min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 py-0.5 text-[10px] font-semibold leading-none text-destructive-foreground">
+                    {unreadCount > 9 ? "9+" : unreadCount}
+                  </span>
+                ) : null}
+              </Link>
+            </Button>
+          ) : null}
           {currentUser ? (
             <>
               <Button variant="outline" asChild>

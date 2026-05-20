@@ -60,9 +60,10 @@ export interface Review {
 export interface Notification {
   id: string;
   userId: string;
-  type: "join-request" | "payment" | "reminder" | "account-alert";
+  type: "trip-approved" | "join-request" | "payment" | "reminder" | "account-alert";
   title: string;
   description: string;
+  tripId?: string;
   read: boolean;
   createdAt: string;
 }
