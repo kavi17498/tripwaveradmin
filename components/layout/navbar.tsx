@@ -112,8 +112,13 @@ export function Navbar() {
           {currentUser ? (
             <>
               <Button variant="outline" asChild>
-                <Link href="/profile">
-                  <UserCircle2 className="size-4" />
+                <Link href="/profile" className="flex items-center gap-2">
+                  {currentUser.avatarUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={currentUser.avatarUrl} alt="avatar" className="h-6 w-6 rounded-full object-cover" />
+                  ) : (
+                    <UserCircle2 className="size-4" />
+                  )}
                   Profile
                 </Link>
               </Button>

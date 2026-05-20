@@ -242,6 +242,7 @@ export interface AdminUserRecord {
   lastName: string;
   email: string;
   phone: string;
+  profileImage?: string;
   bio: string;
   street: string;
   city: string;

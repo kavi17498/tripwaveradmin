@@ -14,6 +14,7 @@ import { authService } from "@/lib/services/authService";
 import { userService, type UserProfileRecord, type UpdateUserProfilePayload } from "@/lib/services/userService";
 import { useAuthCacheStore } from "@/lib/stores/useAuthCacheStore";
 import { userSessionService } from "@/lib/services/userSessionService";
+import { userImageUploadService } from "@/lib/services/userImageUploadService";
 
 const toDateLabel = (value?: { _seconds: number; _nanoseconds: number } | string | null) => {
   if (!value) return "Unknown";
@@ -27,6 +28,7 @@ const profileFields: Array<{
   placeholder: string;
   type?: string;
 }> = [
+  { key: "profileImage", label: "Profile image URL", placeholder: "https://example.com/profile.jpg" },
   { key: "firstName", label: "First name", placeholder: "Enter first name" },
   { key: "lastName", label: "Last name", placeholder: "Enter last name" },
   { key: "phone", label: "Phone", placeholder: "Enter phone number" },
@@ -45,6 +47,8 @@ export default function ProfilePage() {
   const { pushToast } = useToast();
   const { currentUser, token, hydrated, hydrateFromLegacySession } = useAuthCacheStore();
   const [profile, setProfile] = useState<UserProfileRecord | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -84,6 +88,17 @@ export default function ProfilePage() {
     setProfile((current) => (current ? { ...current, [field]: value } : current));
   };
 
+  const handleFileChange = (file?: File | null) => {
+    setSelectedFile(file ?? null);
+    if (file) {
+      const url = URL.createObjectURL(file);
+      setPreviewUrl(url);
+      setProfile((current) => (current ? { ...current, profileImage: url } : current));
+    } else {
+      setPreviewUrl(null);
+    }
+  };
+
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
     if (!profile || !sessionUserId || !token) return;
@@ -95,6 +110,7 @@ export default function ProfilePage() {
       firstName: profile.firstName,
       lastName: profile.lastName,
       phone: profile.phone,
+      profileImage: profile.profileImage,
       bio: profile.bio,
       street: profile.street,
       city: profile.city,
@@ -106,6 +122,11 @@ export default function ProfilePage() {
     };
 
     try {
+      // if a new file is selected, upload it and replace profileImage with the uploaded URL
+      if (selectedFile) {
+        const uploaded = await userImageUploadService.uploadProfileImage(selectedFile);
+        if (uploaded) payload.profileImage = uploaded;
+      }
       const response = await userService.updateUserProfile(sessionUserId, payload, token);
       setProfile(response.data);
       if (currentUser) {
@@ -151,7 +172,20 @@ export default function ProfilePage() {
                     {profileFields.map((field) => (
                       <div key={String(field.key)} className="space-y-2">
                         <label className="text-sm font-medium">{field.label}</label>
-                        {field.key === "bio" ? (
+                        {field.key === "profileImage" ? (
+                          <div>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={(e) => handleFileChange(e.target.files?.[0] ?? null)}
+                              className="w-full"
+                            />
+                            {previewUrl ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={previewUrl} alt="preview" className="mt-2 h-24 w-24 rounded-full object-cover" />
+                            ) : null}
+                          </div>
+                        ) : field.key === "bio" ? (
                           <textarea
                             value={profile.bio ?? ""}
                             onChange={(event) => handleChange("bio", event.target.value)}
@@ -201,8 +235,13 @@ export default function ProfilePage() {
 
             <aside className="space-y-4 border border-border bg-background/70 p-5">
               <div className="flex items-center gap-3">
-                <div className="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
-                  <UserCircle2 className="size-6" />
+                <div className="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary overflow-hidden">
+                  {profile?.profileImage ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={profile.profileImage} alt="profile" className="h-12 w-12 rounded-full object-cover" />
+                  ) : (
+                    <UserCircle2 className="size-6" />
+                  )}
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Signed in as</p>

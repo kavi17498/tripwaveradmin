@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/feedback/toast-provider";
 import { useUserRegistrationStore } from "@/lib/stores/useUserRegistrationStore";
+import { userImageUploadService } from "@/lib/services/userImageUploadService";
 import { useAuthCacheStore } from "@/lib/stores/useAuthCacheStore";
 import { userSessionService } from "@/lib/services/userSessionService";
 
@@ -26,6 +27,13 @@ export default function RegisterPage() {
     clearError();
 
     try {
+      // if user selected a file in the registration form, upload it first
+      const fileInput = document.querySelector<HTMLInputElement>("#profileImageFile");
+      if (fileInput && fileInput.files && fileInput.files[0]) {
+        const uploaded = await userImageUploadService.uploadProfileImage(fileInput.files[0]);
+        if (uploaded) setField("profileImage", uploaded);
+      }
+
       await registerManual(password, confirmPassword);
       const profile = userSessionService.getUserProfile<Record<string, unknown>>();
       const token = userSessionService.getToken();
@@ -111,12 +119,8 @@ export default function RegisterPage() {
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-medium">Profile image URL (optional)</label>
-              <Input
-                value={form.profileImage}
-                onChange={(event) => setField("profileImage", event.target.value)}
-                placeholder="https://example.com/profile.jpg"
-              />
+              <label className="mb-1 block text-sm font-medium">Profile image (optional)</label>
+              <input id="profileImageFile" type="file" accept="image/*" className="w-full" />
             </div>
 
             <div>
