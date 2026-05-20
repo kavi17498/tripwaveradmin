@@ -1,14 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Bell, UserCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { authService } from "@/lib/services/authService";
 import { notificationService } from "@/lib/services/notificationService";
 import { userSessionService } from "@/lib/services/userSessionService";
-import { User } from "@/lib/types";
+import { Notification, User } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 type AppMode = "explorer" | "creator";
@@ -36,10 +36,14 @@ const getInitialMode = (): AppMode => {
 export function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
+  const notificationPanelRef = useRef<HTMLDivElement | null>(null);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
   const [mode, setMode] = useState<AppMode>(getInitialMode);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [loadingNotifications, setLoadingNotifications] = useState(false);
 
   useEffect(() => {
     const unsubscribe = authService.subscribeToAuthChanges((user) => {
@@ -91,6 +95,44 @@ export function Navbar() {
       document.removeEventListener("visibilitychange", handleVisibility);
     };
   }, [currentUser]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (!notificationPanelRef.current) return;
+      if (!notificationPanelRef.current.contains(event.target as Node)) {
+        setShowNotifications(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadNotifications = async () => {
+      if (!showNotifications || !currentUser) return;
+
+      const token = userSessionService.getToken();
+      if (!token) return;
+
+      setLoadingNotifications(true);
+      try {
+        const result = await notificationService.getNotifications(currentUser.id);
+        if (mounted) setNotifications(result.data.slice(0, 5));
+      } catch {
+        if (mounted) setNotifications([]);
+      } finally {
+        if (mounted) setLoadingNotifications(false);
+      }
+    };
+
+    void loadNotifications();
+    return () => {
+      mounted = false;
+    };
+  }, [currentUser, showNotifications]);
 
   const links = useMemo(() => {
     return mode === "explorer" ? explorerLinks : creatorLinks;
@@ -156,16 +198,74 @@ export function Navbar() {
         </nav>
         <div className="flex items-center gap-2">
           {currentUser ? (
-            <Button variant="ghost" size="icon" asChild className="relative">
-              <Link href="/dashboard/notifications" aria-label="Notifications">
+            <div className="relative" ref={notificationPanelRef}>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="relative"
+                aria-label="Notifications"
+                onClick={() => setShowNotifications((current) => !current)}
+              >
                 <Bell className="size-5" />
                 {unreadCount > 0 ? (
                   <span className="absolute -right-1 -top-1 inline-flex min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 py-0.5 text-[10px] font-semibold leading-none text-destructive-foreground">
                     {unreadCount > 9 ? "9+" : unreadCount}
                   </span>
                 ) : null}
-              </Link>
-            </Button>
+              </Button>
+
+              {showNotifications ? (
+                <div className="absolute right-0 top-12 z-50 w-80 rounded-md border border-border bg-background shadow-lg">
+                  <div className="flex items-center justify-between border-b border-border px-4 py-3">
+                    <div>
+                      <p className="text-sm font-semibold">Notifications</p>
+                      <p className="text-xs text-muted-foreground">Latest trip updates</p>
+                    </div>
+                    <Button variant="ghost" size="sm" onClick={() => setShowNotifications(false)}>
+                      Close
+                    </Button>
+                  </div>
+
+                  <div className="max-h-80 overflow-auto p-3 space-y-2">
+                    {loadingNotifications ? (
+                      <p className="px-1 py-3 text-sm text-muted-foreground">Loading notifications...</p>
+                    ) : notifications.length > 0 ? (
+                      notifications.map((item) => (
+                        <Link
+                          key={item.id}
+                          href="/dashboard/notifications"
+                          onClick={() => setShowNotifications(false)}
+                          className={cn(
+                            "block rounded-md border border-border px-3 py-2 transition-colors hover:bg-accent/20",
+                            !item.read && "bg-sky-50/60",
+                          )}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <p className="text-sm font-medium">{item.title}</p>
+                            {!item.read ? <span className="mt-1 h-2.5 w-2.5 rounded-full bg-destructive" aria-label="Unread notification" /> : null}
+                          </div>
+                          <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{item.description}</p>
+                          <p className="mt-1 text-[11px] text-muted-foreground">{new Date(item.createdAt).toLocaleString()}</p>
+                        </Link>
+                      ))
+                    ) : (
+                      <p className="px-1 py-3 text-sm text-muted-foreground">No notifications yet.</p>
+                    )}
+                  </div>
+
+                  <div className="border-t border-border px-4 py-3">
+                    <Link
+                      href="/dashboard/notifications"
+                      onClick={() => setShowNotifications(false)}
+                      className="text-sm font-medium text-primary hover:underline"
+                    >
+                      View full screen
+                    </Link>
+                  </div>
+                </div>
+              ) : null}
+            </div>
           ) : null}
           {currentUser ? (
             <>

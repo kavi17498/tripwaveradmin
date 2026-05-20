@@ -47,6 +47,13 @@ export default function NotificationsPage() {
     return items;
   }, [items, tab]);
 
+  const markItemAsRead = async (item: Notification) => {
+    if (item.read) return;
+
+    await notificationService.markAsRead(item.id);
+    setItems((currentItems) => currentItems.map((currentItem) => (currentItem.id === item.id ? { ...currentItem, read: true } : currentItem)));
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader title="Notifications" description="Track trip updates, reminders, and account alerts." />
@@ -57,7 +64,7 @@ export default function NotificationsPage() {
       </div>
       <div className="space-y-2">
         {filteredItems.map((item) => (
-          <NotificationItem key={item.id} item={item} />
+          <NotificationItem key={item.id} item={item} onClick={markItemAsRead} />
         ))}
       </div>
     </div>
