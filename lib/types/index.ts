@@ -69,6 +69,7 @@ export interface Notification {
 
 export interface ChatMessage {
   id: string;
+  chatGroupId?: string;
   tripId: string;
   senderId: string;
   senderName: string;

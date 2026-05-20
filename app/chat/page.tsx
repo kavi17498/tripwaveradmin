@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Navbar } from "@/components/layout/navbar";
 import { Footer } from "@/components/layout/footer";
 import useChatStore from "@/lib/stores/useChatStore";
 
 export default function ChatLandingPage() {
+  const router = useRouter();
   const groups = useChatStore((s: any) => s.groups);
   const loading = useChatStore((s: any) => s.loading);
   const selected = useChatStore((s: any) => s.selected);
@@ -15,11 +17,6 @@ export default function ChatLandingPage() {
   useEffect(() => {
     fetchGroups();
   }, [fetchGroups]);
-
-  const dummyMessages = [
-    { id: 'd1', senderName: 'System', message: 'Chats are not implemented yet.', createdAt: new Date().toISOString() },
-    { id: 'd2', senderName: 'Alice', message: 'Hello everyone — this is a placeholder chat.', createdAt: new Date().toISOString() },
-  ];
 
   return (
     <div className="min-h-screen bg-background">
@@ -38,19 +35,28 @@ export default function ChatLandingPage() {
               </header>
 
               <div className="flex-1 overflow-auto space-y-3 pb-4">
-                {dummyMessages.map((m) => (
-                  <div key={m.id} className="p-3 bg-muted/20 rounded">
-                    <div className="text-sm font-medium">{m.senderName}</div>
-                    <div className="text-sm text-muted-foreground">{m.message}</div>
-                    <div className="text-xs text-muted-foreground mt-1">{new Date(m.createdAt).toLocaleString()}</div>
+                {selected ? (
+                  <div className="rounded-md border border-border bg-muted/20 p-4 text-sm text-muted-foreground">
+                    This is the trip group overview. Open the full chat to send messages and images.
                   </div>
-                ))}
+                ) : (
+                  <div className="rounded-md border border-border bg-muted/20 p-4 text-sm text-muted-foreground">
+                    Pick a group from the sidebar to continue.
+                  </div>
+                )}
               </div>
 
               <div className="mt-4">
                 <div className="flex gap-2">
-                  <input className="flex-1 input" placeholder="Type a message (disabled)" disabled />
-                  <button className="btn" disabled>Send</button>
+                  <input className="flex-1 input" placeholder="Open a trip chat to send messages" disabled />
+                  <button
+                    className="btn"
+                    disabled={!selected}
+                    onClick={() => selected?.tripId ? router.push(`/dashboard/trips/${selected.tripId}/chat`) : null}
+                    type="button"
+                  >
+                    Open chat
+                  </button>
                 </div>
               </div>
             </div>
@@ -67,7 +73,10 @@ export default function ChatLandingPage() {
                 {groups.map((g: any) => (
                   <button
                     key={g.id}
-                    onClick={() => selectGroup(g.id)}
+                    onClick={() => {
+                      selectGroup(g.id);
+                      if (g.tripId) router.push(`/dashboard/trips/${g.tripId}/chat`);
+                    }}
                     className={`w-full text-left p-3 rounded-md hover:bg-accent/20 ${selected?.id === g.id ? 'bg-accent/30' : ''}`}>
                     <div className="font-medium">{g.name}</div>
                     <div className="text-xs text-muted-foreground">{g.adminName ?? '—'}</div>

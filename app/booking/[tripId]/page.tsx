@@ -11,6 +11,7 @@ import { useAuthCacheStore, type CachedUserProfile } from "@/lib/stores/useAuthC
 import { tripService } from "@/lib/services/tripService";
 import { paymentService } from "@/lib/services/paymentService";
 import { tripApiService, type TripApiItem } from "@/lib/services/tripApiService";
+import { useRouter } from "next/navigation";
 import { formatCurrencyRs } from "@/lib/utils";
 
 type ParticipantGender = "male" | "female" | "other" | "";
@@ -87,6 +88,7 @@ const getPaymentMethodHelpText = (method: TripPaymentMethod) => {
 
 export default function BookingPage() {
   const { tripId } = useParams<{ tripId: string }>();
+  const router = useRouter();
   const [trip, setTrip] = useState<TripApiItem | null>(null);
   const currentUser = useAuthCacheStore((state) => state.currentUser);
   const hydrated = useAuthCacheStore((state) => state.hydrated);
@@ -119,7 +121,6 @@ export default function BookingPage() {
 
           // Server may mark trips as reserved when a family/solo booking is completed
           const reservedFor = (loadedTrip as any).reservedFor as string | undefined;
-          const reservedByUserId = (loadedTrip as any).reservedByUserId as string | undefined | null;
           if (reservedFor === 'family' || reservedFor === 'solo') {
             // If reserved by someone else, block booking for everyone
             setError('This trip has been reserved and is no longer bookable.');
@@ -129,7 +130,7 @@ export default function BookingPage() {
           if (currentUser && Array.isArray(loadedTrip.participants)) {
             const already = loadedTrip.participants.find((p: any) => p.parentUserId && p.parentUserId === currentUser.id);
             if (already) {
-              setError('You already have a booking for this trip.');
+              setError('You have already booked this trip.');
             }
           }
         }
@@ -139,7 +140,7 @@ export default function BookingPage() {
     };
 
     loadTrip();
-  }, [tripId, token]);
+  }, [currentUser, tripId, token]);
 
   useEffect(() => {
     hydrateFromLegacySession();
@@ -262,7 +263,7 @@ export default function BookingPage() {
 
     const participantsPayload = participants.map((participant, index) => {
       const baseParticipant = {
-        parentUserId: participants.length === 1 ? null : parentUserId,
+        parentUserId,
         name: participant.name.trim(),
         gender: participant.gender as "male" | "female" | "other",
         age: Number(participant.age),
@@ -284,6 +285,7 @@ export default function BookingPage() {
       await tripService.submitTripParticipants(tripId, participantsPayload, token ?? undefined, paymentMethod);
       setStatus("success");
       setLoadingSubmission(false);
+      router.push(`/dashboard/trips/${tripId}/chat`);
     };
 
     (async () => {
