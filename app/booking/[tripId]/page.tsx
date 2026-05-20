@@ -14,6 +14,7 @@ import { tripApiService, type TripApiItem } from "@/lib/services/tripApiService"
 import { formatCurrencyRs } from "@/lib/utils";
 
 type ParticipantGender = "male" | "female" | "other" | "";
+type TripPaymentMethod = NonNullable<TripApiItem["paymentMethods"]>[number];
 
 type ParticipantForm = {
   name: string;
@@ -79,6 +80,11 @@ const getBookingBlockedMessage = (trip: TripApiItem) => {
   return "This trip cannot be booked right now.";
 };
 
+const getPaymentMethodHelpText = (method: TripPaymentMethod) => {
+  if (method === "Pay Online") return "Complete the payment online now.";
+  return "Reserve your spot now and pay the guide on the trip day.";
+};
+
 export default function BookingPage() {
   const { tripId } = useParams<{ tripId: string }>();
   const [trip, setTrip] = useState<TripApiItem | null>(null);
@@ -88,6 +94,7 @@ export default function BookingPage() {
   const token = useAuthCacheStore((state) => state.token);
   const [participantsCount, setParticipantsCount] = useState("1");
   const [participants, setParticipants] = useState<ParticipantForm[]>([emptyParticipant()]);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<TripPaymentMethod | "">("");
   const [loadingSubmission, setLoadingSubmission] = useState(false);
   const [status, setStatus] = useState<"idle" | "processing" | "success" | "failed">("idle");
   const [error, setError] = useState("");
@@ -123,12 +130,19 @@ export default function BookingPage() {
   useEffect(() => {
     if (!trip) return;
 
+    const availablePaymentMethods = trip.paymentMethods ?? [];
+    if (availablePaymentMethods.length === 1) {
+      setSelectedPaymentMethod(availablePaymentMethods[0]);
+    } else if (availablePaymentMethods.length > 1 && (!selectedPaymentMethod || !availablePaymentMethods.includes(selectedPaymentMethod as TripPaymentMethod))) {
+      setSelectedPaymentMethod(availablePaymentMethods[0]);
+    }
+
     const nextCount = Math.min(Math.max(1, Number(participantsCount) || 1), Math.max(allowedBookingCount, 1));
     const nextCountText = String(nextCount);
     if (nextCountText !== participantsCount) {
       setParticipantsCount(nextCountText);
     }
-  }, [allowedBookingCount, participantsCount, trip]);
+  }, [allowedBookingCount, participantsCount, selectedPaymentMethod, trip]);
 
   useEffect(() => {
     const count = Math.max(1, Number(participantsCount) || 1);
@@ -192,6 +206,18 @@ export default function BookingPage() {
       return;
     }
 
+    const availablePaymentMethods = trip.paymentMethods ?? [];
+    if (!availablePaymentMethods.length) {
+      setError("This trip does not have a supported payment method configured.");
+      return;
+    }
+
+    const paymentMethod = selectedPaymentMethod || availablePaymentMethods[0];
+    if (!paymentMethod || !availablePaymentMethods.includes(paymentMethod)) {
+      setError("Please select a valid payment method for this trip.");
+      return;
+    }
+
     if (allowedBookingCount <= 0) {
       setError("This trip has reached its maximum participant limit.");
       return;
@@ -236,12 +262,23 @@ export default function BookingPage() {
       return baseParticipant;
     });
 
+    const finalizeBooking = async () => {
+      await tripService.submitTripParticipants(tripId, participantsPayload, token ?? undefined, paymentMethod);
+      setStatus("success");
+      setLoadingSubmission(false);
+    };
+
     (async () => {
       setLoadingSubmission(true);
       setError("");
       setStatus("processing");
 
       try {
+        if (paymentMethod === "Pay to Guide on Trip Day") {
+          await finalizeBooking();
+          return;
+        }
+
         const amount = pricePerPerson * participantsPayload.length;
         const createRes = await paymentService.createPayment({
           tripId,
@@ -270,13 +307,10 @@ export default function BookingPage() {
 
         payhere.onCompleted = async () => {
           try {
-            await tripService.submitTripParticipants(tripId, participantsPayload, token ?? undefined);
-            setStatus("success");
+            await finalizeBooking();
           } catch (submitError: unknown) {
             setStatus("failed");
             setError(submitError instanceof Error ? submitError.message : "Failed to submit participants after payment.");
-          } finally {
-            setLoadingSubmission(false);
           }
         };
 
@@ -313,6 +347,38 @@ export default function BookingPage() {
             <p className="text-sm text-muted-foreground">Your cached profile fills the first participant. Add the rest of the party below.</p>
           </div>
           <form onSubmit={submit} className="space-y-4">
+            <section className="space-y-3 border border-border bg-background p-4">
+              <div>
+                <h2 className="font-semibold">Payment method</h2>
+                <p className="text-xs text-muted-foreground">Choose how you want to complete this booking.</p>
+              </div>
+
+              {trip?.paymentMethods?.length ? (
+                <div className="grid gap-2 md:grid-cols-2">
+                  {trip.paymentMethods.map((method) => (
+                    <label
+                      key={method}
+                      className={`flex cursor-pointer items-start gap-3 rounded-md border p-3 text-sm transition-colors ${selectedPaymentMethod === method ? "border-primary bg-primary/5" : "border-border bg-card"}`}
+                    >
+                      <input
+                        type="radio"
+                        name="payment-method"
+                        className="mt-1"
+                        checked={selectedPaymentMethod === method}
+                        onChange={() => setSelectedPaymentMethod(method)}
+                      />
+                      <div>
+                        <p className="font-medium">{method}</p>
+                        <p className="text-xs text-muted-foreground">{getPaymentMethodHelpText(method)}</p>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-destructive">No payment methods are configured for this trip.</p>
+              )}
+            </section>
+
             <div className="grid gap-2 md:max-w-sm">
               <label className="text-sm font-medium">Total participants</label>
               <Input
@@ -390,8 +456,12 @@ export default function BookingPage() {
             ) : null}
             {error ? <p className="text-sm text-destructive">{error}</p> : null}
             {status === "success" ? <p className="text-sm text-emerald-600">Participants submitted successfully.</p> : null}
-            <Button disabled={loadingSubmission || allowedBookingCount <= 0}>
-              {loadingSubmission ? "Submitting..." : "Submit booking participants"}
+            <Button disabled={loadingSubmission || allowedBookingCount <= 0 || !selectedPaymentMethod}>
+              {loadingSubmission
+                ? "Submitting..."
+                : selectedPaymentMethod === "Pay Online"
+                  ? "Pay online and submit"
+                  : "Confirm booking"}
             </Button>
           </form>
         </section>
@@ -408,6 +478,9 @@ export default function BookingPage() {
               Dates: {trip?.startDate ?? "--"} to {trip?.endDate ?? "--"}
             </p>
             <p>Organizer: {trip?.organizer ?? "--"}</p>
+            <p>
+              Payment: {selectedPaymentMethod || "Select a method"}
+            </p>
             <p>
               Slots left: {allowedBookingCount} of {trip?.maxParticipants ?? "--"}
             </p>
