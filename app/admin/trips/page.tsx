@@ -20,19 +20,20 @@ export default function AdminTripsPage() {
 
   const trips = useMemo(() => tripsByStatus[filter] ?? [], [filter, tripsByStatus]);
 
-  const canModerate = filter === "pending";
+  const canModerate = filter === "in review";
+  const canSendToReview = filter === "pending";
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold">Trips Management</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Review trip submissions and move pending trips to approved or rejected.</p>
+        <p className="mt-1 text-sm text-muted-foreground">Move pending trips to the review queue, then approve or reject trips in review.</p>
       </div>
 
       <div className="flex flex-wrap gap-2">
-        {(["pending", "approved", "rejected", "draft"] as AdminTripStatus[]).map((status) => (
+        {(["pending", "in review", "approved", "rejected", "draft"] as AdminTripStatus[]).map((status) => (
           <Button key={status} asChild variant={filter === status ? "default" : "outline"} size="sm">
-            <Link href={`/admin/trips?status=${status}`}>{status}</Link>
+            <Link href={`/admin/trips?status=${encodeURIComponent(status)}`}>{status}</Link>
           </Button>
         ))}
       </div>
@@ -50,6 +51,15 @@ export default function AdminTripsPage() {
               <Button size="sm" variant="outline" asChild>
                 <Link href={`/admin/trips/${trip.id}`}>Review details</Link>
               </Button>
+              {canSendToReview ? (
+                <Button
+                  size="sm"
+                  onClick={() => void updateTripStatus(trip.id, "in review")}
+                  disabled={loadingTrips}
+                >
+                  Move to review
+                </Button>
+              ) : null}
               {canModerate ? (
                 <>
                   <Button size="sm" onClick={() => void updateTripStatus(trip.id, "approved")} disabled={loadingTrips}>
@@ -60,7 +70,7 @@ export default function AdminTripsPage() {
                   </Button>
                 </>
               ) : (
-                <span className="text-xs text-muted-foreground">Review only</span>
+                <span className="text-xs text-muted-foreground">{canSendToReview ? "Queue only" : "Review only"}</span>
               )}
             </div>
           </article>

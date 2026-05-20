@@ -255,7 +255,7 @@ export interface AdminUserRecord {
   updatedAt: FirestoreTimestamp;
 }
 
-export type AdminTripStatus = "pending" | "approved" | "rejected" | "draft";
+export type AdminTripStatus = "pending" | "in review" | "approved" | "rejected" | "draft";
 
 export interface AdminTripDestination {
   name: string;
