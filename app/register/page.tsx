@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/feedback/toast-provider";
 import { useUserRegistrationStore } from "@/lib/stores/useUserRegistrationStore";
 import { userImageUploadService } from "@/lib/services/userImageUploadService";
+import AvatarUpload from "@/components/common/avatar-upload";
 import { useAuthCacheStore } from "@/lib/stores/useAuthCacheStore";
 import { userSessionService } from "@/lib/services/userSessionService";
 
@@ -21,6 +22,7 @@ export default function RegisterPage() {
     useUserRegistrationStore();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -28,9 +30,8 @@ export default function RegisterPage() {
 
     try {
       // if user selected a file in the registration form, upload it first
-      const fileInput = document.querySelector<HTMLInputElement>("#profileImageFile");
-      if (fileInput && fileInput.files && fileInput.files[0]) {
-        const uploaded = await userImageUploadService.uploadProfileImage(fileInput.files[0]);
+      if (selectedFile) {
+        const uploaded = await userImageUploadService.uploadProfileImage(selectedFile);
         if (uploaded) setField("profileImage", uploaded);
       }
 
@@ -120,7 +121,14 @@ export default function RegisterPage() {
 
             <div>
               <label className="mb-1 block text-sm font-medium">Profile image (optional)</label>
-              <input id="profileImageFile" type="file" accept="image/*" className="w-full" />
+              <div>
+                <AvatarUpload
+                  src={form.profileImage || null}
+                  editable
+                  size={96}
+                  onFileSelected={(file) => setSelectedFile(file)}
+                />
+              </div>
             </div>
 
             <div>

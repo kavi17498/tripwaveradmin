@@ -113,12 +113,27 @@ export function Navbar() {
             <>
               <Button variant="outline" asChild>
                 <Link href="/profile" className="flex items-center gap-2">
-                  {currentUser.avatarUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={currentUser.avatarUrl} alt="avatar" className="h-6 w-6 rounded-full object-cover" />
-                  ) : (
-                    <UserCircle2 className="size-4" />
-                  )}
+                  {/* display avatar or placeholder */}
+                  <div>
+                    {currentUser.avatarUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={currentUser.avatarUrl} alt="avatar" className="h-6 w-6 rounded-full object-cover" />
+                    ) : (
+                      <div className="h-6 w-6 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 border border-border">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                        <div className="absolute -right-1 -bottom-1">
+                          <div className="h-4 w-4 rounded-full bg-white flex items-center justify-center border border-border text-primary">
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                              <path d="M12 5v14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                              <path d="M5 12h14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                   Profile
                 </Link>
               </Button>

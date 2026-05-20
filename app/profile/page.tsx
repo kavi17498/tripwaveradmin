@@ -15,6 +15,7 @@ import { userService, type UserProfileRecord, type UpdateUserProfilePayload } fr
 import { useAuthCacheStore } from "@/lib/stores/useAuthCacheStore";
 import { userSessionService } from "@/lib/services/userSessionService";
 import { userImageUploadService } from "@/lib/services/userImageUploadService";
+import AvatarUpload from "@/components/common/avatar-upload";
 
 const toDateLabel = (value?: { _seconds: number; _nanoseconds: number } | string | null) => {
   if (!value) return "Unknown";
@@ -174,16 +175,21 @@ export default function ProfilePage() {
                         <label className="text-sm font-medium">{field.label}</label>
                         {field.key === "profileImage" ? (
                           <div>
-                            <input
-                              type="file"
-                              accept="image/*"
-                              onChange={(e) => handleFileChange(e.target.files?.[0] ?? null)}
-                              className="w-full"
+                            <AvatarUpload
+                              src={profile.profileImage ?? previewUrl ?? null}
+                              editable
+                              size={96}
+                              onFileSelected={(file) => {
+                                setSelectedFile(file);
+                                if (file) {
+                                  const url = URL.createObjectURL(file);
+                                  setPreviewUrl(url);
+                                  setProfile((current) => (current ? { ...current, profileImage: url } : current));
+                                } else {
+                                  setPreviewUrl(null);
+                                }
+                              }}
                             />
-                            {previewUrl ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img src={previewUrl} alt="preview" className="mt-2 h-24 w-24 rounded-full object-cover" />
-                            ) : null}
                           </div>
                         ) : field.key === "bio" ? (
                           <textarea
