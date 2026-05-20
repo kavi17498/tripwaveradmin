@@ -77,12 +77,13 @@ export const adminService = {
     reason?: string,
   ): Promise<ServiceResponse<AdminTripRecord>> {
     const token = await waitForAuthToken();
+    const nextReason = reason?.trim() || (status === "in review" ? "Moved to the review queue." : "Status updated by admin.");
     const response = await apiClient.authenticatedRequest<AdminTripRecord | ServiceResponse<AdminTripRecord>>(
       `/admin/trips/${tripId}`,
       token,
       {
         method: "PATCH",
-        body: { status, ...(reason ? { reason } : {}) },
+        body: { status, reason: nextReason },
       },
     );
 
