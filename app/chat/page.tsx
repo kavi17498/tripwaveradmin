@@ -1,30 +1,165 @@
 "use client";
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
 import { Navbar } from "@/components/layout/navbar";
 import { Footer } from "@/components/layout/footer";
 import useChatStore from "@/lib/stores/useChatStore";
+import { useAuthCacheStore } from "@/lib/stores/useAuthCacheStore";
+import { ChatMessage } from "@/components/chat/chat-message";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { ImagePlus, Loader2 } from "lucide-react";
+import { chatService } from "@/lib/services/chatService";
+import { chatImageUploadService } from "@/lib/services/chatImageUploadService";
+import { ChatMessage as ChatMessageType } from "@/lib/types";
 
 export default function ChatLandingPage() {
-  const router = useRouter();
   const groups = useChatStore((s: any) => s.groups);
-  const loading = useChatStore((s: any) => s.loading);
+  const loadingGroups = useChatStore((s: any) => s.loading);
   const selected = useChatStore((s: any) => s.selected);
   const fetchGroups = useChatStore((s: any) => s.fetchGroups);
   const selectGroup = useChatStore((s: any) => s.selectGroup);
 
+  const currentUser = useAuthCacheStore((s) => s.currentUser);
+  const token = useAuthCacheStore((s) => s.token);
+
+  const [messages, setMessages] = useState<ChatMessageType[]>([]);
+  const [loadingMessages, setLoadingMessages] = useState(false);
+  const [text, setText] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState("");
+
+  const displayName = useMemo(() => {
+    if (!currentUser) return "You";
+    const first = currentUser.firstName?.trim() ?? "";
+    const last = currentUser.lastName?.trim() ?? "";
+    const name = currentUser.name?.trim() ?? "";
+    return [first, last].filter(Boolean).join(" ") || name || currentUser.email || "You";
+  }, [currentUser]);
+
   useEffect(() => {
     fetchGroups();
   }, [fetchGroups]);
+
+  useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      if (!selected?.id) {
+        setMessages([]);
+        return;
+      }
+
+      setLoadingMessages(true);
+      setError("");
+
+      try {
+        const res = await chatService.getMessages(selected.id, token ?? undefined);
+        if (!mounted) return;
+        setMessages(res.data ?? []);
+      } catch (e) {
+        if (!mounted) return;
+        setError(e instanceof Error ? e.message : "Failed to load messages");
+      } finally {
+        if (mounted) setLoadingMessages(false);
+      }
+    };
+
+    void load();
+    return () => {
+      mounted = false;
+    };
+  }, [selected, token]);
+
+  useEffect(() => {
+    return () => {
+      if (imagePreview?.startsWith("blob:")) URL.revokeObjectURL(imagePreview);
+    };
+  }, [imagePreview]);
+
+  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] ?? null;
+    setSelectedFile(file);
+    if (imagePreview?.startsWith("blob:")) URL.revokeObjectURL(imagePreview);
+    setImagePreview(file ? URL.createObjectURL(file) : null);
+  };
+
+  const send = async (ev: FormEvent) => {
+    ev.preventDefault();
+    if (!selected?.id) return;
+    const trimmed = text.trim();
+    if (!trimmed && !selectedFile) return;
+
+    setSending(true);
+    setError("");
+
+    try {
+      let imageUrl = "";
+      if (selectedFile) {
+        // upload under trip context if available
+        imageUrl = (await chatImageUploadService.uploadChatImage(selectedFile, selected?.tripId ?? "")) ?? "";
+      }
+
+      const res = await chatService.sendMessage(
+        selected.id,
+        {
+          tripId: selected.tripId ?? "",
+          senderId: currentUser?.id ?? "",
+          senderName: displayName,
+          message: trimmed,
+          ...(imageUrl ? { imageUrl } : {}),
+        },
+        token ?? undefined,
+      );
+
+      setMessages((m) => [...m, res.data]);
+      setText("");
+      setSelectedFile(null);
+      if (imagePreview?.startsWith("blob:")) URL.revokeObjectURL(imagePreview);
+      setImagePreview(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to send message");
+    } finally {
+      setSending(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
 
       <main className="mx-auto max-w-7xl px-4 py-8 md:px-6">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          <section className="lg:col-span-3">
+        <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-6">
+          <aside>
+            <div className="h-[72vh] border border-border bg-card rounded-md p-4 flex flex-col">
+              <h3 className="text-md font-semibold mb-3">Chat Groups</h3>
+
+              <div className="flex-1 overflow-auto space-y-2">
+                {loadingGroups && <div className="text-sm text-muted-foreground">Loading groups...</div>}
+                {!loadingGroups && groups.length === 0 && <div className="text-sm text-muted-foreground">No chat groups found.</div>}
+
+                {groups.map((g: any) => (
+                  <button
+                    key={g.id}
+                    onClick={() => selectGroup(g.id)}
+                    className={`w-full text-left p-3 rounded-md hover:bg-accent/20 flex items-center justify-between ${selected?.id === g.id ? 'bg-accent/30' : ''}`}>
+                    <div>
+                      <div className="font-medium">{g.name}</div>
+                      <div className="text-xs text-muted-foreground">{g.adminName ?? '—'}</div>
+                    </div>
+                    <div className="text-xs">
+                      {g.adminId === currentUser?.id ? <span className="px-2 py-1 rounded bg-green-100 text-green-800">Admin</span> : null}
+                    </div>
+                  </button>
+                ))}
+              </div>
+
+              <div className="mt-3 text-xs text-muted-foreground">Fetched from /chatgroups</div>
+            </div>
+          </aside>
+
+          <section>
             <div className="h-[72vh] border border-border bg-card rounded-md p-4 flex flex-col">
               <header className="flex items-center justify-between mb-4">
                 <div>
@@ -35,58 +170,50 @@ export default function ChatLandingPage() {
               </header>
 
               <div className="flex-1 overflow-auto space-y-3 pb-4">
-                {selected ? (
-                  <div className="rounded-md border border-border bg-muted/20 p-4 text-sm text-muted-foreground">
-                    This is the trip group overview. Open the full chat to send messages and images.
+                {loadingMessages ? (
+                  <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                    <Loader2 className="mr-2 size-4 animate-spin" /> Loading messages...
                   </div>
+                ) : messages.length > 0 ? (
+                  messages.map((m) => (
+                    <ChatMessage key={m.id} message={m} isOwnMessage={m.senderId === currentUser?.id} />
+                  ))
                 ) : (
-                  <div className="rounded-md border border-border bg-muted/20 p-4 text-sm text-muted-foreground">
-                    Pick a group from the sidebar to continue.
-                  </div>
+                  <div className="grid h-full place-items-center text-sm text-muted-foreground">No messages yet. Start the conversation.</div>
                 )}
               </div>
 
-              <div className="mt-4">
-                <div className="flex gap-2">
-                  <input className="flex-1 input" placeholder="Open a trip chat to send messages" disabled />
-                  <button
-                    className="btn"
+              <form onSubmit={send} className="border-t border-border p-3">
+                {imagePreview ? (
+                  <div className="mb-3 overflow-hidden rounded-md border border-border">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={imagePreview} alt="Selected attachment preview" className="h-40 w-full object-cover" />
+                  </div>
+                ) : null}
+
+                <div className="flex items-end gap-2">
+                  <label className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-md border border-input bg-background text-muted-foreground hover:bg-accent">
+                    <ImagePlus className="size-4" />
+                    <input type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+                  </label>
+
+                  <Input
+                    value={text}
+                    onChange={(e) => setText(e.target.value)}
+                    placeholder="Type a message"
+                    className="flex-1"
                     disabled={!selected}
-                    onClick={() => selected?.tripId ? router.push(`/dashboard/trips/${selected.tripId}/chat`) : null}
-                    type="button"
-                  >
-                    Open chat
-                  </button>
+                  />
+
+                  <Button type="submit" disabled={!selected || sending || (!text.trim() && !selectedFile)}>
+                    {sending ? "Sending..." : "Send"}
+                  </Button>
                 </div>
-              </div>
+
+                {error ? <p className="mt-2 text-sm text-destructive">{error}</p> : null}
+              </form>
             </div>
           </section>
-
-          <aside className="lg:col-span-1">
-            <div className="h-[72vh] border border-border bg-card rounded-md p-4 flex flex-col">
-              <h3 className="text-md font-semibold mb-3">Chat Groups</h3>
-
-              <div className="flex-1 overflow-auto space-y-2">
-                {loading && <div className="text-sm text-muted-foreground">Loading groups...</div>}
-                {!loading && groups.length === 0 && <div className="text-sm text-muted-foreground">No chat groups found.</div>}
-
-                {groups.map((g: any) => (
-                  <button
-                    key={g.id}
-                    onClick={() => {
-                      selectGroup(g.id);
-                      if (g.tripId) router.push(`/dashboard/trips/${g.tripId}/chat`);
-                    }}
-                    className={`w-full text-left p-3 rounded-md hover:bg-accent/20 ${selected?.id === g.id ? 'bg-accent/30' : ''}`}>
-                    <div className="font-medium">{g.name}</div>
-                    <div className="text-xs text-muted-foreground">{g.adminName ?? '—'}</div>
-                  </button>
-                ))}
-              </div>
-
-              <div className="mt-3 text-xs text-muted-foreground">Fetched from /chatgroups</div>
-            </div>
-          </aside>
         </div>
       </main>
 
