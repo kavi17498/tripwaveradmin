@@ -112,8 +112,26 @@ export default function BookingPage() {
         const loadedTrip = result.data ?? null;
         setTrip(loadedTrip);
 
-        if (loadedTrip && (loadedTrip.status !== "approved" || isTripExpired(loadedTrip))) {
-          setError(getBookingBlockedMessage(loadedTrip));
+        if (loadedTrip) {
+          if (loadedTrip.status !== "approved" || isTripExpired(loadedTrip)) {
+            setError(getBookingBlockedMessage(loadedTrip));
+          }
+
+          // Server may mark trips as reserved when a family/solo booking is completed
+          const reservedFor = (loadedTrip as any).reservedFor as string | undefined;
+          const reservedByUserId = (loadedTrip as any).reservedByUserId as string | undefined | null;
+          if (reservedFor === 'family' || reservedFor === 'solo') {
+            // If reserved by someone else, block booking for everyone
+            setError('This trip has been reserved and is no longer bookable.');
+          }
+
+          // If current user already has a booking, block additional bookings
+          if (currentUser && Array.isArray(loadedTrip.participants)) {
+            const already = loadedTrip.participants.find((p: any) => p.parentUserId && p.parentUserId === currentUser.id);
+            if (already) {
+              setError('You already have a booking for this trip.');
+            }
+          }
         }
       } catch {
         setTrip(null);
