@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Bell, BadgeCheck, Clock3, CreditCard } from "lucide-react";
 import { Notification } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -13,20 +14,15 @@ const iconMap = {
 interface NotificationItemProps {
   item: Notification;
   onClick?: (item: Notification) => void | Promise<void>;
+  href?: string;
 }
 
-export function NotificationItem({ item, onClick }: NotificationItemProps) {
+export function NotificationItem({ item, onClick, href }: NotificationItemProps) {
   const Icon = iconMap[item.type] ?? Bell;
-  return (
-    <button
-      type="button"
-      onClick={() => onClick?.(item)}
-      className={cn(
-        "flex w-full items-start gap-3 border border-border p-4 text-left transition-colors",
-        item.read ? "bg-background" : "bg-sky-50/50",
-        onClick ? "hover:bg-accent/20" : "cursor-default",
-      )}
-    >
+  const resolvedHref = href ?? (item.tripId ? `/trips/${item.tripId}` : "/notifications");
+
+  const content = (
+    <>
       <div className="mt-0.5 border border-border p-1.5 text-muted-foreground">
         <Icon className="size-4" />
       </div>
@@ -38,6 +34,34 @@ export function NotificationItem({ item, onClick }: NotificationItemProps) {
         <p className="mt-1 text-sm text-muted-foreground">{item.description}</p>
         <p className="mt-2 text-xs text-muted-foreground">{new Date(item.createdAt).toLocaleString()}</p>
       </div>
+    </>
+  );
+
+  const sharedClassName = cn(
+    "flex w-full items-start gap-3 border border-border p-4 text-left transition-colors",
+    item.read ? "bg-background" : "bg-sky-50/50",
+    onClick ? "hover:bg-accent/20" : "cursor-default",
+  );
+
+  if (href || resolvedHref) {
+    return (
+      <Link
+        href={resolvedHref}
+        onClick={() => onClick?.(item)}
+        className={sharedClassName}
+      >
+        {content}
+      </Link>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => onClick?.(item)}
+      className={sharedClassName}
+    >
+      {content}
     </button>
   );
 }
