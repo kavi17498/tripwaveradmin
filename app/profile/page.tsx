@@ -268,6 +268,13 @@ export default function ProfilePage() {
                   <div>
                     <p className="font-medium">Verification</p>
                     <p className="text-muted-foreground">{profile ? (profile.isVerified ? "Verified" : "Not verified") : "Unknown"}</p>
+                    {!profile?.isVerified ? (
+                      <div className="mt-2">
+                        <Button asChild>
+                          <Link href="/dashboard/verification">Apply for verification</Link>
+                        </Button>
+                      </div>
+                    ) : null}
                   </div>
                 </div>
                 <div className="rounded-md border border-border p-3">
