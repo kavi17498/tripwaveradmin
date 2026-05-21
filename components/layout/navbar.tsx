@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Bell, UserCircle2 } from "lucide-react";
+import { Bell } from "lucide-react";
 import { getFirestore, collection, query as firestoreQuery, where, onSnapshot } from "firebase/firestore";
 import { app } from "@/lib/config/firebase";
 import { chatService } from "@/lib/services/chatService";
@@ -20,6 +20,7 @@ type AppMode = "explorer" | "creator";
 const explorerLinks = [
   { href: "/", label: "Home" },
   { href: "/trips", label: "Trips" },
+  { href: "/bookings", label: "Bookings" },
   { href: "/chat", label: "Chat" },
 ];
 
@@ -171,8 +172,9 @@ export function Navbar() {
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (!notificationPanelRef.current) return;
-      if (!notificationPanelRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+
+      if (notificationPanelRef.current && !notificationPanelRef.current.contains(target)) {
         setShowNotifications(false);
       }
     };
@@ -208,6 +210,7 @@ export function Navbar() {
       window.removeEventListener("tripwaver:notifications-changed", loadNotifications);
     };
   }, [currentUser, showNotifications]);
+      const token = userSessionService.getToken();
 
   const links = useMemo(() => {
     return mode === "explorer" ? explorerLinks : creatorLinks;

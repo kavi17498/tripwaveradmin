@@ -154,4 +154,21 @@ export const tripApiService = {
       message: "Approved public trips loaded",
     };
   },
+
+  async getParticipatedTrips(token: string): Promise<ServiceResponse<TripApiItem[]>> {
+    const response = await apiClient.authenticatedRequest<TripApiItem[] | ServiceResponse<TripApiItem[]>>(
+      "/trips/participated",
+      token,
+      { method: "GET" },
+    );
+
+    if (response && typeof response === "object" && "data" in response) {
+      return response as ServiceResponse<TripApiItem[]>;
+    }
+
+    return {
+      data: response as TripApiItem[],
+      message: "Participated trips loaded successfully",
+    };
+  },
 };
