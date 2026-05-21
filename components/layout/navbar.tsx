@@ -5,8 +5,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Bell, UserCircle2 } from "lucide-react";
 import { getFirestore, collection, query as firestoreQuery, where, onSnapshot } from "firebase/firestore";
-import { app, auth } from "@/lib/config/firebase";
+import { app } from "@/lib/config/firebase";
 import { chatService } from "@/lib/services/chatService";
+import { waitForFirebaseUser } from "@/lib/services/firebaseAuthUtils";
 import { Button } from "@/components/ui/button";
 import { authService } from "@/lib/services/authService";
 import { notificationService } from "@/lib/services/notificationService";
@@ -104,7 +105,9 @@ export function Navbar() {
 
       try {
         // If the Firebase client is signed-in, subscribe to Firestore summaries for realtime updates.
-        if (auth?.currentUser) {
+        const firebaseUser = await waitForFirebaseUser();
+
+        if (firebaseUser) {
           const db = getFirestore(app);
           const q = firestoreQuery(collection(db, 'chatgroups'), where('members', 'array-contains', currentUser.id));
           let unsub: (() => void) | null = null;

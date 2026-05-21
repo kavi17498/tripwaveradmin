@@ -2,7 +2,8 @@ import { create } from "zustand";
 import { ChatGroup } from "@/lib/types";
 import { chatService } from "@/lib/services/chatService";
 import { userSessionService } from "@/lib/services/userSessionService";
-import { app, auth } from "@/lib/config/firebase";
+import { app } from "@/lib/config/firebase";
+import { waitForFirebaseUser } from "@/lib/services/firebaseAuthUtils";
 import { getFirestore, collection, query as firestoreQuery, where, orderBy, onSnapshot } from "firebase/firestore";
 
 interface ChatState {
@@ -36,8 +37,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
         }
       }
 
-      // If we don't have a uid or the firebase client isn't signed in, fall back to REST
-      if (!uid || !auth?.currentUser) {
+      const firebaseUser = await waitForFirebaseUser();
+
+      // If we don't have a uid or Firebase auth never hydrated, fall back to REST
+      if (!uid || !firebaseUser) {
         // fallback to REST fetch
         const res = await chatService.getChatGroups(token ?? undefined);
         set({ groups: res.data ?? [], selected: (res.data && res.data[0]) ?? null });

@@ -12,8 +12,19 @@ import { ImagePlus, Loader2 } from "lucide-react";
 import { chatService } from "@/lib/services/chatService";
 import { chatImageUploadService } from "@/lib/services/chatImageUploadService";
 import { ChatMessage as ChatMessageType } from "@/lib/types";
-import { app, auth } from "@/lib/config/firebase";
-import { getFirestore, collection, query as firestoreQuery, where, orderBy, onSnapshot } from "firebase/firestore";
+import { app } from "@/lib/config/firebase";
+import { waitForFirebaseUser } from "@/lib/services/firebaseAuthUtils";
+import { getFirestore, collection, query as firestoreQuery, where, onSnapshot } from "firebase/firestore";
+
+const sortMessagesByCreatedAt = (items: ChatMessageType[]) => {
+  return [...items].sort((left, right) => {
+    const leftDate = new Date(left.createdAt as any);
+    const rightDate = new Date(right.createdAt as any);
+    const leftTime = Number.isNaN(leftDate.getTime()) ? 0 : leftDate.getTime();
+    const rightTime = Number.isNaN(rightDate.getTime()) ? 0 : rightDate.getTime();
+    return leftTime - rightTime;
+  });
+};
 
 export default function ChatLandingPage() {
   const groups = useChatStore((s: any) => s.groups);
@@ -54,86 +65,93 @@ export default function ChatLandingPage() {
     setLoadingMessages(true);
     setError("");
 
-    // Use Firestore realtime subscription only when the Firebase client is signed-in
-    if (auth?.currentUser) {
-      const db = getFirestore(app);
-      const q = firestoreQuery(
-        collection(db, "chatmessages"),
-        where("chatGroupId", "==", selected.id),
-        orderBy("createdAt", "asc"),
-      );
+    let cleanup = () => {};
 
-      let unsub: (() => void) | null = null;
-      unsub = onSnapshot(
-        q,
-        (snap) => {
-          const msgs: ChatMessageType[] = [];
-          snap.forEach((doc) => {
-            const data: any = doc.data();
-            const createdAt = data?.createdAt && typeof data.createdAt.toDate === "function"
-              ? data.createdAt.toDate()
-              : data?.createdAt
-              ? new Date(data.createdAt)
-              : new Date(0);
+    void (async () => {
+      const firebaseUser = await waitForFirebaseUser();
 
-            msgs.push({ id: doc.id, ...data, createdAt } as ChatMessageType);
-          });
+      // Use Firestore realtime subscription only when Firebase auth has hydrated
+      if (firebaseUser) {
+        const db = getFirestore(app);
+        const q = firestoreQuery(
+          collection(db, "chatmessages"),
+          where("chatGroupId", "==", selected.id),
+        );
 
-          setMessages(msgs);
-          setLoadingMessages(false);
-        },
-        async (err) => {
-          const msg = err?.message ?? "Failed to subscribe to messages";
-          setError(msg);
-          setLoadingMessages(false);
+        let unsub: (() => void) | null = null;
+        unsub = onSnapshot(
+          q,
+          (snap) => {
+            const msgs: ChatMessageType[] = [];
+            snap.forEach((doc) => {
+              const data: any = doc.data();
+              const createdAt = data?.createdAt && typeof data.createdAt.toDate === "function"
+                ? data.createdAt.toDate()
+                : data?.createdAt
+                ? new Date(data.createdAt)
+                : new Date(0);
 
-          const code = (err && (err.code || err?.name)) ?? null;
-          if (code === 'permission-denied' || (typeof msg === 'string' && msg.toLowerCase().includes('permission-denied'))) {
-            try { if (typeof unsub === 'function') unsub(); } catch {}
-            // fallback to REST fetch once
-            try {
-              const res = await chatService.getMessages(selected.id, token ?? undefined);
-              setMessages((res.data ?? []).map((m: any) => ({ ...m, createdAt: m.createdAt ? new Date(m.createdAt) : new Date(0) })));
-            } catch (e: any) {
-              setError(e?.message ?? 'Failed to load messages');
+              msgs.push({ id: doc.id, ...data, createdAt } as ChatMessageType);
+            });
+
+            setMessages(sortMessagesByCreatedAt(msgs));
+            setLoadingMessages(false);
+          },
+          async (err) => {
+            const msg = err?.message ?? "Failed to subscribe to messages";
+            setError(msg);
+            setLoadingMessages(false);
+
+            const code = (err && (err.code || err?.name)) ?? null;
+            if (code === 'permission-denied' || (typeof msg === 'string' && msg.toLowerCase().includes('permission-denied'))) {
+              try { if (typeof unsub === 'function') unsub(); } catch {}
+              try {
+                const res = await chatService.getMessages(selected.id, token ?? undefined);
+                setMessages(sortMessagesByCreatedAt((res.data ?? []).map((m: any) => ({ ...m, createdAt: m.createdAt ? new Date(m.createdAt) : new Date(0) }))));
+              } catch (e: any) {
+                setError(e?.message ?? 'Failed to load messages');
+              }
             }
-          }
-        },
-      );
+          },
+        );
 
-      return () => {
-        try { if (typeof unsub === 'function') unsub(); } catch {}
-      };
-    }
-
-    // Fallback: fetch messages through backend REST (requires Authorization token) and poll
-    let mounted = true;
-    let pollId: number | null = null;
-
-    const loadOnce = async () => {
-      try {
-        const res = await chatService.getMessages(selected.id, token ?? undefined);
-        if (!mounted) return;
-        setMessages((res.data ?? []).map((m: any) => ({
-          ...m,
-          createdAt: m.createdAt ? new Date(m.createdAt) : new Date(0),
-        })));
-      } catch (e: any) {
-        if (!mounted) return;
-        setError(e?.message ?? 'Failed to load messages');
-      } finally {
-        if (mounted) setLoadingMessages(false);
+        cleanup = () => {
+          try { if (typeof unsub === 'function') unsub(); } catch {}
+        };
+        return;
       }
-    };
 
-    void loadOnce();
-    // Poll every 5 seconds for new messages when realtime isn't available
-    pollId = window.setInterval(() => void loadOnce(), 5000);
+      // Fallback: fetch messages through backend REST (requires Authorization token) and poll
+      let mounted = true;
+      let pollId: number | null = null;
 
-    return () => {
-      mounted = false;
-      if (pollId) window.clearInterval(pollId);
-    };
+      const loadOnce = async () => {
+        try {
+          const res = await chatService.getMessages(selected.id, token ?? undefined);
+          if (!mounted) return;
+          setMessages(sortMessagesByCreatedAt((res.data ?? []).map((m: any) => ({
+            ...m,
+            createdAt: m.createdAt ? new Date(m.createdAt) : new Date(0),
+          }))));
+        } catch (e: any) {
+          if (!mounted) return;
+          setError(e?.message ?? 'Failed to load messages');
+        } finally {
+          if (mounted) setLoadingMessages(false);
+        }
+      };
+
+      void loadOnce();
+      // Poll every 5 seconds for new messages when realtime isn't available
+      pollId = window.setInterval(() => void loadOnce(), 5000);
+
+      cleanup = () => {
+        mounted = false;
+        if (pollId) window.clearInterval(pollId);
+      };
+    })();
+
+    return () => cleanup();
   }, [selected, token]);
 
   useEffect(() => {
