@@ -72,19 +72,27 @@ export default function OrganizerVerificationPage() {
       const nicFrontUrl = await userImageUploadService.uploadProfileImage(nicFront);
       const nicBackUrl = await userImageUploadService.uploadProfileImage(nicBack);
 
+      if (!sltdaUrl || !nicFrontUrl || !nicBackUrl) {
+        throw new Error("Failed to upload required verification files.");
+      }
+
+      const socialLinks = Object.fromEntries(
+        Object.entries({
+          facebook,
+          instagram,
+          youtube,
+          tiktok,
+          linkedin,
+        }).filter(([, value]) => value.trim().length > 0),
+      );
+
       const payload = {
         sltdaGuideLicense: sltdaUrl,
         nicImageFront: nicFrontUrl,
         nicImageBack: nicBackUrl,
         registeredBusinessName: registeredBusinessName || undefined,
         taxOrBusinessRegistrationNumber: taxNumber || undefined,
-        socialLinks: {
-          facebook: facebook || undefined,
-          instagram: instagram || undefined,
-          youtube: youtube || undefined,
-          tiktok: tiktok || undefined,
-          linkedin: linkedin || undefined,
-        },
+        socialLinks: Object.keys(socialLinks).length ? socialLinks : undefined,
       };
 
       await verificationApiService.submit(payload);

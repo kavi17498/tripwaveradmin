@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { StatusBadge } from "@/components/common/status-badge";
 import { Button } from "@/components/ui/button";
 import { formatFirestoreTimestamp } from "@/lib/utils";
@@ -170,7 +171,11 @@ export default function AdminVerificationsPage() {
             <tbody>
               {inReviewRequests.map((request) => (
                 <tr key={request.id} className="border-t border-border">
-                  <td className="p-3 font-mono text-xs">{request.id}</td>
+                  <td className="p-3 font-mono text-xs">
+                    <Link href={`/admin/verifications/${request.id}`} className="text-primary underline">
+                      {request.id}
+                    </Link>
+                  </td>
                   <td className="p-3 font-mono text-xs">{request.userId}</td>
                   <td className="p-3"><StatusBadge status={request.status} /></td>
                   <td className="p-3">{request.inReviewByName ?? "Admin"}</td>
