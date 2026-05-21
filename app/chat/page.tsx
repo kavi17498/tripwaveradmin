@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Navbar } from "@/components/layout/navbar";
 import { Footer } from "@/components/layout/footer";
 import useChatStore from "@/lib/stores/useChatStore";
@@ -43,6 +43,7 @@ export default function ChatLandingPage() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
+  const messagesContainerRef = useRef<HTMLDivElement | null>(null);
 
   const displayName = useMemo(() => {
     if (!currentUser) return "You";
@@ -160,6 +161,13 @@ export default function ChatLandingPage() {
     };
   }, [imagePreview]);
 
+  useEffect(() => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+
+    container.scrollTop = container.scrollHeight;
+  }, [messages, selected?.id]);
+
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0] ?? null;
     setSelectedFile(file);
@@ -262,7 +270,7 @@ export default function ChatLandingPage() {
                 <div className="text-sm text-muted-foreground">{selected ? `Members: ${selected.members?.length ?? 0}` : ""}</div>
               </header>
 
-              <div className="flex-1 overflow-auto space-y-3 pb-4">
+              <div ref={messagesContainerRef} className="flex-1 overflow-auto space-y-3 pb-4">
                 {loadingMessages ? (
                   <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
                     <Loader2 className="mr-2 size-4 animate-spin" /> Loading messages...
