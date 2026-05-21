@@ -88,11 +88,13 @@ export function Navbar() {
     };
 
     document.addEventListener("visibilitychange", handleVisibility);
+    window.addEventListener("tripwaver:notifications-changed", refreshNotifications);
 
     return () => {
       mounted = false;
       window.clearInterval(intervalId);
       document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("tripwaver:notifications-changed", refreshNotifications);
     };
   }, [currentUser]);
 
@@ -129,8 +131,10 @@ export function Navbar() {
     };
 
     void loadNotifications();
+    window.addEventListener("tripwaver:notifications-changed", loadNotifications);
     return () => {
       mounted = false;
+      window.removeEventListener("tripwaver:notifications-changed", loadNotifications);
     };
   }, [currentUser, showNotifications]);
 
@@ -256,7 +260,7 @@ export function Navbar() {
 
                   <div className="border-t border-border px-4 py-3">
                     <Link
-                      href="/dashboard/notifications"
+                      href="/notifications"
                       onClick={() => setShowNotifications(false)}
                       className="text-sm font-medium text-primary hover:underline"
                     >

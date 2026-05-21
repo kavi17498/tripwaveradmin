@@ -55,18 +55,20 @@ export default function NotificationsPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <PageHeader title="Notifications" description="Track trip updates, reminders, and account alerts." />
-      <div className="flex gap-2">
-        <Button variant={tab === "all" ? "default" : "outline"} onClick={() => setTab("all")}>All</Button>
-        <Button variant={tab === "unread" ? "default" : "outline"} onClick={() => setTab("unread")}>Unread</Button>
-        <Button variant={tab === "payment" ? "default" : "outline"} onClick={() => setTab("payment")}>Payments</Button>
+    <main className="mx-auto w-full max-w-4xl px-4 py-8 md:px-6 md:py-10">
+      <div className="space-y-6">
+        <PageHeader title="Notifications" description="Track trip updates, reminders, and account alerts." />
+        <div className="flex flex-wrap gap-2">
+          <Button variant={tab === "all" ? "default" : "outline"} onClick={() => setTab("all")}>All</Button>
+          <Button variant={tab === "unread" ? "default" : "outline"} onClick={() => setTab("unread")}>Unread</Button>
+          <Button variant={tab === "payment" ? "default" : "outline"} onClick={() => setTab("payment")}>Payments</Button>
+        </div>
+        <div className="space-y-3">
+          {filteredItems.map((item) => (
+            <NotificationItem key={item.id} item={item} onClick={markItemAsRead} />
+          ))}
+        </div>
       </div>
-      <div className="space-y-2">
-        {filteredItems.map((item) => (
-          <NotificationItem key={item.id} item={item} onClick={markItemAsRead} />
-        ))}
-      </div>
-    </div>
+    </main>
   );
 }
