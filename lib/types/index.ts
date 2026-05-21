@@ -248,6 +248,7 @@ export interface AdminUserRecord {
   lastName: string;
   email: string;
   phone: string;
+  role?: UserRole;
   profileImage?: string;
   bio: string;
   street: string;

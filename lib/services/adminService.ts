@@ -96,4 +96,19 @@ export const adminService = {
       message: "Trip status updated successfully",
     };
   },
+
+  async assignRole(userId: string, role: "user" | "guide") {
+    const token = await waitForAuthToken();
+    return apiClient.authenticatedRequest<{ status: string; assigned: string[]; failed: Array<{ userId: string; reason: string }> }>(
+      "/users/assign-roles",
+      token,
+      {
+        method: "POST",
+        body: {
+          userIds: userId,
+          role,
+        },
+      },
+    );
+  },
 };
