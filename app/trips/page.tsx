@@ -8,44 +8,61 @@ import { TripCard } from "@/components/trips/trip-card";
 import { EmptyState } from "@/components/feedback/empty-state";
 import { CardSkeletonGrid } from "@/components/feedback/loading-skeletons";
 import { Button } from "@/components/ui/button";
-import { tripService } from "@/lib/services/tripService";
-import { Trip, TripFilters } from "@/lib/types";
+import { tripApiService, type TripApiItem } from "@/lib/services/tripApiService";
+import { TripFilters } from "@/lib/types";
 
-const categoryCards = [
-  {
-    title: "Travel with Guide",
-    note: "Verified guide-led routes across the island",
-    query: "galle",
-    image: "https://images.unsplash.com/photo-1530789253388-582c481c54b0?q=80&w=1400&auto=format&fit=crop",
-  },
-  {
-    title: "Join Group Trip",
-    note: "Join open departures with new travel friends",
-    query: "ella",
-    image: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=80&w=1400&auto=format&fit=crop",
-  },
-  {
-    title: "Family Trip with Guide",
-    note: "Comfortable family-focused itineraries",
-    query: "sigiriya",
-    image: "https://images.unsplash.com/photo-1511895426328-dc8714191300?q=80&w=1400&auto=format&fit=crop",
-  },
-];
+// Helper: map API trip shape to UI Trip shape used by `TripCard`
+function mapApiToTrip(item: TripApiItem) {
+  const firstDestination = item.destinations?.[0]?.name ?? item.startLocation ?? "";
+  const cover = item.coverImage ?? item.photos?.[0] ?? "";
+
+  return {
+    id: item.id,
+    title: item.tripName,
+    destination: firstDestination,
+    description: item.description ?? "",
+    startDate: item.startDate,
+    endDate: item.endDate,
+    price: item.price ?? 0,
+    capacity: item.maxParticipants ?? 0,
+    bookedCount: item.participants ? item.participants.length : 0,
+    durationDays: 0,
+    tripType: item.tripCategory?.toLowerCase().includes("private") ? "private" : "public",
+    status: (item.status as any) ?? "published",
+    coverImage: cover,
+    organizerId: "",
+    organizerName: item.organizer ?? "",
+    organizerRating: 0,
+    location: {
+      city: firstDestination,
+      country: "",
+      lat: 0,
+      lng: 0,
+    },
+    included: item.included ? Object.values(item.included).flat() as string[] : [],
+    excluded: [],
+    itinerary: item.itinerary?.days?.map((d) => ({ day: d.day, title: d.title, description: "" })) ?? [],
+    // attach original category for grouping
+    _category: item.tripCategory ?? "Uncategorized",
+  } as any;
+}
 
 export default function TripsPage() {
   const [filters, setFilters] = useState<TripFilters>({});
-  const [trips, setTrips] = useState<Trip[]>([]);
+  const [apiTrips, setApiTrips] = useState<TripApiItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [visibleCount, setVisibleCount] = useState(6);
+
 
   useEffect(() => {
     const loadTrips = async () => {
       try {
         setLoading(true);
         setError("");
-        const result = await tripService.getPublicTrips(filters);
-        setTrips(result.data.filter((trip) => trip.tripType !== "private"));
+        const result = await tripApiService.getApprovedPublicTrips(filters as Record<string, string | number | undefined>);
+        // Exclude any trips categorized as private
+        const publicTrips = result.data.filter((t) => !(t.tripCategory ?? "").toLowerCase().includes("private"));
+        setApiTrips(publicTrips);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to fetch trips");
       } finally {
@@ -56,7 +73,17 @@ export default function TripsPage() {
     loadTrips();
   }, [filters]);
 
-  const resultsLabel = useMemo(() => `${trips.length} public trips found`, [trips.length]);
+  const resultsLabel = useMemo(() => `${apiTrips.length} public trips found`, [apiTrips.length]);
+
+  const grouped = useMemo(() => {
+    const out: Record<string, TripApiItem[]> = {};
+    apiTrips.forEach((t) => {
+      const cat = t.tripCategory ?? "Uncategorized";
+      if (!out[cat]) out[cat] = [];
+      out[cat].push(t);
+    });
+    return out;
+  }, [apiTrips]);
 
   return (
     <div>
@@ -80,18 +107,19 @@ export default function TripsPage() {
 
         <section>
           <h2 className="mb-4 text-xl font-semibold">Trip categories</h2>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-            {categoryCards.map((category) => (
-              <button
-                key={category.title}
-                type="button"
-                onClick={() => setFilters({ ...filters, query: category.query })}
-                className="border border-border bg-card p-3 text-left"
-              >
-                <img src={category.image} alt={category.title} className="h-36 w-full object-cover" />
-                <p className="mt-3 font-semibold">{category.title}</p>
-                <p className="mt-1 text-sm text-muted-foreground">{category.note}</p>
-              </button>
+          <div className="space-y-8">
+            {Object.entries(grouped).map(([category, items]) => (
+              <div key={category}>
+                <div className="mb-3 flex items-center justify-between">
+                  <h3 className="text-lg font-semibold">{category}</h3>
+                  <p className="text-sm text-muted-foreground">{items.length} trips</p>
+                </div>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  {items.map((it) => (
+                    <TripCard key={it.id} trip={mapApiToTrip(it)} />
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
         </section>
@@ -104,29 +132,12 @@ export default function TripsPage() {
           <EmptyState title="Unable to load trips" description={error} action={<Button onClick={() => setFilters({ ...filters })}>Retry</Button>} />
         ) : null}
 
-        {!loading && !error && trips.length === 0 ? (
+        {!loading && !error && apiTrips.length === 0 ? (
           <EmptyState
             title="No public trips found"
             description="Try another location, date, or budget filter. Private trips are intentionally hidden from this feed."
             action={<Button variant="outline" onClick={() => setFilters({})}>Clear filters</Button>}
           />
-        ) : null}
-
-        {!loading && !error && trips.length > 0 ? (
-          <>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {trips.slice(0, visibleCount).map((trip) => (
-                <TripCard key={trip.id} trip={trip} />
-              ))}
-            </div>
-            {visibleCount < trips.length ? (
-              <div className="flex justify-center">
-                <Button variant="outline" onClick={() => setVisibleCount((count) => count + 3)}>
-                  Load more
-                </Button>
-              </div>
-            ) : null}
-          </>
         ) : null}
       </main>
       <Footer />
