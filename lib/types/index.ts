@@ -87,6 +87,10 @@ export interface ChatGroup {
   adminName?: string;
   description?: string;
   members?: string[];
+  lastMessage?: string;
+  lastMessageAt?: FirestoreTimestamp | string;
+  lastMessageSenderId?: string;
+  unreadCounts?: Record<string, number>;
   createdAt?: FirestoreTimestamp | string;
   updatedAt?: FirestoreTimestamp | string;
 }

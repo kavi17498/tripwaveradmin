@@ -4,7 +4,32 @@ import { chatService } from "@/lib/services/chatService";
 import { userSessionService } from "@/lib/services/userSessionService";
 import { app } from "@/lib/config/firebase";
 import { waitForFirebaseUser } from "@/lib/services/firebaseAuthUtils";
-import { getFirestore, collection, query as firestoreQuery, where, orderBy, onSnapshot } from "firebase/firestore";
+import { getFirestore, collection, query as firestoreQuery, where, onSnapshot } from "firebase/firestore";
+
+const toTime = (value: unknown) => {
+  if (!value) return 0;
+  if (value instanceof Date) {
+    const time = value.getTime();
+    return Number.isNaN(time) ? 0 : time;
+  }
+  if (typeof value === "string") {
+    const time = new Date(value).getTime();
+    return Number.isNaN(time) ? 0 : time;
+  }
+  if (typeof value === "object" && value && "toDate" in value && typeof (value as { toDate: () => Date }).toDate === "function") {
+    const time = (value as { toDate: () => Date }).toDate().getTime();
+    return Number.isNaN(time) ? 0 : time;
+  }
+  return 0;
+};
+
+const sortChatGroups = (items: ChatGroup[]) => {
+  return [...items].sort((left, right) => {
+    const leftTime = toTime(left.lastMessageAt) || toTime(left.updatedAt) || toTime(left.createdAt);
+    const rightTime = toTime(right.lastMessageAt) || toTime(right.updatedAt) || toTime(right.createdAt);
+    return rightTime - leftTime;
+  });
+};
 
 interface ChatState {
   groups: ChatGroup[];
@@ -43,7 +68,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
       if (!uid || !firebaseUser) {
         // fallback to REST fetch
         const res = await chatService.getChatGroups(token ?? undefined);
-        set({ groups: res.data ?? [], selected: (res.data && res.data[0]) ?? null });
+        const sortedGroups = sortChatGroups(res.data ?? []);
+        set({ groups: sortedGroups, selected: sortedGroups[0] ?? null });
         set({ loading: false });
         return;
       }
@@ -52,7 +78,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const q = firestoreQuery(
         collection(db, 'chatgroups'),
         where('members', 'array-contains', uid),
-        orderBy('lastMessageAt', 'desc'),
       );
 
       let unsub: (() => void) | null = null;
@@ -64,7 +89,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
             const d: any = doc.data();
             groups.push({ id: doc.id, ...d } as ChatGroup);
           });
-          set({ groups, selected: groups[0] ?? null, loading: false });
+          const sortedGroups = sortChatGroups(groups);
+          set({ groups: sortedGroups, selected: sortedGroups[0] ?? null, loading: false });
         },
         async (err) => {
           const msg = err?.message ?? 'Failed to subscribe to groups';
@@ -79,7 +105,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
             try {
               const res = await chatService.getChatGroups(token ?? undefined);
-              set({ groups: res.data ?? [], selected: (res.data && res.data[0]) ?? null });
+              const sortedGroups = sortChatGroups(res.data ?? []);
+              set({ groups: sortedGroups, selected: sortedGroups[0] ?? null });
             } catch {
               // ignore
             }
