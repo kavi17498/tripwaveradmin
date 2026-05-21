@@ -18,7 +18,7 @@ const heroSlides = [
     ctaLabel: "Explore Guided Trips",
     ctaHref: "/trips",
     image:
-      "https://images.unsplash.com/photo-1566552881560-0be862a7c445?q=80&w=1800&auto=format&fit=crop",
+      "https://images.unsplash.com/photo-1511895426328-dc8714191300?q=80&w=1800&auto=format&fit=crop",
   },
   {
     title: "Planning a family trip without stress?",
