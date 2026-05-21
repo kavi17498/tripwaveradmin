@@ -171,4 +171,21 @@ export const tripApiService = {
       message: "Participated trips loaded successfully",
     };
   },
+
+  async cancelBooking(tripId: string, token: string): Promise<ServiceResponse<TripApiItem | null>> {
+    const response = await apiClient.authenticatedRequest<TripApiItem | ServiceResponse<TripApiItem | null>>(
+      `/trips/${tripId}/booking`,
+      token,
+      { method: "DELETE" },
+    );
+
+    if (response && typeof response === "object" && "data" in response) {
+      return response as ServiceResponse<TripApiItem | null>;
+    }
+
+    return {
+      data: response ?? null,
+      message: "Booking canceled successfully",
+    };
+  },
 };

@@ -1,6 +1,7 @@
 "use client";
 
 import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Navbar } from "@/components/layout/navbar";
 import { Footer } from "@/components/layout/footer";
 import useChatStore from "@/lib/stores/useChatStore";
@@ -35,6 +36,8 @@ export default function ChatLandingPage() {
 
   const currentUser = useAuthCacheStore((s) => s.currentUser);
   const token = useAuthCacheStore((s) => s.token);
+  const searchParams = useSearchParams();
+  const tripIdParam = searchParams.get("tripId");
 
   const [messages, setMessages] = useState<ChatMessageType[]>([]);
   const [loadingMessages, setLoadingMessages] = useState(false);
@@ -56,6 +59,15 @@ export default function ChatLandingPage() {
   useEffect(() => {
     fetchGroups();
   }, [fetchGroups]);
+
+  useEffect(() => {
+    if (!tripIdParam || !groups.length) return;
+
+    const matchedGroup = groups.find((group: any) => group.tripId === tripIdParam);
+    if (matchedGroup && selected?.id !== matchedGroup.id) {
+      selectGroup(matchedGroup.id);
+    }
+  }, [groups, selectGroup, selected?.id, tripIdParam]);
 
   useEffect(() => {
     if (!selected?.id) {

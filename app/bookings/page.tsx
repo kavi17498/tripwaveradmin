@@ -27,6 +27,7 @@ export default function BookingsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
+  const [actionTripId, setActionTripId] = useState<string | null>(null);
 
   useEffect(() => {
     hydrateFromLegacySession();
@@ -134,10 +135,28 @@ export default function BookingsPage() {
                       </p>
                     </div>
 
-                    <div className="flex items-center justify-between gap-3 pt-1">
-                      <p className="text-lg font-semibold">{formatCurrencyRs(trip.price ?? 0)}</p>
+                    <div className="flex flex-wrap items-center gap-2 pt-1">
+                      <Button
+                        variant="outline"
+                        disabled={actionTripId === trip.id}
+                        onClick={async () => {
+                          if (!token) return;
+                          setActionTripId(trip.id);
+                          try {
+                            await tripApiService.cancelBooking(trip.id, token);
+                            const response = await tripApiService.getParticipatedTrips(token);
+                            setTrips(response.data);
+                          } catch (cancelError) {
+                            setError(cancelError instanceof Error ? cancelError.message : "Failed to cancel booking.");
+                          } finally {
+                            setActionTripId(null);
+                          }
+                        }}
+                      >
+                        {actionTripId === trip.id ? "Canceling..." : "Cancel booking"}
+                      </Button>
                       <Button asChild>
-                        <Link href={`/trips/${trip.id}`}>View trip</Link>
+                        <Link href={`/chat?tripId=${trip.id}`}>View chat group</Link>
                       </Button>
                     </div>
                   </div>
