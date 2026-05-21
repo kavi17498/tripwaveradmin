@@ -24,9 +24,11 @@ export default function AdminVerificationReviewDetailPage() {
 
   const [meetingModalOpen, setMeetingModalOpen] = useState(false);
   const [summaryModalOpen, setSummaryModalOpen] = useState(false);
+  const [rejectModalOpen, setRejectModalOpen] = useState(false);
   const [meetingDate, setMeetingDate] = useState("");
   const [meetingTime, setMeetingTime] = useState("");
   const [summary, setSummary] = useState("");
+  const [rejectionReason, setRejectionReason] = useState("");
 
   const loadDetails = useCallback(async () => {
     if (!verificationId) return;
@@ -49,6 +51,7 @@ export default function AdminVerificationReviewDetailPage() {
 
   const hasMeeting = useMemo(() => Boolean(details?.meeting?.mailSentAt || details?.meeting?.scheduledAt), [details]);
   const hasSummary = useMemo(() => Boolean(details?.meeting?.meetingSummary?.trim()), [details]);
+  const isFinalized = details?.verification?.status === "approved" || details?.verification?.status === "rejected";
 
   const handleCreateMeeting = async () => {
     if (!verificationId) return;
@@ -99,9 +102,31 @@ export default function AdminVerificationReviewDetailPage() {
     setError(null);
     try {
       await adminVerificationService.assignGuideRole(details.user.id);
+      await adminVerificationService.approveVerification(verificationId as string);
       await loadDetails();
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : "Failed to set guide role.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleRejectVerification = async () => {
+    if (!verificationId) return;
+    if (!rejectionReason.trim()) {
+      setError("A rejection reason is required.");
+      return;
+    }
+
+    setActionLoading(true);
+    setError(null);
+    try {
+      await adminVerificationService.rejectVerification(verificationId, rejectionReason.trim());
+      setRejectModalOpen(false);
+      setRejectionReason("");
+      await loadDetails();
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "Failed to reject verification request.");
     } finally {
       setActionLoading(false);
     }
@@ -207,6 +232,9 @@ export default function AdminVerificationReviewDetailPage() {
           <Button type="button" onClick={() => void handleSetGuideRole()} disabled={actionLoading || !hasSummary}>
             Set guide role
           </Button>
+          <Button type="button" variant="destructive" onClick={() => setRejectModalOpen(true)} disabled={actionLoading || isFinalized}>
+            Reject
+          </Button>
         </div>
         <p className="text-xs text-muted-foreground">
           Step order: create meeting first, then submit summary, then set guide role.
@@ -257,6 +285,24 @@ export default function AdminVerificationReviewDetailPage() {
             className="mt-1 min-h-28 w-full border border-border bg-background px-3 py-2"
             value={summary}
             onChange={(event) => setSummary(event.target.value)}
+          />
+        </label>
+      </Modal>
+
+      <Modal
+        open={rejectModalOpen}
+        title="Reject Verification Request"
+        description="Provide a reason so the request creator can be notified."
+        onClose={() => setRejectModalOpen(false)}
+        onConfirm={() => void handleRejectVerification()}
+        confirmText="Reject"
+      >
+        <label className="text-sm">
+          Rejection reason
+          <textarea
+            className="mt-1 min-h-28 w-full border border-border bg-background px-3 py-2"
+            value={rejectionReason}
+            onChange={(event) => setRejectionReason(event.target.value)}
           />
         </label>
       </Modal>

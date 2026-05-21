@@ -15,6 +15,13 @@ export type AdminVerificationRequest = {
   inReviewBy?: string;
   inReviewByName?: string;
   inReviewAssignedAt?: { _seconds: number; _nanoseconds: number };
+  approvedBy?: string;
+  approvedByName?: string;
+  approvedAt?: { _seconds: number; _nanoseconds: number };
+  rejectionReason?: string;
+  rejectedBy?: string;
+  rejectedByName?: string;
+  rejectedAt?: { _seconds: number; _nanoseconds: number };
   createdAt?: { _seconds: number; _nanoseconds: number };
   updatedAt?: { _seconds: number; _nanoseconds: number };
 };
@@ -118,6 +125,21 @@ export const adminVerificationService = {
         userIds: userId,
         role: "guide",
       },
+    });
+  },
+
+  async approveVerification(verificationId: string) {
+    const token = await waitForAuthToken();
+    return apiClient.authenticatedRequest<AdminVerificationRequest>(`/verifications/admin/${verificationId}/approve`, token, {
+      method: "PATCH",
+    });
+  },
+
+  async rejectVerification(verificationId: string, reason: string) {
+    const token = await waitForAuthToken();
+    return apiClient.authenticatedRequest<AdminVerificationRequest>(`/verifications/admin/${verificationId}/reject`, token, {
+      method: "PATCH",
+      body: { reason },
     });
   },
 };
