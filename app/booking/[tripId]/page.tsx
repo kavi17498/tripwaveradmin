@@ -285,7 +285,7 @@ export default function BookingPage() {
       await tripService.submitTripParticipants(tripId, participantsPayload, token ?? undefined, paymentMethod);
       setStatus("success");
       setLoadingSubmission(false);
-      router.push(`/dashboard/trips/${tripId}/chat`);
+      router.push(`/chat?tripId=${encodeURIComponent(tripId)}`);
     };
 
     (async () => {
