@@ -52,7 +52,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
         orderBy('lastMessageAt', 'desc'),
       );
 
-      const unsub = onSnapshot(
+      let unsub: (() => void) | null = null;
+      unsub = onSnapshot(
         q,
         (snap) => {
           const groups: ChatGroup[] = [];
@@ -62,8 +63,24 @@ export const useChatStore = create<ChatState>((set, get) => ({
           });
           set({ groups, selected: groups[0] ?? null, loading: false });
         },
-        (err) => {
-          set({ error: err?.message ?? 'Failed to subscribe to groups', loading: false });
+        async (err) => {
+          const msg = err?.message ?? 'Failed to subscribe to groups';
+          set({ error: msg, loading: false });
+
+          // If permissions denied, unsubscribe and fallback to REST fetch
+          const code = (err && (err.code || err?.name)) ?? null;
+          if (code === 'permission-denied' || (typeof msg === 'string' && msg.toLowerCase().includes('permission-denied'))) {
+            try {
+              if (typeof unsub === 'function') unsub();
+            } catch {}
+
+            try {
+              const res = await chatService.getChatGroups(token ?? undefined);
+              set({ groups: res.data ?? [], selected: (res.data && res.data[0]) ?? null });
+            } catch {
+              // ignore
+            }
+          }
         },
       );
 

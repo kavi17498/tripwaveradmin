@@ -107,7 +107,8 @@ export function Navbar() {
         if (auth?.currentUser) {
           const db = getFirestore(app);
           const q = firestoreQuery(collection(db, 'chatgroups'), where('members', 'array-contains', currentUser.id));
-          const unsub = onSnapshot(q, (snap) => {
+          let unsub: (() => void) | null = null;
+          unsub = onSnapshot(q, (snap) => {
             let total = 0;
             snap.forEach((doc) => {
               const d: any = doc.data();
@@ -115,6 +116,25 @@ export function Navbar() {
               total += unreadCounts[currentUser.id] ?? 0;
             });
             setChatUnreadCount(total);
+          }, async (err) => {
+            // on permission error, unsubscribe and fallback to REST computation
+            const msg = err?.message ?? '';
+            const code = (err && (err.code || err?.name)) ?? null;
+            if (code === 'permission-denied' || (typeof msg === 'string' && msg.toLowerCase().includes('permission-denied'))) {
+              try { if (typeof unsub === 'function') unsub(); } catch {}
+              try {
+                const res = await chatService.getChatGroups(token ?? undefined);
+                const groups = res.data ?? [];
+                let total = 0;
+                for (const g of groups) {
+                  const unreadCounts: Record<string, number> = (g as any)?.unreadCounts ?? {};
+                  total += unreadCounts[currentUser.id] ?? 0;
+                }
+                setChatUnreadCount(total);
+              } catch {
+                setChatUnreadCount(0);
+              }
+            }
           });
 
           (window as any).__tripwaver_chat_unsub_nav = unsub;

@@ -12,7 +12,7 @@ import { ImagePlus, Loader2 } from "lucide-react";
 import { chatService } from "@/lib/services/chatService";
 import { chatImageUploadService } from "@/lib/services/chatImageUploadService";
 import { ChatMessage as ChatMessageType } from "@/lib/types";
-import { app } from "@/lib/config/firebase";
+import { app, auth } from "@/lib/config/firebase";
 import { getFirestore, collection, query as firestoreQuery, where, orderBy, onSnapshot } from "firebase/firestore";
 
 export default function ChatLandingPage() {
@@ -54,39 +54,85 @@ export default function ChatLandingPage() {
     setLoadingMessages(true);
     setError("");
 
-    const db = getFirestore(app);
-    const q = firestoreQuery(
-      collection(db, "chatmessages"),
-      where("chatGroupId", "==", selected.id),
-      orderBy("createdAt", "asc"),
-    );
+    // Use Firestore realtime subscription only when the Firebase client is signed-in
+    if (auth?.currentUser) {
+      const db = getFirestore(app);
+      const q = firestoreQuery(
+        collection(db, "chatmessages"),
+        where("chatGroupId", "==", selected.id),
+        orderBy("createdAt", "asc"),
+      );
 
-    const unsub = onSnapshot(
-      q,
-      (snap) => {
-        const msgs: ChatMessageType[] = [];
-        snap.forEach((doc) => {
-          const data: any = doc.data();
-          const createdAt = data?.createdAt && typeof data.createdAt.toDate === "function"
-            ? data.createdAt.toDate()
-            : data?.createdAt
-            ? new Date(data.createdAt)
-            : new Date(0);
+      let unsub: (() => void) | null = null;
+      unsub = onSnapshot(
+        q,
+        (snap) => {
+          const msgs: ChatMessageType[] = [];
+          snap.forEach((doc) => {
+            const data: any = doc.data();
+            const createdAt = data?.createdAt && typeof data.createdAt.toDate === "function"
+              ? data.createdAt.toDate()
+              : data?.createdAt
+              ? new Date(data.createdAt)
+              : new Date(0);
 
-          msgs.push({ id: doc.id, ...data, createdAt } as ChatMessageType);
-        });
+            msgs.push({ id: doc.id, ...data, createdAt } as ChatMessageType);
+          });
 
-        setMessages(msgs);
-        setLoadingMessages(false);
-      },
-      (err) => {
-        setError(err?.message ?? "Failed to subscribe to messages");
-        setLoadingMessages(false);
-      },
-    );
+          setMessages(msgs);
+          setLoadingMessages(false);
+        },
+        async (err) => {
+          const msg = err?.message ?? "Failed to subscribe to messages";
+          setError(msg);
+          setLoadingMessages(false);
+
+          const code = (err && (err.code || err?.name)) ?? null;
+          if (code === 'permission-denied' || (typeof msg === 'string' && msg.toLowerCase().includes('permission-denied'))) {
+            try { if (typeof unsub === 'function') unsub(); } catch {}
+            // fallback to REST fetch once
+            try {
+              const res = await chatService.getMessages(selected.id, token ?? undefined);
+              setMessages((res.data ?? []).map((m: any) => ({ ...m, createdAt: m.createdAt ? new Date(m.createdAt) : new Date(0) })));
+            } catch (e: any) {
+              setError(e?.message ?? 'Failed to load messages');
+            }
+          }
+        },
+      );
+
+      return () => {
+        try { if (typeof unsub === 'function') unsub(); } catch {}
+      };
+    }
+
+    // Fallback: fetch messages through backend REST (requires Authorization token) and poll
+    let mounted = true;
+    let pollId: number | null = null;
+
+    const loadOnce = async () => {
+      try {
+        const res = await chatService.getMessages(selected.id, token ?? undefined);
+        if (!mounted) return;
+        setMessages((res.data ?? []).map((m: any) => ({
+          ...m,
+          createdAt: m.createdAt ? new Date(m.createdAt) : new Date(0),
+        })));
+      } catch (e: any) {
+        if (!mounted) return;
+        setError(e?.message ?? 'Failed to load messages');
+      } finally {
+        if (mounted) setLoadingMessages(false);
+      }
+    };
+
+    void loadOnce();
+    // Poll every 5 seconds for new messages when realtime isn't available
+    pollId = window.setInterval(() => void loadOnce(), 5000);
 
     return () => {
-      unsub();
+      mounted = false;
+      if (pollId) window.clearInterval(pollId);
     };
   }, [selected, token]);
 
