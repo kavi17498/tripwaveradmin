@@ -57,18 +57,18 @@ export const paymentService = {
     };
   },
 
-  async getPaymentById(id: string, token?: string): Promise<ServiceResponse<CreatePaymentResult | null>> {
+  async getPaymentById(id: string, token?: string): Promise<ServiceResponse<Payment | null>> {
     const authToken = token || userSessionService.getToken() || undefined;
-    const response = await apiClient.request<CreatePaymentResult | ServiceResponse<CreatePaymentResult | null>>(
+    const response = await apiClient.request<Payment | ServiceResponse<Payment | null>>(
       `/payments/${id}`,
       { method: "GET", token: authToken },
     );
 
     if (response && typeof response === "object" && "data" in response) {
-      return response as ServiceResponse<CreatePaymentResult | null>;
+      return response as ServiceResponse<Payment | null>;
     }
 
-    return { data: response as CreatePaymentResult | null, message: "Payment loaded" };
+    return { data: response as Payment | null, message: "Payment loaded" };
   },
 };
 
