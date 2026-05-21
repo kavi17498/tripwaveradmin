@@ -12,6 +12,8 @@ import { ImagePlus, Loader2 } from "lucide-react";
 import { chatService } from "@/lib/services/chatService";
 import { chatImageUploadService } from "@/lib/services/chatImageUploadService";
 import { ChatMessage as ChatMessageType } from "@/lib/types";
+import { app } from "@/lib/config/firebase";
+import { getFirestore, collection, query as firestoreQuery, where, orderBy, onSnapshot } from "firebase/firestore";
 
 export default function ChatLandingPage() {
   const groups = useChatStore((s: any) => s.groups);
@@ -44,31 +46,47 @@ export default function ChatLandingPage() {
   }, [fetchGroups]);
 
   useEffect(() => {
-    let mounted = true;
-    const load = async () => {
-      if (!selected?.id) {
-        setMessages([]);
-        return;
-      }
+    if (!selected?.id) {
+      setMessages([]);
+      return;
+    }
 
-      setLoadingMessages(true);
-      setError("");
+    setLoadingMessages(true);
+    setError("");
 
-      try {
-        const res = await chatService.getMessages(selected.id, token ?? undefined);
-        if (!mounted) return;
-        setMessages(res.data ?? []);
-      } catch (e) {
-        if (!mounted) return;
-        setError(e instanceof Error ? e.message : "Failed to load messages");
-      } finally {
-        if (mounted) setLoadingMessages(false);
-      }
-    };
+    const db = getFirestore(app);
+    const q = firestoreQuery(
+      collection(db, "chatmessages"),
+      where("chatGroupId", "==", selected.id),
+      orderBy("createdAt", "asc"),
+    );
 
-    void load();
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        const msgs: ChatMessageType[] = [];
+        snap.forEach((doc) => {
+          const data: any = doc.data();
+          const createdAt = data?.createdAt && typeof data.createdAt.toDate === "function"
+            ? data.createdAt.toDate()
+            : data?.createdAt
+            ? new Date(data.createdAt)
+            : new Date(0);
+
+          msgs.push({ id: doc.id, ...data, createdAt } as ChatMessageType);
+        });
+
+        setMessages(msgs);
+        setLoadingMessages(false);
+      },
+      (err) => {
+        setError(err?.message ?? "Failed to subscribe to messages");
+        setLoadingMessages(false);
+      },
+    );
+
     return () => {
-      mounted = false;
+      unsub();
     };
   }, [selected, token]);
 
@@ -148,7 +166,18 @@ export default function ChatLandingPage() {
                       <div className="font-medium">{g.name}</div>
                       <div className="text-xs text-muted-foreground">{g.adminName ?? '—'}</div>
                     </div>
-                    <div className="text-xs">
+                    <div className="text-xs flex items-center gap-2">
+                      {typeof g.unreadCounts === 'object' && currentUser ? (
+                        (() => {
+                          const uid = currentUser.id as string;
+                          const count = (g.unreadCounts?.[uid] ?? 0) as number;
+                          return (
+                            <span className="inline-flex items-center justify-center rounded-full bg-destructive px-2 py-0.5 text-[11px] font-semibold text-destructive-foreground">
+                              {count > 9 ? '9+' : count}
+                            </span>
+                          );
+                        })()
+                      ) : null}
                       {g.adminId === currentUser?.id ? <span className="px-2 py-1 rounded bg-green-100 text-green-800">Admin</span> : null}
                     </div>
                   </button>

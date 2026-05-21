@@ -2,6 +2,8 @@ import { create } from "zustand";
 import { ChatGroup } from "@/lib/types";
 import { chatService } from "@/lib/services/chatService";
 import { userSessionService } from "@/lib/services/userSessionService";
+import { app, auth } from "@/lib/config/firebase";
+import { getFirestore, collection, query as firestoreQuery, where, orderBy, onSnapshot } from "firebase/firestore";
 
 interface ChatState {
   groups: ChatGroup[];
@@ -19,14 +21,57 @@ export const useChatStore = create<ChatState>((set, get) => ({
   selected: null,
 
   fetchGroups: async () => {
+    // subscribe to chat summaries for the authenticated user
     set({ loading: true, error: null });
     try {
-      const token = userSessionService.getToken() ?? undefined;
-      const res = await chatService.getChatGroups(token);
-      set({ groups: res.data ?? [], selected: (res.data && res.data[0]) ?? null });
+      const token = userSessionService.getToken();
+      const user = localStorage.getItem('tripwaver:user-profile');
+      let uid: string | null = null;
+      if (user) {
+        try {
+          const parsed = JSON.parse(user) as any;
+          uid = parsed?.id ?? parsed?.uid ?? null;
+        } catch {
+          uid = null;
+        }
+      }
+
+      // If we don't have a uid or the firebase client isn't signed in, fall back to REST
+      if (!uid || !auth?.currentUser) {
+        // fallback to REST fetch
+        const res = await chatService.getChatGroups(token ?? undefined);
+        set({ groups: res.data ?? [], selected: (res.data && res.data[0]) ?? null });
+        set({ loading: false });
+        return;
+      }
+
+      const db = getFirestore(app);
+      const q = firestoreQuery(
+        collection(db, 'chatgroups'),
+        where('members', 'array-contains', uid),
+        orderBy('lastMessageAt', 'desc'),
+      );
+
+      const unsub = onSnapshot(
+        q,
+        (snap) => {
+          const groups: ChatGroup[] = [];
+          snap.forEach((doc) => {
+            const d: any = doc.data();
+            groups.push({ id: doc.id, ...d } as ChatGroup);
+          });
+          set({ groups, selected: groups[0] ?? null, loading: false });
+        },
+        (err) => {
+          set({ error: err?.message ?? 'Failed to subscribe to groups', loading: false });
+        },
+      );
+
+      // attach unsubscribe so components can optionally call it
+      // store it on window for now (simple approach) - components should manage lifecycle
+      (window as any).__tripwaver_chatgroups_unsub = unsub;
     } catch (err: any) {
       set({ error: err?.message ?? 'Failed to load groups', groups: [] });
-    } finally {
       set({ loading: false });
     }
   },
@@ -34,6 +79,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
   selectGroup: (id: string) => {
     const g = get().groups.find((x) => x.id === id) ?? null;
     set({ selected: g });
+    // mark group read on selection
+    (async () => {
+      try {
+        const token = userSessionService.getToken() ?? undefined;
+        if (!token || !g) return;
+        await chatService.markGroupRead(g.id, token);
+      } catch {
+        // ignore
+      }
+    })();
   },
 }));
 

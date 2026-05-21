@@ -4,6 +4,9 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Bell, UserCircle2 } from "lucide-react";
+import { getFirestore, collection, query as firestoreQuery, where, onSnapshot } from "firebase/firestore";
+import { app, auth } from "@/lib/config/firebase";
+import { chatService } from "@/lib/services/chatService";
 import { Button } from "@/components/ui/button";
 import { authService } from "@/lib/services/authService";
 import { notificationService } from "@/lib/services/notificationService";
@@ -41,6 +44,7 @@ export function Navbar() {
   const [loggingOut, setLoggingOut] = useState(false);
   const [mode, setMode] = useState<AppMode>(getInitialMode);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [chatUnreadCount, setChatUnreadCount] = useState(0);
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loadingNotifications, setLoadingNotifications] = useState(false);
@@ -90,11 +94,55 @@ export function Navbar() {
     document.addEventListener("visibilitychange", handleVisibility);
     window.addEventListener("tripwaver:notifications-changed", refreshNotifications);
 
+    // Listen for chat summary changes to update unread chat count
+    const handleChatSnapshots = async () => {
+      const token = userSessionService.getToken();
+      if (!token || !currentUser) {
+        setChatUnreadCount(0);
+        return;
+      }
+
+      try {
+        // If the Firebase client is signed-in, subscribe to Firestore summaries for realtime updates.
+        if (auth?.currentUser) {
+          const db = getFirestore(app);
+          const q = firestoreQuery(collection(db, 'chatgroups'), where('members', 'array-contains', currentUser.id));
+          const unsub = onSnapshot(q, (snap) => {
+            let total = 0;
+            snap.forEach((doc) => {
+              const d: any = doc.data();
+              const unreadCounts: Record<string, number> = d?.unreadCounts ?? {};
+              total += unreadCounts[currentUser.id] ?? 0;
+            });
+            setChatUnreadCount(total);
+          });
+
+          (window as any).__tripwaver_chat_unsub_nav = unsub;
+        } else {
+          // Fallback to REST-based computation when the client isn't signed into Firebase.
+          const res = await chatService.getChatGroups(token ?? undefined);
+          const groups = res.data ?? [];
+          let total = 0;
+          for (const g of groups) {
+            const unreadCounts: Record<string, number> = (g as any)?.unreadCounts ?? {};
+            total += unreadCounts[currentUser.id] ?? 0;
+          }
+          setChatUnreadCount(total);
+        }
+      } catch {
+        setChatUnreadCount(0);
+      }
+    };
+
+    void handleChatSnapshots();
+
     return () => {
       mounted = false;
       window.clearInterval(intervalId);
       document.removeEventListener("visibilitychange", handleVisibility);
       window.removeEventListener("tripwaver:notifications-changed", refreshNotifications);
+      const navUnsub = (window as any).__tripwaver_chat_unsub_nav;
+      if (typeof navUnsub === 'function') navUnsub();
     };
   }, [currentUser]);
 

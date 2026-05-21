@@ -41,6 +41,19 @@ export const chatService = {
     }
   },
 
+  async markGroupRead(chatGroupId: string, token?: string): Promise<ServiceResponse<boolean>> {
+    try {
+      const res = token
+        ? await apiClient.authenticatedRequest<boolean | ServiceResponse<boolean>>(`/chatgroups/${chatGroupId}/mark-read`, token, { method: 'POST' })
+        : await apiClient.request<boolean | ServiceResponse<boolean>>(`/chatgroups/${chatGroupId}/mark-read`, { method: 'POST' });
+
+      if (res && typeof res === 'object' && 'data' in res) return res as ServiceResponse<boolean>;
+      return { data: (res as boolean) ?? true };
+    } catch (err: any) {
+      return { data: false, message: err?.message ?? 'Failed to mark group read' };
+    }
+  },
+
   async sendMessage(
     chatGroupId: string,
     payload: Omit<ChatMessage, "id" | "createdAt" | "chatGroupId">,
