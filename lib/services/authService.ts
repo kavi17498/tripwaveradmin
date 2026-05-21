@@ -37,6 +37,7 @@ const toAppUser = (firebaseUser: { uid: string; displayName: string | null; emai
   return {
     id: firebaseUser.uid,
     name: firebaseUser.displayName || email.split("@")[0] || "TripWaver User",
+    avatarUrl: (savedProfile as any)?.profileImage ?? undefined,
     email,
     role: resolveUserRole(savedRole) ?? resolveUserRole(sessionRole) ?? roleByEmail[email.toLowerCase()] ?? "traveler",
     verifiedOrganizer: false,

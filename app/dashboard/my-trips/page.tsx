@@ -18,6 +18,7 @@ type TripRow = {
   title: string;
   destination: string;
   startDate: string;
+  endDate: string;
   status: string;
 };
 
@@ -26,8 +27,14 @@ const toTripRow = (trip: TripApiItem): TripRow => ({
   title: trip.tripName,
   destination: trip.destinations[0]?.name ?? trip.startLocation ?? "Unknown destination",
   startDate: trip.startDate,
+  endDate: trip.endDate,
   status: trip.status ?? "published",
 });
+
+const isTripExpired = (trip: TripRow) => {
+  const endOfDay = new Date(`${trip.endDate}T23:59:59.999`);
+  return Number.isNaN(endOfDay.getTime()) ? false : new Date() > endOfDay;
+};
 
 export default function MyTripsPage() {
   const { pushToast } = useToast();
@@ -112,16 +119,33 @@ export default function MyTripsPage() {
             </thead>
             <tbody>
               {visibleTrips.map((trip) => (
+                (() => {
+                  const expired = isTripExpired(trip);
+                  const canEdit = trip.status !== "in review";
+                  const canShare = trip.status === "approved" && !expired;
+                  const statusLabel = expired ? "expired" : trip.status;
+
+                  return (
                 <tr key={trip.id} className="border-t border-border">
                   <td className="p-3">{trip.title}</td>
                   <td className="p-3">{trip.destination}</td>
                   <td className="p-3">{trip.startDate}</td>
-                  <td className="p-3"><StatusBadge status={(trip.status || "published") as any} /></td>
+                  <td className="p-3"><StatusBadge status={(statusLabel || "published") as any} /></td>
                   <td className="p-3 text-right">
                     <div className="flex justify-end gap-2">
-                      <Button size="sm" variant="outline" asChild><Link href={`/dashboard/trips/${trip.id}/edit`}>Edit</Link></Button>
+                      {canEdit ? (
+                        <Button size="sm" variant="outline" asChild>
+                          <Link href={`/dashboard/trips/${trip.id}/edit`}>
+                            {trip.status === "rejected" ? "Edit & Resubmit" : "Edit"}
+                          </Link>
+                        </Button>
+                      ) : (
+                        <Button size="sm" variant="outline" disabled title="Trips in review cannot be edited">
+                          Edit
+                        </Button>
+                      )}
                       <Button size="sm" variant="outline" asChild><Link href={`/dashboard/trips/${trip.id}/participants`}>Participants</Link></Button>
-                      {trip.status === "approved" ? (
+                      {canShare ? (
                         <Button
                           size="sm"
                           onClick={() => {
@@ -134,13 +158,20 @@ export default function MyTripsPage() {
                           Share Invite
                         </Button>
                       ) : (
-                        <Button size="sm" variant="outline" disabled title="Trip not approved">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled
+                          title={expired ? "Trip has expired" : trip.status === "approved" ? "Invite unavailable" : "Trip not approved"}
+                        >
                           Share Invite
                         </Button>
                       )}
                     </div>
                   </td>
                 </tr>
+                  );
+                })()
               ))}
             </tbody>
           </table>

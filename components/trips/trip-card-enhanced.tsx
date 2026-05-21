@@ -2,7 +2,6 @@ import Link from "next/link";
 import { CalendarDays, MapPin, Users, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { RatingStars } from "@/components/common/rating-stars";
-import { StatusBadge } from "@/components/common/status-badge";
 import { Trip } from "@/lib/types";
 import { formatCurrencyRs } from "@/lib/utils";
 
@@ -14,14 +13,24 @@ interface TripCardEnhancedProps {
 export function TripCardEnhanced({ trip, href }: TripCardEnhancedProps) {
   const displayedItinerary = trip.itinerary.slice(0, 3);
   const displayedIncluded = trip.included.slice(0, 4);
+  const tripCategoryLabel =
+    trip.tripType === "private"
+      ? "Private Trip"
+      : trip.title.toLowerCase().includes("solo")
+        ? "Solo Trip"
+        : trip.title.toLowerCase().includes("family")
+          ? "Family Trip"
+          : trip.title.toLowerCase().includes("stranger")
+            ? "Strangers Trip"
+            : "Public Trip";
 
   return (
     <article className="border border-border bg-card shadow-md overflow-hidden hover:shadow-lg transition-shadow">
       {/* Cover Image */}
       <div className="relative h-56 w-full overflow-hidden bg-muted">
         <img src={trip.coverImage} alt={trip.title} className="h-full w-full object-cover" />
-        <div className="absolute top-3 right-3">
-          <StatusBadge status={trip.status} />
+        <div className="absolute left-3 top-3 rounded-full border border-white/20 bg-slate-950/75 px-3 py-1 text-xs font-medium text-white backdrop-blur">
+          {tripCategoryLabel}
         </div>
       </div>
 

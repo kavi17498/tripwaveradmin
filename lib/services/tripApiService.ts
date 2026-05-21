@@ -1,4 +1,5 @@
 import { apiClient } from "@/lib/services/apiClient";
+import { userSessionService } from "@/lib/services/userSessionService";
 import { CreateTripApiPayload, ServiceResponse } from "@/lib/types";
 
 export type TripApiDestination = {
@@ -15,6 +16,7 @@ export type TripApiItem = {
   id: string;
   tripName: string;
   tripCategory: CreateTripApiPayload["tripCategory"] | string;
+  paymentMethods?: CreateTripApiPayload["paymentMethods"];
   destinations: TripApiDestination[];
   mainDestinations?: Array<{
     name: string;
@@ -119,6 +121,37 @@ export const tripApiService = {
     return {
       data: response,
       message: "Trip updated successfully",
+    };
+  },
+
+  async getApprovedPublicTrips(
+    filters?: Record<string, string | number | undefined>,
+    token?: string
+  ): Promise<ServiceResponse<TripApiItem[]>> {
+    const qs = filters
+      ? "?" +
+        Object.entries(filters)
+          .filter(([, v]) => v !== undefined && v !== "")
+          .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`)
+          .join("&")
+      : "";
+
+    const path = `/trips/approvedpublictrips${qs}`;
+    
+    // Auto-retrieve token from session if not provided
+    const authToken = token || userSessionService.getToken();
+    
+    const response = authToken
+      ? await apiClient.authenticatedRequest<TripApiItem[] | ServiceResponse<TripApiItem[]>>(path, authToken, { method: "GET" })
+      : await apiClient.request<TripApiItem[] | ServiceResponse<TripApiItem[]>>(path, { method: "GET" });
+
+    if (response && typeof response === "object" && "data" in response) {
+      return response as ServiceResponse<TripApiItem[]>;
+    }
+
+    return {
+      data: response as TripApiItem[],
+      message: "Approved public trips loaded",
     };
   },
 };

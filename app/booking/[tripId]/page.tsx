@@ -9,10 +9,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuthCacheStore, type CachedUserProfile } from "@/lib/stores/useAuthCacheStore";
 import { tripService } from "@/lib/services/tripService";
-import { Trip } from "@/lib/types";
+import { paymentService } from "@/lib/services/paymentService";
+import { tripApiService, type TripApiItem } from "@/lib/services/tripApiService";
+import { useRouter } from "next/navigation";
 import { formatCurrencyRs } from "@/lib/utils";
 
 type ParticipantGender = "male" | "female" | "other" | "";
+type TripPaymentMethod = NonNullable<TripApiItem["paymentMethods"]>[number];
 
 type ParticipantForm = {
   name: string;
@@ -56,26 +59,109 @@ const getUserAddress = (user: CachedUserProfile | null) => {
   ]);
 };
 
+const computeAgeFromDOB = (dob?: string | null) => {
+  if (!dob) return "";
+  const date = new Date(dob);
+  if (Number.isNaN(date.getTime())) return "";
+  const now = new Date();
+  let age = now.getFullYear() - date.getFullYear();
+  const m = now.getMonth() - date.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < date.getDate())) age--;
+  return String(Math.max(0, age));
+};
+
+const isTripExpired = (trip: TripApiItem) => {
+  const endOfDay = new Date(`${trip.endDate}T23:59:59.999`);
+  return Number.isNaN(endOfDay.getTime()) ? false : new Date() > endOfDay;
+};
+
+const getBookingBlockedMessage = (trip: TripApiItem) => {
+  if (isTripExpired(trip)) return "This trip has expired.";
+  if (trip.status !== "approved") return "Booking is available after the trip is approved.";
+  return "This trip cannot be booked right now.";
+};
+
+const getPaymentMethodHelpText = (method: TripPaymentMethod) => {
+  if (method === "Pay Online") return "Complete the payment online now.";
+  return "Reserve your spot now and pay the guide on the trip day.";
+};
+
 export default function BookingPage() {
   const { tripId } = useParams<{ tripId: string }>();
-  const [trip, setTrip] = useState<Trip | null>(null);
+  const router = useRouter();
+  const [trip, setTrip] = useState<TripApiItem | null>(null);
   const currentUser = useAuthCacheStore((state) => state.currentUser);
   const hydrated = useAuthCacheStore((state) => state.hydrated);
   const hydrateFromLegacySession = useAuthCacheStore((state) => state.hydrateFromLegacySession);
   const token = useAuthCacheStore((state) => state.token);
   const [participantsCount, setParticipantsCount] = useState("1");
   const [participants, setParticipants] = useState<ParticipantForm[]>([emptyParticipant()]);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<TripPaymentMethod | "">("");
   const [loadingSubmission, setLoadingSubmission] = useState(false);
-  const [status, setStatus] = useState<"idle" | "success" | "failed">("idle");
+  const [status, setStatus] = useState<"idle" | "processing" | "success" | "failed">("idle");
   const [error, setError] = useState("");
 
+  const bookedParticipantsCount = trip?.participants?.length ?? 0;
+  const allowedBookingCount = Math.max(0, (trip?.maxParticipants ?? 0) - bookedParticipantsCount);
+  const mainDestination = trip?.mainDestinations?.[0]?.name || trip?.destinations?.[0]?.name || trip?.startLocation || "Not specified";
+  const pricePerPerson = trip?.price ?? 0;
+  const coverImage = trip?.coverImage || trip?.photos?.[0] || trip?.destinations?.[0]?.photos?.[0] || "";
+
   useEffect(() => {
-    tripService.getTripById(tripId).then((result) => setTrip(result.data));
-  }, [tripId]);
+    const loadTrip = async () => {
+      try {
+        const result = await tripApiService.getTripById(tripId, token ?? "");
+        const loadedTrip = result.data ?? null;
+        setTrip(loadedTrip);
+
+        if (loadedTrip) {
+          if (loadedTrip.status !== "approved" || isTripExpired(loadedTrip)) {
+            setError(getBookingBlockedMessage(loadedTrip));
+          }
+
+          // Server may mark trips as reserved when a family/solo booking is completed
+          const reservedFor = (loadedTrip as any).reservedFor as string | undefined;
+          if (reservedFor === 'family' || reservedFor === 'solo') {
+            // If reserved by someone else, block booking for everyone
+            setError('This trip has been reserved and is no longer bookable.');
+          }
+
+          // If current user already has a booking, block additional bookings
+          if (currentUser && Array.isArray(loadedTrip.participants)) {
+            const already = loadedTrip.participants.find((p: any) => p.parentUserId && p.parentUserId === currentUser.id);
+            if (already) {
+              setError('You have already booked this trip.');
+            }
+          }
+        }
+      } catch {
+        setTrip(null);
+      }
+    };
+
+    loadTrip();
+  }, [currentUser, tripId, token]);
 
   useEffect(() => {
     hydrateFromLegacySession();
   }, [hydrateFromLegacySession]);
+
+  useEffect(() => {
+    if (!trip) return;
+
+    const availablePaymentMethods = trip.paymentMethods ?? [];
+    if (availablePaymentMethods.length === 1) {
+      setSelectedPaymentMethod(availablePaymentMethods[0]);
+    } else if (availablePaymentMethods.length > 1 && (!selectedPaymentMethod || !availablePaymentMethods.includes(selectedPaymentMethod as TripPaymentMethod))) {
+      setSelectedPaymentMethod(availablePaymentMethods[0]);
+    }
+
+    const nextCount = Math.min(Math.max(1, Number(participantsCount) || 1), Math.max(allowedBookingCount, 1));
+    const nextCountText = String(nextCount);
+    if (nextCountText !== participantsCount) {
+      setParticipantsCount(nextCountText);
+    }
+  }, [allowedBookingCount, participantsCount, selectedPaymentMethod, trip]);
 
   useEffect(() => {
     const count = Math.max(1, Number(participantsCount) || 1);
@@ -99,6 +185,8 @@ export default function BookingPage() {
       email: currentUser.email?.trim() ?? "",
       phone: currentUser.phone?.trim() ?? "",
       address: getUserAddress(currentUser),
+      gender: (currentUser.gender as ParticipantGender) ?? "",
+      age: computeAgeFromDOB(currentUser.dateOfBirth),
     };
 
     setParticipants((currentParticipants) => {
@@ -113,6 +201,8 @@ export default function BookingPage() {
         email: firstParticipant.email.trim() || primaryParticipant.email,
         phone: firstParticipant.phone.trim() || primaryParticipant.phone,
         address: firstParticipant.address.trim() || primaryParticipant.address,
+        gender: (firstParticipant.gender.trim() || primaryParticipant.gender) as ParticipantGender,
+        age: firstParticipant.age.trim() || primaryParticipant.age,
       };
 
       return nextParticipants;
@@ -129,6 +219,28 @@ export default function BookingPage() {
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
+
+    if (!trip || trip.status !== "approved" || isTripExpired(trip)) {
+      setError(trip ? getBookingBlockedMessage(trip) : "This trip is not available for booking.");
+      return;
+    }
+
+    const availablePaymentMethods = trip.paymentMethods ?? [];
+    if (!availablePaymentMethods.length) {
+      setError("This trip does not have a supported payment method configured.");
+      return;
+    }
+
+    const paymentMethod = selectedPaymentMethod || availablePaymentMethods[0];
+    if (!paymentMethod || !availablePaymentMethods.includes(paymentMethod)) {
+      setError("Please select a valid payment method for this trip.");
+      return;
+    }
+
+    if (allowedBookingCount <= 0) {
+      setError("This trip has reached its maximum participant limit.");
+      return;
+    }
 
     const parentUserId = typeof currentUser?.id === "string" ? currentUser.id.trim() : "";
 
@@ -149,9 +261,9 @@ export default function BookingPage() {
       return;
     }
 
-    const payload = participants.map((participant, index) => {
+    const participantsPayload = participants.map((participant, index) => {
       const baseParticipant = {
-        parentUserId: participants.length === 1 ? null : parentUserId,
+        parentUserId,
         name: participant.name.trim(),
         gender: participant.gender as "male" | "female" | "other",
         age: Number(participant.age),
@@ -169,22 +281,80 @@ export default function BookingPage() {
       return baseParticipant;
     });
 
-    setLoadingSubmission(true);
-    setError("");
-    setStatus("idle");
+    const finalizeBooking = async () => {
+      await tripService.submitTripParticipants(tripId, participantsPayload, token ?? undefined, paymentMethod);
+      setStatus("success");
+      setLoadingSubmission(false);
+      router.push(`/dashboard/trips/${tripId}/chat`);
+    };
 
-    void tripService
-      .submitTripParticipants(tripId, payload, token ?? undefined)
-      .then(() => {
-        setStatus("success");
-      })
-      .catch((submissionError) => {
+    (async () => {
+      setLoadingSubmission(true);
+      setError("");
+      setStatus("processing");
+
+      try {
+        if (paymentMethod === "Pay to Guide on Trip Day") {
+          await finalizeBooking();
+          return;
+        }
+
+        const amount = pricePerPerson * participantsPayload.length;
+        const createRes = await paymentService.createPayment({
+          tripId,
+          userId: parentUserId,
+          method: "card",
+          amount,
+          // pass explicit user fields to avoid relying on server-side guessing
+          firstName: currentUser?.firstName ?? (currentUser?.name ? currentUser.name.split(" ")[0] : ""),
+          lastName: currentUser?.lastName ?? (currentUser?.name ? currentUser.name.split(" ").slice(1).join(" ") : ""),
+          email: currentUser?.email?.trim() ?? "",
+          phone: currentUser?.phone?.trim() ?? "",
+        }, token ?? undefined);
+
+        const payment = createRes.data;
+
+        const payhere = (window as Window & { payhere?: {
+          startPayment: (payload: typeof payment) => void;
+          onCompleted?: (orderId: string) => void;
+          onDismissed?: () => void;
+          onError?: (error: unknown) => void;
+        } }).payhere;
+
+        if (!payhere) {
+          throw new Error("PayHere script is not loaded.");
+        }
+
+        payhere.onCompleted = async () => {
+          try {
+            await finalizeBooking();
+          } catch (submitError: unknown) {
+            setStatus("failed");
+            setError(submitError instanceof Error ? submitError.message : "Failed to submit participants after payment.");
+          }
+        };
+
+        payhere.onDismissed = () => {
+          setStatus("failed");
+          setError("Payment was dismissed before completion.");
+          setLoadingSubmission(false);
+        };
+
+        payhere.onError = (payhereError: unknown) => {
+          setStatus("failed");
+          setError(payhereError instanceof Error ? payhereError.message : "Payment failed to initialize.");
+          setLoadingSubmission(false);
+        };
+
+        payhere.startPayment(payment);
+      } catch (err: unknown) {
         setStatus("failed");
-        setError(submissionError instanceof Error ? submissionError.message : "Failed to submit participants.");
-      })
-      .finally(() => {
+        setError(err instanceof Error ? err.message : String(err));
         setLoadingSubmission(false);
-      });
+      } finally {
+        // Keep the button disabled until the PayHere callback completes.
+      }
+    })();
   };
 
   return (
@@ -197,9 +367,53 @@ export default function BookingPage() {
             <p className="text-sm text-muted-foreground">Your cached profile fills the first participant. Add the rest of the party below.</p>
           </div>
           <form onSubmit={submit} className="space-y-4">
+            <section className="space-y-3 border border-border bg-background p-4">
+              <div>
+                <h2 className="font-semibold">Payment method</h2>
+                <p className="text-xs text-muted-foreground">Choose how you want to complete this booking.</p>
+              </div>
+
+              {trip?.paymentMethods?.length ? (
+                <div className="grid gap-2 md:grid-cols-2">
+                  {trip.paymentMethods.map((method) => (
+                    <label
+                      key={method}
+                      className={`flex cursor-pointer items-start gap-3 rounded-md border p-3 text-sm transition-colors ${selectedPaymentMethod === method ? "border-primary bg-primary/5" : "border-border bg-card"}`}
+                    >
+                      <input
+                        type="radio"
+                        name="payment-method"
+                        className="mt-1"
+                        checked={selectedPaymentMethod === method}
+                        onChange={() => setSelectedPaymentMethod(method)}
+                      />
+                      <div>
+                        <p className="font-medium">{method}</p>
+                        <p className="text-xs text-muted-foreground">{getPaymentMethodHelpText(method)}</p>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-destructive">No payment methods are configured for this trip.</p>
+              )}
+            </section>
+
             <div className="grid gap-2 md:max-w-sm">
               <label className="text-sm font-medium">Total participants</label>
-              <Input type="number" min={1} value={participantsCount} onChange={(event) => setParticipantsCount(event.target.value)} />
+              <Input
+                type="number"
+                min={1}
+                max={allowedBookingCount}
+                value={participantsCount}
+                onChange={(event) => setParticipantsCount(event.target.value)}
+                disabled={allowedBookingCount <= 0}
+              />
+              <p className="text-xs text-muted-foreground">
+                {allowedBookingCount > 0
+                  ? `You can book up to ${allowedBookingCount} participant${allowedBookingCount === 1 ? "" : "s"} for this trip.`
+                  : "This trip is fully booked."}
+              </p>
             </div>
 
             {!hydrated ? <p className="text-sm text-muted-foreground">Loading cached profile...</p> : null}
@@ -257,17 +471,42 @@ export default function BookingPage() {
               </article>
             ))}
 
+            {allowedBookingCount <= 0 ? (
+              <p className="text-sm text-destructive">Booking is closed because this trip has no remaining participant slots.</p>
+            ) : null}
             {error ? <p className="text-sm text-destructive">{error}</p> : null}
             {status === "success" ? <p className="text-sm text-emerald-600">Participants submitted successfully.</p> : null}
-            <Button disabled={loadingSubmission}>{loadingSubmission ? "Submitting..." : "Submit booking participants"}</Button>
+            <Button disabled={loadingSubmission || allowedBookingCount <= 0 || !selectedPaymentMethod}>
+              {loadingSubmission
+                ? "Submitting..."
+                : selectedPaymentMethod === "Pay Online"
+                  ? "Pay online and submit"
+                  : "Confirm booking"}
+            </Button>
           </form>
         </section>
         <aside className="border border-border bg-card p-5">
           <h2 className="font-semibold">Trip summary</h2>
-          <p className="mt-2 text-sm">{trip?.title ?? "Loading..."}</p>
-          <p className="mt-1 text-sm text-muted-foreground">{trip?.destination}</p>
-          <p className="mt-4 text-sm text-muted-foreground">Participants: {participants.length}</p>
-          <p className="mt-1 text-lg font-semibold">{formatCurrencyRs(trip ? trip.price * participants.length : 0)}</p>
+          {coverImage ? (
+            <img src={coverImage} alt={trip?.tripName ?? "Trip cover"} className="mt-4 h-36 w-full rounded-md object-cover" />
+          ) : null}
+          <p className="mt-3 text-lg font-semibold">{trip?.tripName ?? "Loading trip..."}</p>
+          <p className="mt-1 text-sm text-muted-foreground">{trip?.tripCategory ?? "Trip category not available"}</p>
+          <div className="mt-4 space-y-2 text-sm text-muted-foreground">
+            <p>Destination: {mainDestination}</p>
+            <p>
+              Dates: {trip?.startDate ?? "--"} to {trip?.endDate ?? "--"}
+            </p>
+            <p>Organizer: {trip?.organizer ?? "--"}</p>
+            <p>
+              Payment: {selectedPaymentMethod || "Select a method"}
+            </p>
+            <p>
+              Slots left: {allowedBookingCount} of {trip?.maxParticipants ?? "--"}
+            </p>
+            <p>Participants: {participants.length}</p>
+          </div>
+          <p className="mt-4 text-lg font-semibold">{formatCurrencyRs(pricePerPerson * participants.length)}</p>
           <Button variant="outline" className="mt-4 w-full" asChild>
             <Link href={`/trips/${tripId}`}>Back to Trip</Link>
           </Button>

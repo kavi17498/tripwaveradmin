@@ -70,6 +70,34 @@ type SelectedTravelDestination = {
 
 const categories: TripCategory[] = ["Solo Trip with guide", "Family Trip with guide", "Strangers Trip with guide", "Private trip"];
 
+const paymentMethodOptions = ["Pay Online", "Pay to Guide on Trip Day"] as const;
+type PaymentMethod = (typeof paymentMethodOptions)[number];
+
+const leadTimeTripCategories: TripCategory[] = ["Solo Trip with guide", "Family Trip with guide", "Strangers Trip with guide"];
+
+const getLocalDateString = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const getMinStartDate = (leadDays: number) => {
+  const date = new Date();
+  date.setHours(0, 0, 0, 0);
+  date.setDate(date.getDate() + leadDays);
+  return getLocalDateString(date);
+};
+
+const timeToMinutes = (value: string) => {
+  const match = value.match(/^(\d{2}):(\d{2})$/);
+  if (!match) return Number.NaN;
+
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  return hours * 60 + minutes;
+};
+
 const emptyDestination = (): DestinationFormItem => ({
   name: "",
   description: "",
@@ -91,6 +119,16 @@ const travelMethods = [
   { key: "car", label: "Car", icon: Car },
   { key: "van", label: "Van", icon: Car },
   { key: "lorry", label: "Lorry", icon: Truck },
+  { key: "three-wheel", label: "Three Wheel", icon: Car },
+  { key: "bike", label: "Bike", icon: Car },
+  { key: "four-by-four", label: "4x4", icon: Truck },
+  { key: "suv", label: "SUV", icon: Car },
+  { key: "minibus", label: "Mini Bus", icon: Bus },
+  { key: "coach", label: "Coach", icon: Bus },
+  { key: "boat", label: "Boat", icon: Truck },
+  { key: "ferry", label: "Ferry", icon: Truck },
+  { key: "airplane", label: "Airplane", icon: Truck },
+  { key: "helicopter", label: "Helicopter", icon: Truck },
 ];
 
 const toDateOnly = (value: string) => {
@@ -182,7 +220,8 @@ export default function CreateTripPage() {
   const [participants, setParticipants] = useState<ParticipantFormItem[]>([emptyParticipant()]);
 
   const [hotelFacilitiesEditor, setHotelFacilitiesEditor] = useState("");
-  const [travelBy, setTravelBy] = useState<string>("");
+  const [travelMethodsSelected, setTravelMethodsSelected] = useState<string[]>([]);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [otherInclusionsEditor, setOtherInclusionsEditor] = useState("");
   const [exclusionsEditor, setExclusionsEditor] = useState("");
 
@@ -227,6 +266,9 @@ export default function CreateTripPage() {
   const [isTripwaverAIOpen, setIsTripwaverAIOpen] = useState(false);
   const [tripwaverAIError, setTripwaverAIError] = useState("");
 
+  const minStartDate = useMemo(() => getMinStartDate(3), []);
+  const endDateMin = startDate || minStartDate;
+
   useEffect(() => {
     const profile = userSessionService.getUserProfile<StoredUserProfile>();
     if (!profile) return;
@@ -266,11 +308,12 @@ export default function CreateTripPage() {
         setStartLocation(trip.startLocation ?? "");
         setPrice(String(trip.price ?? ""));
         setMaxParticipants(String(trip.maxParticipants ?? ""));
+        setPaymentMethods((trip.paymentMethods as PaymentMethod[] | undefined) ?? []);
         if (trip.included) {
           setHotelFacilitiesEditor((trip.included.hotelFacilities || []).join("\n"));
           setOtherInclusionsEditor((trip.included.otherInclusions || []).join("\n"));
           setExclusionsEditor((trip.included.exclusions || []).join("\n"));
-          setTravelBy(trip.included.transportFacilities?.[0] ?? "");
+          setTravelMethodsSelected(trip.included.transportFacilities || []);
         }
 
         if (trip.mainDestinations && trip.mainDestinations.length > 0) {
@@ -446,8 +489,12 @@ export default function CreateTripPage() {
     setParticipants((prev) => prev.filter((_, currentIndex) => currentIndex !== index));
   };
 
-  const toggleTravelBy = (method: string) => {
-    setTravelBy((prev) => (prev === method ? "" : method));
+  const toggleTravelMethod = (method: string) => {
+    setTravelMethodsSelected((prev) => (prev.includes(method) ? prev.filter((item) => item !== method) : [...prev, method]));
+  };
+
+  const togglePaymentMethod = (method: PaymentMethod) => {
+    setPaymentMethods((prev) => (prev.includes(method) ? prev.filter((item) => item !== method) : [...prev, method]));
   };
 
   const addMainDestination = () => {
@@ -500,6 +547,19 @@ export default function CreateTripPage() {
     const issues: string[] = [];
     if (!tripName.trim()) issues.push("Trip name is required.");
     if (!tripCategory) issues.push("Trip category is required.");
+    if (!isEditMode && leadTimeTripCategories.includes(allowedTripCategory) && (!startDate || startDate < minStartDate)) {
+      issues.push(`For guided trips, start date must be at least 3 days from today (${minStartDate}).`);
+    }
+    if (startDate && endDate && endDate < startDate) {
+      issues.push("End date must be the same as or later than the start date.");
+    }
+    if (startDate && endDate && startDate === endDate) {
+      const startMinutes = timeToMinutes(startTime);
+      const endMinutes = timeToMinutes(endTime);
+      if (!Number.isNaN(startMinutes) && !Number.isNaN(endMinutes) && endMinutes <= startMinutes) {
+        issues.push("For a one-day trip, end time must be later than start time.");
+      }
+    }
     const hasManualDest = destinations.some((d) => d.name.trim() && d.latitude.trim() && d.longitude.trim());
     const hasSelectedDest = selectedTravelDestinations.length > 0;
     if (!hasManualDest && !hasSelectedDest) {
@@ -578,7 +638,7 @@ export default function CreateTripPage() {
       startLocation: startLocation.trim(),
       included: {
         hotelFacilities: toLines(hotelFacilitiesEditor),
-        transportFacilities: travelBy ? [travelBy] : [],
+        transportFacilities: travelMethodsSelected,
         otherInclusions: toLines(otherInclusionsEditor),
         exclusions: toLines(exclusionsEditor),
       },
@@ -663,11 +723,25 @@ export default function CreateTripPage() {
 
     if (!tripName.trim()) issues.push("Trip name is required.");
     if (!startDate || !endDate) issues.push("Start date and end date are required.");
+    if (!isEditMode && leadTimeTripCategories.includes(allowedTripCategory) && (!startDate || startDate < minStartDate)) {
+      issues.push(`For guided trips, start date must be at least 3 days from today (${minStartDate}).`);
+    }
+    if (startDate && endDate && endDate < startDate) {
+      issues.push("End date must be the same as or later than the start date.");
+    }
+    if (startDate && endDate && startDate === endDate) {
+      const startMinutes = timeToMinutes(startTime);
+      const endMinutes = timeToMinutes(endTime);
+      if (!Number.isNaN(startMinutes) && !Number.isNaN(endMinutes) && endMinutes <= startMinutes) {
+        issues.push("For a one-day trip, end time must be later than start time.");
+      }
+    }
     if (!startTime) issues.push("Start time is required.");
     if (!startLocation.trim()) issues.push("Start location is required.");
     if (!organizerId.trim()) issues.push("Organizer id (user id) is required.");
     if (Number(price) <= 0) issues.push("Price must be greater than 0.");
     if (Number(maxParticipants) <= 0) issues.push("Max participants must be greater than 0.");
+    if (paymentMethods.length === 0) issues.push("Select at least one payment method.");
 
     const hasSelectedDestinations = selectedTravelDestinations.length > 0;
     const hasManualDestinationInput = destinations.some((destination) =>
@@ -828,12 +902,13 @@ export default function CreateTripPage() {
       startLocation: startLocation.trim(),
       organizer: organizerId.trim(),
       price: Number(price),
+      paymentMethods,
       itinerary: {
         days: itineraryDaysPayload,
       },
       included: {
         hotelFacilities: dayCount > 1 ? toLines(hotelFacilitiesEditor) : [],
-        transportFacilities: travelBy ? [travelBy] : [],
+        transportFacilities: travelMethodsSelected,
         otherInclusions: toLines(otherInclusionsEditor),
         exclusions: toLines(exclusionsEditor),
       },
@@ -982,11 +1057,16 @@ export default function CreateTripPage() {
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
             <div>
               <label className="mb-1 block text-sm font-medium">Start date</label>
-              <Input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
+              <Input
+                type="date"
+                value={startDate}
+                min={isEditMode ? undefined : minStartDate}
+                onChange={(event) => setStartDate(event.target.value)}
+              />
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium">End date</label>
-              <Input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
+              <Input type="date" value={endDate} min={endDateMin} onChange={(event) => setEndDate(event.target.value)} />
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium">Start time</label>
@@ -1011,7 +1091,7 @@ export default function CreateTripPage() {
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium">Organizer name (preview)</label>
-              <Input value={organizerName} onChange={(event) => setOrganizerName(event.target.value)} />
+              <Input value={organizerName} readOnly />
             </div>
           </div>
         </section>
@@ -1176,16 +1256,17 @@ export default function CreateTripPage() {
         <section className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold">Travel By</h2>
+            <p className="text-xs text-muted-foreground">Choose one or more transport options</p>
           </div>
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
             {travelMethods.map((method) => {
               const Icon = method.icon;
-              const isSelected = travelBy === method.label;
+              const isSelected = travelMethodsSelected.includes(method.label);
               return (
                 <button
                   key={method.key}
                   type="button"
-                  onClick={() => toggleTravelBy(method.label)}
+                  onClick={() => toggleTravelMethod(method.label)}
                   className={
                     "flex items-center gap-2 rounded border px-3 py-2 text-left transition" +
                     (isSelected ? " border-primary bg-primary/10" : " border-border bg-card hover:bg-accent")
@@ -1194,6 +1275,42 @@ export default function CreateTripPage() {
                   <Icon className="size-4" />
                   <span className="text-sm font-medium">{method.label}</span>
                 </button>
+              );
+            })}
+          </div>
+        </section>
+
+        <section className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold">Payment Method</h2>
+            <p className="text-xs text-muted-foreground">Select one or both options</p>
+          </div>
+          <p className="text-sm text-muted-foreground">You can select one or both payment methods for this trip.</p>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            {paymentMethodOptions.map((method) => {
+              const isSelected = paymentMethods.includes(method);
+
+              return (
+                <label
+                  key={method}
+                  className={
+                    "flex cursor-pointer items-start gap-3 rounded border px-3 py-3 text-left transition" +
+                    (isSelected ? " border-primary bg-primary/10" : " border-border bg-card hover:bg-accent")
+                  }
+                >
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={() => togglePaymentMethod(method)}
+                    className="mt-1"
+                  />
+                  <span>
+                    <span className="block text-sm font-medium">{method}</span>
+                    <span className="block text-xs text-muted-foreground">
+                      {method === "Pay Online" ? "Guests can pay digitally before the trip." : "Guests can pay the guide on the trip day."}
+                    </span>
+                  </span>
+                </label>
               );
             })}
           </div>

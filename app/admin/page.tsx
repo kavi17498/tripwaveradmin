@@ -12,13 +12,15 @@ export default function AdminPage() {
   useEffect(() => {
     void fetchUsers();
     void fetchTrips("pending");
+    void fetchTrips("in review");
     void fetchTrips("approved");
     void fetchTrips("rejected");
     void fetchTrips("draft");
   }, [fetchTrips, fetchUsers]);
 
-  const allTrips = [...(tripsByStatus.pending ?? []), ...(tripsByStatus.approved ?? []), ...(tripsByStatus.rejected ?? []), ...(tripsByStatus.draft ?? [])];
+  const allTrips = [...(tripsByStatus.pending ?? []), ...(tripsByStatus["in review"] ?? []), ...(tripsByStatus.approved ?? []), ...(tripsByStatus.rejected ?? []), ...(tripsByStatus.draft ?? [])];
   const pendingTrips = tripsByStatus.pending ?? [];
+  const reviewTrips = tripsByStatus["in review"] ?? [];
   const verifiedUsers = users.filter((user) => user.isVerified).length;
   const unverifiedUsers = users.length - verifiedUsers;
 
@@ -29,7 +31,7 @@ export default function AdminPage() {
         <p className="mt-1 text-sm text-muted-foreground">Platform-wide overview of users, trips, and verification activity.</p>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
         <article className="border border-border bg-card p-4">
           <p className="text-xs uppercase tracking-wide text-muted-foreground">Total Users</p>
           <p className="mt-2 text-2xl font-semibold">{users.length}</p>
@@ -37,6 +39,10 @@ export default function AdminPage() {
         <article className="border border-border bg-card p-4">
           <p className="text-xs uppercase tracking-wide text-muted-foreground">Pending Trips</p>
           <p className="mt-2 text-2xl font-semibold">{pendingTrips.length}</p>
+        </article>
+        <article className="border border-border bg-card p-4">
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">In Review Trips</p>
+          <p className="mt-2 text-2xl font-semibold">{reviewTrips.length}</p>
         </article>
         <article className="border border-border bg-card p-4">
           <p className="text-xs uppercase tracking-wide text-muted-foreground">Verified Users</p>

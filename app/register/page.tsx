@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/feedback/toast-provider";
 import { useUserRegistrationStore } from "@/lib/stores/useUserRegistrationStore";
+import { userImageUploadService } from "@/lib/services/userImageUploadService";
+import AvatarUpload from "@/components/common/avatar-upload";
 import { useAuthCacheStore } from "@/lib/stores/useAuthCacheStore";
 import { userSessionService } from "@/lib/services/userSessionService";
 
@@ -20,12 +22,19 @@ export default function RegisterPage() {
     useUserRegistrationStore();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     clearError();
 
     try {
+      // if user selected a file in the registration form, upload it first
+      if (selectedFile) {
+        const uploaded = await userImageUploadService.uploadProfileImage(selectedFile);
+        if (uploaded) setField("profileImage", uploaded);
+      }
+
       await registerManual(password, confirmPassword);
       const profile = userSessionService.getUserProfile<Record<string, unknown>>();
       const token = userSessionService.getToken();
@@ -87,13 +96,39 @@ export default function RegisterPage() {
               </div>
             </div>
 
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-sm font-medium">Date of birth</label>
+                <Input
+                  type="date"
+                  value={form.dateOfBirth}
+                  onChange={(event) => setField("dateOfBirth", event.target.value)}
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium">Gender</label>
+                <select
+                  className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  value={form.gender}
+                  onChange={(event) => setField("gender", event.target.value as "male" | "female" | "other")}
+                >
+                  <option value="male">Male</option>
+                  <option value="female">Female</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+            </div>
+
             <div>
-              <label className="mb-1 block text-sm font-medium">Profile image URL (optional)</label>
-              <Input
-                value={form.profileImage}
-                onChange={(event) => setField("profileImage", event.target.value)}
-                placeholder="https://example.com/profile.jpg"
-              />
+              <label className="mb-1 block text-sm font-medium">Profile image (optional)</label>
+              <div>
+                <AvatarUpload
+                  src={form.profileImage || null}
+                  editable
+                  size={96}
+                  onFileSelected={(file) => setSelectedFile(file)}
+                />
+              </div>
             </div>
 
             <div>

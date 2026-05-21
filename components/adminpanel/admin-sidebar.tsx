@@ -50,7 +50,7 @@ type AdminSidebarItem =
       label: string;
       href: string;
       activePath: string;
-      status?: "pending" | "approved" | "rejected" | "draft";
+      status?: "pending" | "in review" | "approved" | "rejected" | "draft";
       icon: LucideIcon;
     }
   | {
@@ -92,6 +92,14 @@ const adminSections: AdminSidebarSection[] = [
         href: "/admin/trips?status=pending",
         activePath: "/admin/trips",
         status: "pending",
+        icon: Clock3,
+      },
+      {
+        kind: "link",
+        label: "To Review Trips",
+        href: "/admin/trips?status=in%20review",
+        activePath: "/admin/trips",
+        status: "in review",
         icon: Clock3,
       },
       {

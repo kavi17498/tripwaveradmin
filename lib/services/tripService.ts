@@ -2,6 +2,7 @@ import { mockTrips } from "@/lib/data/trips";
 import { apiClient } from "@/lib/services/apiClient";
 import { BookingParticipantPayload, ServiceResponse, Trip, TripFilters } from "@/lib/types";
 import { sleep, sometimesFail } from "@/lib/services/serviceUtils";
+import type { TripApiItem } from "@/lib/services/tripApiService";
 
 const applyFilters = (trips: Trip[], filters: TripFilters): Trip[] => {
   let results = [...trips];
@@ -74,12 +75,14 @@ export const tripService = {
     tripId: string,
     participants: BookingParticipantPayload[],
     token?: string,
+    paymentMethod?: NonNullable<TripApiItem["paymentMethods"]>[number],
   ): Promise<ServiceResponse<unknown>> {
     const response = await apiClient.request<unknown>(`/trips/${tripId}/participants`, {
       method: "POST",
       token,
       body: {
         participants,
+        ...(paymentMethod ? { paymentMethod } : {}),
       },
     });
 

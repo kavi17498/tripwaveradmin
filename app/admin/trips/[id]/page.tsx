@@ -58,6 +58,20 @@ export default function AdminTripDetailPage() {
     }
   };
 
+  const moveToReview = async () => {
+    if (!trip) return;
+
+    setSaving(true);
+    try {
+      const response = await adminService.updateTripStatus(trip.id, "in review", "Moved to the review queue.");
+      setTrip(response.data);
+    } catch (updateError) {
+      setError(updateError instanceof Error ? updateError.message : "Failed to move trip to review.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (loading) {
     return <div className="p-6 text-sm text-muted-foreground">Loading trip details...</div>;
   }
@@ -70,14 +84,15 @@ export default function AdminTripDetailPage() {
     return <div className="p-6 text-sm text-muted-foreground">Trip not found.</div>;
   }
 
-  const canModerate = trip.status === "pending";
+  const canModerate = trip.status === "in review";
+  const canSendToReview = trip.status === "pending";
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div>
           <Button variant="outline" size="sm" asChild>
-            <Link href="/admin/trips?status=pending">Back to trips</Link>
+            <Link href={`/admin/trips?status=${encodeURIComponent(trip.status)}`}>Back to trips</Link>
           </Button>
           <h1 className="mt-4 text-2xl font-semibold">{trip.tripName}</h1>
           <p className="mt-1 text-sm text-muted-foreground">Full review view for admin moderation.</p>
@@ -90,6 +105,7 @@ export default function AdminTripDetailPage() {
           <h2 className="font-semibold">Trip Summary</h2>
           <div className="mt-3 grid gap-3 text-sm md:grid-cols-2">
             <p><span className="text-muted-foreground">Category:</span> {trip.tripCategory}</p>
+            <p><span className="text-muted-foreground">Payment methods:</span> {trip.paymentMethods?.length ? trip.paymentMethods.join(", ") : "-"}</p>
             <p><span className="text-muted-foreground">Price:</span> {formatCurrencyRs(trip.price)}</p>
             <p><span className="text-muted-foreground">Start:</span> {formatDateLabel(trip.startDate)} {trip.startTime ? `at ${trip.startTime}` : ""}</p>
             <p><span className="text-muted-foreground">End:</span> {formatDateLabel(trip.endDate)} {trip.endTime ? `at ${trip.endTime}` : ""}</p>
@@ -104,13 +120,16 @@ export default function AdminTripDetailPage() {
           <p className="mt-2 text-sm text-muted-foreground">Created {formatFirestoreTimestamp(trip.createdAt)}</p>
           <p className="mt-1 text-sm text-muted-foreground">Updated {formatFirestoreTimestamp(trip.updatedAt)}</p>
           <div className="mt-4 flex flex-col gap-2">
+            {canSendToReview ? (
+              <Button onClick={() => void moveToReview()} disabled={saving}>Move to review</Button>
+            ) : null}
             {canModerate ? (
               <>
                 <Button onClick={() => setPendingStatus("approved")} disabled={saving}>Approve</Button>
                 <Button variant="destructive" onClick={() => setPendingStatus("rejected")} disabled={saving}>Reject</Button>
               </>
             ) : (
-              <p className="text-sm text-muted-foreground">This trip is read-only in admin review mode.</p>
+              <p className="text-sm text-muted-foreground">{canSendToReview ? "This trip is waiting to be queued for review." : "This trip is read-only in admin review mode."}</p>
             )}
           </div>
         </article>

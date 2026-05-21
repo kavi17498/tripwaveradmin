@@ -60,15 +60,17 @@ export interface Review {
 export interface Notification {
   id: string;
   userId: string;
-  type: "join-request" | "payment" | "reminder" | "account-alert";
+  type: "trip-approved" | "join-request" | "payment" | "reminder" | "account-alert";
   title: string;
   description: string;
+  tripId?: string;
   read: boolean;
   createdAt: string;
 }
 
 export interface ChatMessage {
   id: string;
+  chatGroupId?: string;
   tripId: string;
   senderId: string;
   senderName: string;
@@ -85,6 +87,10 @@ export interface ChatGroup {
   adminName?: string;
   description?: string;
   members?: string[];
+  lastMessage?: string;
+  lastMessageAt?: FirestoreTimestamp | string;
+  lastMessageSenderId?: string;
+  unreadCounts?: Record<string, number>;
   createdAt?: FirestoreTimestamp | string;
   updatedAt?: FirestoreTimestamp | string;
 }
@@ -138,6 +144,8 @@ export interface UserModuleRegistrationInput {
   lastName: string;
   email: string;
   phone: string;
+  dateOfBirth: string;
+  gender: "male" | "female" | "other";
   profileImage?: string;
   bio: string;
   street: string;
@@ -204,6 +212,7 @@ export interface CreateTripApiPayload {
   tripName: string;
   tripCategory: "Solo Trip with guide" | "Family Trip with guide" | "Strangers Trip with guide" | "Private trip";
   status?: "pending" | "draft";
+  paymentMethods: ("Pay Online" | "Pay to Guide on Trip Day")[];
   destinations: TripDestinationPayload[];
   mainDestinations?: Array<{
     name: string;
@@ -239,18 +248,21 @@ export interface AdminUserRecord {
   lastName: string;
   email: string;
   phone: string;
+  profileImage?: string;
   bio: string;
   street: string;
   city: string;
   state: string;
   postalCode: string;
   country: string;
+  dateOfBirth?: string;
+  gender?: "male" | "female" | "other";
   isVerified: boolean;
   createdAt: FirestoreTimestamp;
   updatedAt: FirestoreTimestamp;
 }
 
-export type AdminTripStatus = "pending" | "approved" | "rejected" | "draft";
+export type AdminTripStatus = "pending" | "in review" | "approved" | "rejected" | "draft";
 
 export interface AdminTripDestination {
   name: string;
@@ -266,6 +278,7 @@ export interface AdminTripRecord {
   id: string;
   tripName: string;
   tripCategory: string;
+  paymentMethods?: ("Pay Online" | "Pay to Guide on Trip Day")[];
   destinations: AdminTripDestination[];
   mainDestinations?: Array<{
     name: string;
