@@ -7,6 +7,7 @@ import { Footer } from "@/components/layout/footer";
 import useChatStore from "@/lib/stores/useChatStore";
 import { useAuthCacheStore } from "@/lib/stores/useAuthCacheStore";
 import { ChatMessage } from "@/components/chat/chat-message";
+import { Modal } from "@/components/common/modal";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ImagePlus, Loader2 } from "lucide-react";
@@ -16,6 +17,7 @@ import { ChatMessage as ChatMessageType } from "@/lib/types";
 import { app } from "@/lib/config/firebase";
 import { waitForFirebaseUser } from "@/lib/services/firebaseAuthUtils";
 import { getFirestore, collection, query as firestoreQuery, where, onSnapshot } from "firebase/firestore";
+import type { TripChatContext } from "@/lib/services/chatService";
 
 const sortMessagesByCreatedAt = (items: ChatMessageType[]) => {
   return [...items].sort((left, right) => {
@@ -46,6 +48,9 @@ export default function ChatLandingPageClient() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [detailsLoading, setDetailsLoading] = useState(false);
+  const [detailsContext, setDetailsContext] = useState<TripChatContext | null>(null);
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
 
   const displayName = useMemo(() => {
@@ -184,6 +189,48 @@ export default function ChatLandingPageClient() {
     setImagePreview(file ? URL.createObjectURL(file) : null);
   };
 
+  const renderAvatar = (name: string, profileImage?: string | null) => {
+    const initials = name
+      .split(" ")
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase() ?? "")
+      .join("");
+
+    if (profileImage) {
+      return <img src={profileImage} alt={name} className="size-10 rounded-full object-cover" />;
+    }
+
+    return (
+      <div className="flex size-10 items-center justify-center rounded-full bg-slate-100 text-sm font-semibold text-slate-600">
+        {initials || "U"}
+      </div>
+    );
+  };
+
+  const openGroupDetails = async (group: any) => {
+    if (!group?.tripId) return;
+
+    setDetailsOpen(true);
+    setDetailsLoading(true);
+    setDetailsContext(null);
+
+    try {
+      const res = await chatService.getTripChatContext(group.tripId, token ?? undefined);
+      setDetailsContext(res.data ?? null);
+    } catch {
+      setDetailsContext(null);
+    } finally {
+      setDetailsLoading(false);
+    }
+  };
+
+  const closeGroupDetails = () => {
+    setDetailsOpen(false);
+    setDetailsContext(null);
+    setDetailsLoading(false);
+  };
+
   const send = async (ev: FormEvent) => {
     ev.preventDefault();
     if (!selected?.id) return;
@@ -238,12 +285,30 @@ export default function ChatLandingPageClient() {
                 {!loadingGroups && groups.length === 0 && <div className="text-sm text-muted-foreground">No chat groups found.</div>}
 
                 {groups.map((g: any) => (
-                  <button
+                  <div
                     key={g.id}
+                    role="button"
+                    tabIndex={0}
                     onClick={() => selectGroup(g.id)}
-                    className={`w-full text-left p-3 rounded-md hover:bg-accent/20 flex items-center justify-between ${selected?.id === g.id ? 'bg-accent/30' : ''}`}>
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        selectGroup(g.id);
+                      }
+                    }}
+                    className={`w-full text-left p-3 rounded-md hover:bg-accent/20 flex items-center justify-between cursor-pointer ${selected?.id === g.id ? 'bg-accent/30' : ''}`}
+                  >
                     <div>
-                      <div className="font-medium">{g.name}</div>
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          void openGroupDetails(g);
+                        }}
+                        className="font-medium text-left hover:underline"
+                      >
+                        {g.name}
+                      </button>
                       <div className="text-xs text-muted-foreground">{g.adminName ?? '—'}</div>
                     </div>
                     <div className="text-xs flex items-center gap-2">
@@ -260,7 +325,7 @@ export default function ChatLandingPageClient() {
                       ) : null}
                       {g.adminId === currentUser?.id ? <span className="px-2 py-1 rounded bg-green-100 text-green-800">Admin</span> : null}
                     </div>
-                  </button>
+                  </div>
                 ))}
               </div>
 
@@ -324,6 +389,72 @@ export default function ChatLandingPageClient() {
           </section>
         </div>
       </main>
+
+      <Modal
+        open={detailsOpen}
+        title={detailsContext?.chatGroup?.name ?? "Chat group details"}
+        description={detailsContext ? detailsContext.trip.tripName : "Trip summary, organizer, and participants"}
+        onClose={closeGroupDetails}
+      >
+        {detailsLoading ? (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="size-4 animate-spin" /> Loading details...
+          </div>
+        ) : detailsContext ? (
+          <div className="space-y-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Trip summary</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {detailsContext.trip.description || detailsContext.trip.mainDestinations?.[0]?.name || detailsContext.trip.startLocation || "Coordinate your trip here."}
+              </p>
+              <p className="mt-2 text-xs text-muted-foreground">
+                {detailsContext.trip.startDate} to {detailsContext.trip.endDate}
+              </p>
+            </div>
+
+            <div className="rounded-md border border-border p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Organizer</p>
+              <div className="mt-3 flex items-center gap-3">
+                {renderAvatar(
+                  `${detailsContext.organizer.firstName} ${detailsContext.organizer.lastName}`.trim() || detailsContext.organizer.email || "Organizer",
+                  detailsContext.organizer.profileImage,
+                )}
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">
+                    {`${detailsContext.organizer.firstName} ${detailsContext.organizer.lastName}`.trim() || detailsContext.organizer.email || "Organizer"}
+                  </p>
+                  <p className="truncate text-xs text-muted-foreground">{detailsContext.organizer.email}</p>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Participants</p>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                {detailsContext.participants.map(({ participant, profile }) => {
+                  const displayName = profile
+                    ? `${profile.firstName} ${profile.lastName}`.trim() || profile.email
+                    : participant.name;
+
+                  return (
+                    <div key={participant.participantId ?? `${participant.name}-${participant.email ?? "na"}`} className="flex items-center gap-3 rounded-md border border-border p-3">
+                      {renderAvatar(displayName, profile?.profileImage)}
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">{displayName}</p>
+                        <p className="truncate text-xs text-muted-foreground">
+                          {participant.email || profile?.email || participant.phone || "Participant"}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">No details available for this chat group.</p>
+        )}
+      </Modal>
 
       <Footer />
     </div>
