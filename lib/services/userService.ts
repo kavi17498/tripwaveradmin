@@ -64,4 +64,19 @@ export const userService = {
       message: "User profile updated successfully",
     };
   },
+
+  async getOrganizerProfile(organizerId: string): Promise<ServiceResponse<any>> {
+    const response = await apiClient.request<any | ServiceResponse<any>>(`/users/organizer/${organizerId}`, {
+      method: "GET",
+    });
+
+    if (response && typeof response === "object" && "data" in response) {
+      return response as ServiceResponse<any>;
+    }
+
+    return {
+      data: response,
+      message: "Organizer profile fetched successfully",
+    };
+  },
 };

@@ -97,12 +97,28 @@ export function TripCardEnhanced({ trip, href }: TripCardEnhancedProps) {
         <div className="border-t border-border/60 pt-4 flex items-center justify-between">
           <div className="space-y-0.5">
             <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block">Host Guide</span>
-            <span className="font-bold text-xs text-foreground block">{trip.organizerName}</span>
+            {trip.organizerId ? (
+              <Link 
+                href={`/organizers/${trip.organizerId}`} 
+                className="font-bold text-xs text-foreground hover:text-primary transition-colors cursor-pointer block"
+              >
+                {trip.organizerName}
+              </Link>
+            ) : (
+              <span className="font-bold text-xs text-foreground block">{trip.organizerName}</span>
+            )}
           </div>
-          <div className="flex items-center gap-1.5 bg-amber-500/5 px-2.5 py-1 rounded-md border border-amber-500/10">
-            <Star className="size-3.5 fill-amber-500 text-amber-500" />
-            <span className="text-xs font-extrabold text-amber-600">{trip.organizerRating || "4.8"}</span>
-          </div>
+          {trip.organizerRating ? (
+            <div className="flex items-center gap-1.5 bg-amber-500/5 px-2.5 py-1 rounded-md border border-amber-500/10" title="Real review rating">
+              <Star className="size-3.5 fill-amber-500 text-amber-500" />
+              <span className="text-xs font-extrabold text-amber-600">{trip.organizerRating}</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 bg-muted/65 px-2.5 py-1 rounded-md border border-border/40" title="No reviews yet">
+              <Star className="size-3.5 text-muted-foreground" />
+              <span className="text-xs font-semibold text-muted-foreground">New</span>
+            </div>
+          )}
         </div>
 
         {/* Participants & Price Section */}

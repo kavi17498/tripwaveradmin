@@ -92,7 +92,7 @@ function mapApiToTrip(item: TripApiItem): Trip {
     coverImage: item.coverImage || (item.photos && item.photos[0]) || "",
     organizerId: item.organizer ?? "",
     organizerName: (item as any).organizerName || String(item.organizer ?? ""),
-    organizerRating: 4.5,
+    organizerRating: (item as any).organizerRating ?? null,
     location: {
       city: mainDest || item.startLocation || "",
       country: mainCountry || "",

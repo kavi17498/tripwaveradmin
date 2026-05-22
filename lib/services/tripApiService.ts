@@ -29,6 +29,7 @@ export type TripApiItem = {
   endTime?: string;
   startLocation: string;
   organizer: string;
+  organizerName?: string;
   price: number;
   itinerary?: {
     days?: Array<{

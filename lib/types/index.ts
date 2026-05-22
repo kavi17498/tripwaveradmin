@@ -37,7 +37,7 @@ export interface Trip {
   coverImage: string;
   organizerId: string;
   organizerName: string;
-  organizerRating: number;
+  organizerRating: number | null;
   location: {
     city: string;
     country: string;

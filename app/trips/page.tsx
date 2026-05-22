@@ -44,8 +44,8 @@ function mapApiToTrip(item: TripApiItem) {
     status: (item.status as any) ?? "published",
     coverImage: cover,
     organizerId: item.organizer ?? "",
-    organizerName: item.organizer ?? "Local Guide",
-    organizerRating: 4.8,
+    organizerName: item.organizerName ?? "Local Guide",
+    organizerRating: (item as any).organizerRating ?? null,
     location: {
       city: firstDestination,
       country: "Sri Lanka",
