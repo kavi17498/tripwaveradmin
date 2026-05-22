@@ -1,6 +1,7 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/common/page-header";
 import { RatingStars } from "@/components/common/rating-stars";
 import { Button } from "@/components/ui/button";
@@ -43,6 +44,9 @@ const resolveUserProfile = () => {
 
 export default function ReviewsPage() {
   const currentUser = useMemo(resolveUserProfile, []);
+  const searchParams = useSearchParams();
+  const selectedTripId = searchParams.get("tripId") ?? "";
+  const selectedTripRef = useRef<HTMLElement | null>(null);
   const [summaries, setSummaries] = useState<ParticipantReviewSummary[]>([]);
   const [drafts, setDrafts] = useState<Record<string, ReviewDraft>>({});
   const [loading, setLoading] = useState(true);
@@ -82,6 +86,31 @@ export default function ReviewsPage() {
     void loadReviews();
   }, [currentUser.id]);
 
+  useEffect(() => {
+    if (!selectedTripId || loading) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      selectedTripRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 50);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [loading, selectedTripId, summaries]);
+
+  const orderedSummaries = useMemo(() => {
+    if (!selectedTripId) {
+      return summaries;
+    }
+
+    const selectedSummary = summaries.find((summary) => summary.trip.id === selectedTripId);
+    if (!selectedSummary) {
+      return summaries;
+    }
+
+    return [selectedSummary, ...summaries.filter((summary) => summary.trip.id !== selectedTripId)];
+  }, [selectedTripId, summaries]);
+
   const metrics = useMemo(() => {
     const completedTrips = summaries.filter((summary) => summary.tripEnded);
     return {
@@ -109,8 +138,8 @@ export default function ReviewsPage() {
     const draft = drafts[tripId] ?? { rating: 4, comment: "" };
     const comment = draft.comment.trim();
 
-    if (!summary || !comment) {
-      setError("Add a review comment before submitting.");
+    if (!summary) {
+      setError("Select a trip before submitting a review.");
       return;
     }
 
@@ -123,7 +152,7 @@ export default function ReviewsPage() {
         userId: currentUser.id,
         userName: currentUser.name,
         rating: draft.rating,
-        comment,
+        comment: comment || undefined,
       });
 
       await loadReviews();
@@ -178,15 +207,20 @@ export default function ReviewsPage() {
       ) : null}
 
       <section className="space-y-4">
-        {summaries.map((summary) => {
+        {orderedSummaries.map((summary) => {
           const draft = drafts[summary.trip.id] ?? {
             rating: summary.myReview?.rating ?? 4,
             comment: summary.myReview?.comment ?? "",
           };
           const statusLabel = getTripStatusLabel(summary);
+          const isSelectedTrip = selectedTripId === summary.trip.id;
 
           return (
-            <article key={summary.trip.id} className="border border-border bg-card p-5">
+            <article
+              key={summary.trip.id}
+              ref={isSelectedTrip ? selectedTripRef : undefined}
+              className={`border bg-card p-5 ${isSelectedTrip ? "border-primary shadow-sm" : "border-border"}`}
+            >
               <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                 <div className="space-y-1">
                   <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">{statusLabel}</p>
@@ -216,7 +250,9 @@ export default function ReviewsPage() {
                         </div>
                         <RatingStars rating={summary.myReview.rating} />
                       </div>
-                      <p className="mt-3 text-sm text-muted-foreground">{summary.myReview.comment}</p>
+                      <p className="mt-3 text-sm text-muted-foreground">
+                        {summary.myReview.comment.trim() ? summary.myReview.comment : "No written feedback provided."}
+                      </p>
                     </div>
                   ) : summary.canReview ? (
                     <form className="space-y-3" onSubmit={(event) => void submitReview(event, summary.trip.id)}>
@@ -239,7 +275,7 @@ export default function ReviewsPage() {
                         value={draft.comment}
                         onChange={(event) => updateDraft(summary.trip.id, { comment: event.target.value })}
                         className="min-h-28 w-full border border-input bg-background px-3 py-2 text-sm"
-                        placeholder="Tell other participants what the trip was like"
+                        placeholder="Optional feedback for other participants"
                       />
 
                       <div className="flex flex-wrap items-center gap-3">
@@ -247,7 +283,7 @@ export default function ReviewsPage() {
                           {submittingTripId === summary.trip.id ? "Submitting..." : "Submit review"}
                         </Button>
                         <p className="text-xs text-muted-foreground">
-                          A reminder notification is sent automatically when the trip ends.
+                          Feedback is optional. A reminder notification is sent automatically when the trip ends.
                         </p>
                       </div>
                     </form>
@@ -268,7 +304,9 @@ export default function ReviewsPage() {
                             <p className="font-medium">{review.userName}</p>
                             <RatingStars rating={review.rating} />
                           </div>
-                          <p className="mt-2 text-sm text-muted-foreground">{review.comment}</p>
+                          <p className="mt-2 text-sm text-muted-foreground">
+                            {review.comment.trim() ? review.comment : "No written feedback provided."}
+                          </p>
                           <p className="mt-2 text-xs text-muted-foreground">Posted on {formatDate(review.createdAt)}</p>
                         </article>
                       ))

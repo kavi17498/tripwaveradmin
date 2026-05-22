@@ -19,7 +19,7 @@ interface NotificationItemProps {
 
 export function NotificationItem({ item, onClick, href }: NotificationItemProps) {
   const Icon = iconMap[item.type] ?? Bell;
-  const resolvedHref = href ?? (item.tripId ? `/trips/${item.tripId}` : "/notifications");
+  const resolvedHref = href ?? (item.type === "reminder" && item.tripId ? `/trips/${item.tripId}/review` : item.tripId ? `/trips/${item.tripId}` : "/notifications");
 
   const content = (
     <>

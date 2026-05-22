@@ -18,6 +18,14 @@ export interface ParticipantReviewSummary {
   reminderSent: boolean;
 }
 
+export type ReviewSubmission = {
+  tripId: string;
+  userId: string;
+  userName: string;
+  rating: number;
+  comment?: string;
+};
+
 type BackendReview = {
   id?: string;
   tripId: string;
@@ -232,7 +240,7 @@ export const reviewService = {
     return { data: summaries };
   },
 
-  async submitReview(payload: Omit<Review, "id" | "createdAt">): Promise<ServiceResponse<Review>> {
+  async submitReview(payload: ReviewSubmission): Promise<ServiceResponse<Review>> {
     const token = userSessionService.getToken();
 
     if (token) {
@@ -241,7 +249,7 @@ export const reviewService = {
         body: {
           tripId: payload.tripId,
           rating: payload.rating,
-          comment: payload.comment,
+          comment: payload.comment?.trim() || undefined,
           userName: payload.userName,
         },
       });
@@ -257,6 +265,7 @@ export const reviewService = {
 
     const submittedReview: Review = {
       ...payload,
+      comment: payload.comment?.trim() || "",
       id: existingReviewIndex >= 0 ? reviewStore[existingReviewIndex].id : `r-${Date.now()}`,
       createdAt: existingReviewIndex >= 0 ? reviewStore[existingReviewIndex].createdAt : new Date().toISOString(),
     };

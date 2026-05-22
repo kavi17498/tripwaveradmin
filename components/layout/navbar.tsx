@@ -312,7 +312,7 @@ export function Navbar() {
                       notifications.map((item) => (
                         <Link
                           key={item.id}
-                          href={item.tripId ? `/trips/${item.tripId}` : "/notifications"}
+                          href={item.type === "reminder" && item.tripId ? `/trips/${item.tripId}/review` : item.tripId ? `/trips/${item.tripId}` : "/notifications"}
                           onClick={() => setShowNotifications(false)}
                           className={cn(
                             "block rounded-md border border-border px-3 py-2 transition-colors hover:bg-accent/20",
