@@ -191,37 +191,78 @@ export default function HomePage() {
     <div className="bg-background">
       <Navbar />
       <main>
-        <section className="border-b border-border bg-card">
-          <div className="mx-auto grid max-w-7xl grid-cols-1 gap-8 px-4 py-10 md:grid-cols-2 md:px-6 md:py-14">
-            <div className="space-y-5">
-              <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">All-in-one Sri Lanka travel platform</p>
-              <h1 className="text-3xl font-semibold tracking-tight md:text-5xl">{currentSlide.title}</h1>
-              <p className="text-base text-muted-foreground">{currentSlide.description}</p>
+        <section className="relative w-full overflow-hidden bg-zinc-950 min-h-[500px] md:min-h-[600px] lg:min-h-[680px] flex items-center">
+          {/* Background Images with Cross-fade and subtle Ken Burns zoom */}
+          <div className="absolute inset-0 z-0">
+            {heroSlides.map((slide, index) => (
+              <div
+                key={slide.title}
+                className={`absolute inset-0 transition-opacity duration-[1200ms] ease-in-out ${
+                  index === activeSlide ? "opacity-100" : "opacity-0"
+                }`}
+              >
+                <img
+                  src={slide.image}
+                  alt=""
+                  className={`w-full h-full object-cover transition-transform duration-[6000ms] ease-out ${
+                    index === activeSlide ? "scale-100" : "scale-105"
+                  }`}
+                />
+              </div>
+            ))}
+            {/* Elegant dark overlay gradient to ensure high readability */}
+            <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/50 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-black/30" />
+          </div>
 
-              <div className="flex flex-wrap gap-3">
-                <Button asChild>
+          {/* Content Overlays */}
+          <div className="relative z-10 mx-auto w-full max-w-7xl px-4 py-20 md:px-6 md:py-28">
+            <div className="max-w-2xl space-y-6 text-white">
+              {/* Category indicator / Tag */}
+              <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3.5 py-1 text-xs font-semibold tracking-[0.12em] uppercase text-sky-300 backdrop-blur-sm border border-white/10">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-sky-500"></span>
+                </span>
+                All-in-one Sri Lanka travel platform
+              </div>
+
+              {/* Slide Title with visual entry transition */}
+              <h1 className="text-3xl font-bold tracking-tight md:text-5xl lg:text-6xl text-balance drop-shadow-md leading-tight">
+                {currentSlide.title}
+              </h1>
+
+              {/* Description */}
+              <p className="text-base md:text-lg text-zinc-200 drop-shadow-sm max-w-xl leading-relaxed">
+                {currentSlide.description}
+              </p>
+
+              {/* Call-to-actions */}
+              <div className="flex flex-wrap gap-3 pt-2">
+                <Button size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-lg shadow-primary/25 border-none transition-all duration-300 transform hover:-translate-y-0.5" asChild>
                   <Link href={currentSlide.ctaHref}>{currentSlide.ctaLabel}</Link>
                 </Button>
-                <Button variant="outline" asChild>
+                <Button size="lg" variant="outline" className="border-white/20 bg-white/5 text-white hover:bg-white/10 hover:border-white/40 backdrop-blur-sm font-semibold transition-all duration-300 transform hover:-translate-y-0.5" asChild>
                   <Link href="/dashboard/create-trip">Plan My Trip</Link>
                 </Button>
               </div>
 
-              <div className="flex gap-2 pt-2">
+              {/* Slide Pagination Dots */}
+              <div className="flex gap-2 pt-6">
                 {heroSlides.map((slide, index) => (
                   <button
                     key={slide.title}
                     type="button"
                     aria-label={`Go to slide ${index + 1}`}
                     onClick={() => setActiveSlide(index)}
-                    className={`h-2.5 transition-all ${index === activeSlide ? "w-10 bg-foreground" : "w-5 bg-border"}`}
+                    className={`h-2 transition-all duration-300 rounded-full ${
+                      index === activeSlide 
+                        ? "w-10 bg-white" 
+                        : "w-2.5 bg-white/40 hover:bg-white/60"
+                    }`}
                   />
                 ))}
               </div>
-            </div>
-
-            <div className="border border-border bg-muted/20 p-2">
-              <img src={currentSlide.image} alt={currentSlide.title} className="h-full w-full object-cover" />
             </div>
           </div>
         </section>
