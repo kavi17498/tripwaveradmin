@@ -212,6 +212,20 @@ export function Navbar() {
   }, [currentUser, showNotifications]);
       const token = userSessionService.getToken();
 
+  useEffect(() => {
+    if (pathname.startsWith("/dashboard")) {
+      setMode("creator");
+      localStorage.setItem(APP_MODE_STORAGE_KEY, "creator");
+    } else if (
+      pathname === "/" ||
+      pathname.startsWith("/trips") ||
+      pathname.startsWith("/bookings")
+    ) {
+      setMode("explorer");
+      localStorage.setItem(APP_MODE_STORAGE_KEY, "explorer");
+    }
+  }, [pathname]);
+
   const links = useMemo(() => {
     return mode === "explorer" ? explorerLinks : creatorLinks;
   }, [mode]);
