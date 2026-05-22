@@ -26,6 +26,8 @@ export interface Trip {
   description: string;
   startDate: string;
   endDate: string;
+  startTime?: string;
+  endTime?: string;
   price: number;
   capacity: number;
   bookedCount: number;
