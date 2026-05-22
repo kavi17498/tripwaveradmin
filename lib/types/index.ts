@@ -32,7 +32,7 @@ export interface Trip {
   capacity: number;
   bookedCount: number;
   durationDays: number;
-  tripType: "public" | "private";
+  tripType: string;
   status: "draft" | "published" | "ongoing" | "completed" | "cancelled";
   coverImage: string;
   organizerId: string;

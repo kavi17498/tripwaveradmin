@@ -49,23 +49,7 @@ const heroSlides = [
   },
 ];
 
-const categoryHighlights = [
-  {
-    name: "Travel with Guide",
-    text: "Verified Sri Lankan guides, curated routes, and cultural storytelling for every stop.",
-    image: "https://images.unsplash.com/photo-1530789253388-582c481c54b0?q=80&w=1400&auto=format&fit=crop",
-  },
-  {
-    name: "Join Group Trip",
-    text: "Join group trips across Sri Lanka and travel with like-minded people.",
-    image: "https://images.unsplash.com/photo-1529156069898-49953e39b3ac?q=80&w=1400&auto=format&fit=crop",
-  },
-  {
-    name: "Family Trip with Guide",
-    text: "Family-friendly itineraries with child-safe activities and verified accommodations.",
-    image: "https://images.unsplash.com/photo-1511895426328-dc8714191300?q=80&w=1400&auto=format&fit=crop",
-  },
-];
+
 
 function mapApiToTrip(item: TripApiItem): Trip {
   const start = item.startDate ? new Date(item.startDate) : null;
@@ -125,6 +109,7 @@ export default function HomePage() {
   const [activeSlide, setActiveSlide] = useState(0);
   const [trips, setTrips] = useState<Trip[]>([]);
   const [loading, setLoading] = useState(false);
+  const [isSearchActive, setIsSearchActive] = useState(false);
 
   const [filters, setFilters] = useState({
     tripCategory: "",
@@ -146,12 +131,17 @@ export default function HomePage() {
   }, []);
 
   const token = useAuthCacheStore((s) => s.token);
+  const currentUser = useAuthCacheStore((s) => s.currentUser);
   const hydrated = useAuthCacheStore((s) => s.hydrated);
   const hydrateFromLegacySession = useAuthCacheStore((s) => s.hydrateFromLegacySession);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (!hydrated) hydrateFromLegacySession();
-    // load trips when token/hydration changes (ensures auth header is sent when available)
     loadTrips();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, hydrated]);
@@ -164,7 +154,6 @@ export default function HomePage() {
         setTrips(res.data.map(mapApiToTrip));
       }
     } catch (err) {
-      // swallow for now; UI can show empty state
       setTrips([]);
     } finally {
       setLoading(false);
@@ -182,8 +171,35 @@ export default function HomePage() {
     Object.entries(filters).forEach(([k, v]) => {
       if (v !== "") params[k] = v;
     });
+    const hasActiveFilters = Object.values(filters).some((v) => v !== "");
+    setIsSearchActive(hasActiveFilters);
     loadTrips(params);
   }
+
+  function handleReset() {
+    setFilters({
+      tripCategory: "",
+      tripName: "",
+      organizer: "",
+      startLocation: "",
+      startDate: "",
+      endDate: "",
+      minPrice: "",
+      maxPrice: "",
+    });
+    setIsSearchActive(false);
+    loadTrips();
+  }
+
+  const soloTrips = trips.filter((t) => t.tripType === "Solo Trip with guide");
+  const familyTrips = trips.filter((t) => t.tripType === "Family Trip with guide");
+  const groupTrips = trips.filter((t) => t.tripType === "Strangers Trip with guide");
+  const otherTrips = trips.filter(
+    (t) =>
+      t.tripType !== "Solo Trip with guide" &&
+      t.tripType !== "Family Trip with guide" &&
+      t.tripType !== "Strangers Trip with guide"
+  );
 
   const currentSlide = heroSlides[activeSlide];
 
@@ -267,53 +283,62 @@ export default function HomePage() {
           </div>
         </section>
 
-        <section className="mx-auto max-w-7xl px-4 py-12 md:px-6">
-          <div className="mb-6 flex items-center justify-between">
-            <h2 className="text-2xl font-semibold">Trip Categories in Sri Lanka</h2>
-            <Button variant="outline" asChild>
-              <Link href="/trips">Browse Categories</Link>
-            </Button>
-          </div>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {categoryHighlights.map((category) => (
-              <article key={category.name} className="border border-border bg-card p-3">
-                <img src={category.image} alt={category.name} className="h-40 w-full object-cover" />
-                <h3 className="mt-3 font-semibold">{category.name}</h3>
-                <p className="mt-2 text-sm text-muted-foreground">{category.text}</p>
-              </article>
-            ))}
-          </div>
-        </section>
-
-        <section className="border-y border-border bg-card">
-          <div className="mx-auto max-w-7xl px-4 py-12 md:px-6">
-            <div className="mb-6 flex items-center justify-between">
+        <section className="mx-auto max-w-7xl px-4 py-16 md:px-6 md:py-24">
+          <div className="mb-8 flex items-center justify-between">
+            <div>
               <h2 className="text-2xl font-semibold">Featured Sri Lanka Trips</h2>
-              <Button variant="outline" asChild>
+              <p className="text-sm text-muted-foreground mt-1">Search or browse by our hand-picked travel options.</p>
+            </div>
+            {!isSearchActive && (
+              <Button variant="outline" asChild className="hidden sm:inline-flex">
                 <Link href="/trips">View all trips</Link>
               </Button>
-            </div>
+            )}
+          </div>
 
-            <form onSubmit={handleSearch} className="mb-6 grid gap-2 md:grid-cols-4">
-              <input name="tripName" placeholder="Trip name" value={filters.tripName} onChange={handleInputChange} className="input" />
-              <input name="startLocation" placeholder="Start location" value={filters.startLocation} onChange={handleInputChange} className="input" />
-              <input name="startDate" type="date" placeholder="Start date" value={filters.startDate} onChange={handleInputChange} className="input" />
+          <form onSubmit={handleSearch} className="mb-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end border border-border bg-card p-6 rounded-sm">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">Trip Name</label>
+              <input name="tripName" placeholder="Trip name" value={filters.tripName} onChange={handleInputChange} className="input w-full" />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">Start Location</label>
+              <input name="startLocation" placeholder="Start location" value={filters.startLocation} onChange={handleInputChange} className="input w-full" />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">Start Date</label>
+              <input name="startDate" type="date" placeholder="Start date" value={filters.startDate} onChange={handleInputChange} className="input w-full" />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">Price Range</label>
               <div className="flex gap-2">
-                <input name="minPrice" placeholder="Min price" value={filters.minPrice} onChange={handleInputChange} className="input" />
-                <input name="maxPrice" placeholder="Max price" value={filters.maxPrice} onChange={handleInputChange} className="input" />
+                <input name="minPrice" placeholder="Min price" value={filters.minPrice} onChange={handleInputChange} className="input w-full" />
+                <input name="maxPrice" placeholder="Max price" value={filters.maxPrice} onChange={handleInputChange} className="input w-full" />
               </div>
-              <div className="md:col-span-4 flex gap-2">
-                <Button type="submit">Search</Button>
-                <Button variant="outline" onClick={() => { setFilters({ tripCategory: "", tripName: "", organizer: "", startLocation: "", startDate: "", endDate: "", minPrice: "", maxPrice: "" }); loadTrips(); }}>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider hidden lg:block invisible select-none">Actions</label>
+              <div className="flex gap-2 w-full">
+                <Button type="submit" className="flex-1">Search</Button>
+                <Button variant="outline" className="flex-1" onClick={handleReset}>
                   Reset
                 </Button>
               </div>
-            </form>
+            </div>
+          </form>
 
+          {loading ? (
+            <p>Loading trips…</p>
+          ) : isSearchActive ? (
             <div>
-              {loading ? (
-                <p>Loading trips…</p>
-              ) : trips.length === 0 ? (
+              <div className="mb-6 flex items-center justify-between border-b border-border pb-4">
+                <div>
+                  <h3 className="text-xl font-bold tracking-tight">Search Results</h3>
+                  <p className="text-sm text-muted-foreground mt-1">Found {trips.length} matching trips in Sri Lanka</p>
+                </div>
+                <Button variant="outline" size="sm" onClick={handleReset}>Clear All Filters</Button>
+              </div>
+              {trips.length === 0 ? (
                 <p className="text-muted-foreground">No trips found.</p>
               ) : (
                 <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
@@ -323,26 +348,158 @@ export default function HomePage() {
                 </div>
               )}
             </div>
-          </div>
+          ) : (
+            <div className="space-y-16">
+              {/* Solo Trips Row */}
+              <div className="grid grid-cols-1 gap-8 lg:grid-cols-3 border-b border-border pb-16 last:border-0 last:pb-0">
+                <div className="space-y-4">
+                  <span className="text-xs font-semibold tracking-wider text-sky-600 uppercase block">Explore Alone</span>
+                  <h3 className="text-2xl font-bold tracking-tight">Guided Solo Trips</h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    Travel on your own with complete freedom. A verified local guide is always nearby to keep you safe and comfortable.
+                  </p>
+                  <Button variant="outline" asChild className="w-full sm:w-auto">
+                    <Link href="/trips?category=Solo Trip with guide">Browse Solo Trips</Link>
+                  </Button>
+                </div>
+                <div className="lg:col-span-2">
+                  {soloTrips.length === 0 ? (
+                    <div className="border border-border bg-card p-8 flex flex-col justify-between h-full min-h-[200px]">
+                      <div>
+                        <h4 className="font-semibold text-sm">Be the first to plan this journey</h4>
+                        <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
+                          No scheduled solo trips are available right now. Collaborate with a certified guide to plan your own custom route through Sri Lanka.
+                        </p>
+                      </div>
+                      <Button className="mt-6 w-full sm:w-auto self-start" asChild>
+                        <Link href="/dashboard/create-trip">Plan My Trip</Link>
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                      {soloTrips.slice(0, 2).map((t) => (
+                        <TripCardEnhanced key={t.id} trip={t} />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Family Trips Row */}
+              <div className="grid grid-cols-1 gap-8 lg:grid-cols-3 border-b border-border pb-16 last:border-0 last:pb-0">
+                <div className="space-y-4">
+                  <span className="text-xs font-semibold tracking-wider text-emerald-600 uppercase block">Family Journeys</span>
+                  <h3 className="text-2xl font-bold tracking-tight">Family Trips with Guide</h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    Enjoy a relaxed family vacation where everyone feels comfortable. We handle the transport, safe stays, and activities for you.
+                  </p>
+                  <Button variant="outline" asChild className="w-full sm:w-auto">
+                    <Link href="/trips?category=Family Trip with guide">Browse Family Trips</Link>
+                  </Button>
+                </div>
+                <div className="lg:col-span-2">
+                  {familyTrips.length === 0 ? (
+                    <div className="border border-border bg-card p-8 flex flex-col justify-between h-full min-h-[200px]">
+                      <div>
+                        <h4 className="font-semibold text-sm">Be the first to plan this journey</h4>
+                        <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
+                          No scheduled family trips are available right now. Collaborate with a certified guide to plan your own custom route through Sri Lanka.
+                        </p>
+                      </div>
+                      <Button className="mt-6 w-full sm:w-auto self-start" asChild>
+                        <Link href="/dashboard/create-trip">Plan My Trip</Link>
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                      {familyTrips.slice(0, 2).map((t) => (
+                        <TripCardEnhanced key={t.id} trip={t} />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Shared Group Trips Row */}
+              <div className="grid grid-cols-1 gap-8 lg:grid-cols-3 border-b border-border pb-16 last:border-0 last:pb-0">
+                <div className="space-y-4">
+                  <span className="text-xs font-semibold tracking-wider text-purple-600 uppercase block">Travel Together</span>
+                  <h3 className="text-2xl font-bold tracking-tight">Shared Group Trips</h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    Meet new friends in a relaxed, friendly group. Explore beautiful places together at a comfortable pace with zero pressure.
+                  </p>
+                  <Button variant="outline" asChild className="w-full sm:w-auto">
+                    <Link href="/trips?category=Strangers Trip with guide">Browse Group Trips</Link>
+                  </Button>
+                </div>
+                <div className="lg:col-span-2">
+                  {groupTrips.length === 0 ? (
+                    <div className="border border-border bg-card p-8 flex flex-col justify-between h-full min-h-[200px]">
+                      <div>
+                        <h4 className="font-semibold text-sm">Be the first to plan this journey</h4>
+                        <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
+                          No scheduled group trips are available right now. Collaborate with a certified guide to plan your own custom route through Sri Lanka.
+                        </p>
+                      </div>
+                      <Button className="mt-6 w-full sm:w-auto self-start" asChild>
+                        <Link href="/dashboard/create-trip">Plan My Trip</Link>
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                      {groupTrips.slice(0, 2).map((t) => (
+                        <TripCardEnhanced key={t.id} trip={t} />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Other Curated Departures Row */}
+              {otherTrips.length > 0 && (
+                <div className="grid grid-cols-1 gap-8 lg:grid-cols-3 border-b border-border pb-16 last:border-0 last:pb-0">
+                  <div className="space-y-4">
+                    <span className="text-xs font-semibold tracking-wider text-amber-600 uppercase block">Curated Departures</span>
+                    <h3 className="text-2xl font-bold tracking-tight">More Sri Lanka Trips</h3>
+                    <p className="text-sm text-muted-foreground leading-relaxed">
+                      Discover more beautiful journeys planned by our community. Find private tours, custom schedules, and unique local routes.
+                    </p>
+                    <Button variant="outline" asChild className="w-full sm:w-auto">
+                      <Link href="/trips">Browse All Trips</Link>
+                    </Button>
+                  </div>
+                  <div className="lg:col-span-2">
+                    <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                      {otherTrips.slice(0, 2).map((t) => (
+                        <TripCardEnhanced key={t.id} trip={t} />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </section>
 
-        <section className="mx-auto max-w-7xl px-4 py-12 md:px-6">
-          <div className="border border-border bg-card p-8 text-center">
-            <h2 className="text-3xl font-semibold">Create, share, and manage Sri Lanka trips in one workspace</h2>
-            <p className="mx-auto mt-3 max-w-2xl text-sm text-muted-foreground">
-              From guided family escapes to group adventures and team outings, TripWaver helps with planning, participant tracking,
-              and payment collection from one dashboard.
-            </p>
-            <div className="mt-6 flex justify-center gap-3">
-              <Button asChild>
-                <Link href="/register">Create account</Link>
-              </Button>
-              <Button variant="outline" asChild>
-                <Link href="/dashboard">Open dashboard</Link>
-              </Button>
+        {mounted && !currentUser && (
+          <section className="mx-auto max-w-7xl px-4 pb-24 md:px-6">
+            <div className="border border-border bg-card p-12 md:p-16 text-center rounded-sm">
+              <h2 className="text-3xl font-semibold">Create, share, and manage Sri Lanka trips in one workspace</h2>
+              <p className="mx-auto mt-3 max-w-2xl text-sm text-muted-foreground">
+                From guided family escapes to group adventures and team outings, TripWaver helps with planning, participant tracking,
+                and payment collection from one dashboard.
+              </p>
+              <div className="mt-6 flex justify-center gap-3">
+                <Button asChild>
+                  <Link href="/register">Create account</Link>
+                </Button>
+                <Button variant="outline" asChild>
+                  <Link href="/dashboard">Open dashboard</Link>
+                </Button>
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
+        )}
       </main>
       <Footer />
     </div>
