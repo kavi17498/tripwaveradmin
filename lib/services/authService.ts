@@ -13,7 +13,7 @@ import { mockUsers } from "@/lib/data/users";
 import { useAuthCacheStore } from "@/lib/stores/useAuthCacheStore";
 import { AuthSession, ServiceResponse, User, UserRole } from "@/lib/types";
 import { sleep, sometimesFail } from "@/lib/services/serviceUtils";
-import { userSessionService } from "@/lib/services/userSessionService";
+import { userSessionService, isTokenExpired } from "@/lib/services/userSessionService";
 
 const roleByEmail = mockUsers.reduce<Record<string, UserRole>>((acc, user) => {
   acc[user.email.toLowerCase()] = user.role;
@@ -81,7 +81,12 @@ const toAuthSession = async (firebaseUser: FirebaseUser): Promise<AuthSession> =
 export const authService = {
   subscribeToAuthChanges(callback: (user: User | null) => void) {
     return onAuthStateChanged(auth, (firebaseUser) => {
-      callback(firebaseUser ? toAppUser(firebaseUser) : null);
+      const token = userSessionService.getToken();
+      if (firebaseUser && token && !isTokenExpired(token)) {
+        callback(toAppUser(firebaseUser));
+      } else {
+        callback(null);
+      }
     });
   },
 
@@ -181,7 +186,11 @@ export const authService = {
 
   async getCurrentUser(): Promise<ServiceResponse<User | null>> {
     const user = await waitForAuthInit();
-    return { data: user ? toAppUser(user) : null };
+    const token = userSessionService.getToken();
+    if (user && token && !isTokenExpired(token)) {
+      return { data: toAppUser(user) };
+    }
+    return { data: null };
   },
 
   async logout(): Promise<ServiceResponse<boolean>> {
