@@ -21,12 +21,12 @@ const explorerLinks = [
   { href: "/", label: "Home" },
   { href: "/trips", label: "Trips" },
   { href: "/bookings", label: "Bookings" },
-  { href: "/chat", label: "Chat" },
+  { href: "/chat", label: "Chats" },
 ];
 
 const creatorLinks = [
   { href: "/dashboard", label: "Dashboard" },
-  { href: "/chat", label: "Chat" },
+  { href: "/chat", label: "Chats" },
   
 ];
 
@@ -280,14 +280,20 @@ export function Navbar() {
               key={link.href}
               href={link.href}
               className={cn(
-                "text-sm text-muted-foreground hover:text-foreground",
+                "relative text-sm text-muted-foreground hover:text-foreground",
                 pathname === link.href && "font-medium text-foreground",
               )}
             >
               {link.label}
+              {link.label === "Chats" && chatUnreadCount > 0 && (
+                <span className="absolute -left-2.5 -top-1.5 inline-flex min-w-4 h-4 items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold leading-none text-white shadow-sm">
+                  {chatUnreadCount}
+                </span>
+              )}
             </Link>
           ))}
         </nav>
+
         <div className="flex items-center gap-2">
           {currentUser ? (
             <div className="relative" ref={notificationPanelRef}>
