@@ -299,16 +299,9 @@ export default function ChatLandingPageClient() {
                     className={`w-full text-left p-3 rounded-md hover:bg-accent/20 flex items-center justify-between cursor-pointer ${selected?.id === g.id ? 'bg-accent/30' : ''}`}
                   >
                     <div>
-                      <button
-                        type="button"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          void openGroupDetails(g);
-                        }}
-                        className="font-medium text-left hover:underline"
-                      >
+                      <div className="font-medium text-left">
                         {g.name}
-                      </button>
+                      </div>
                       <div className="text-xs text-muted-foreground">{g.adminName ?? '—'}</div>
                     </div>
                     <div className="text-xs flex items-center gap-2">
@@ -328,8 +321,6 @@ export default function ChatLandingPageClient() {
                   </div>
                 ))}
               </div>
-
-              <div className="mt-3 text-xs text-muted-foreground">Fetched from /chatgroups</div>
             </div>
           </aside>
 
@@ -337,7 +328,17 @@ export default function ChatLandingPageClient() {
             <div className="h-[72vh] border border-border bg-card rounded-md p-4 flex flex-col">
               <header className="flex items-center justify-between mb-4">
                 <div>
-                  <h2 className="text-lg font-semibold">{selected ? selected.name : "Select a Chat Group"}</h2>
+                  {selected ? (
+                    <button
+                      type="button"
+                      onClick={() => void openGroupDetails(selected)}
+                      className="text-lg font-semibold hover:underline text-left cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded-sm"
+                    >
+                      {selected.name}
+                    </button>
+                  ) : (
+                    <h2 className="text-lg font-semibold">Select a Chat Group</h2>
+                  )}
                   <p className="text-sm text-muted-foreground">{selected ? selected.description : "No chat selected"}</p>
                 </div>
                 <div className="text-sm text-muted-foreground">{selected ? `Members: ${selected.members?.length ?? 0}` : ""}</div>

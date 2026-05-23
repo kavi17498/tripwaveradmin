@@ -286,7 +286,7 @@ export function Navbar() {
             >
               {link.label}
               {link.label === "Chats" && chatUnreadCount > 0 && (
-                <span className="absolute -left-2.5 -top-1.5 inline-flex min-w-4 h-4 items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold leading-none text-white shadow-sm">
+                <span className="absolute -right-2.5 -top-1.5 inline-flex min-w-4 h-4 items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold leading-none text-white shadow-sm">
                   {chatUnreadCount}
                 </span>
               )}
@@ -307,7 +307,7 @@ export function Navbar() {
               >
                 <Bell className="size-5" />
                 {unreadCount > 0 ? (
-                  <span className="absolute -right-1 -top-1 inline-flex min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 py-0.5 text-[10px] font-semibold leading-none text-destructive-foreground">
+                  <span className="absolute -right-1 -top-1 inline-flex min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white">
                     {unreadCount > 9 ? "9+" : unreadCount}
                   </span>
                 ) : null}
