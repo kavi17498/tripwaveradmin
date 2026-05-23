@@ -141,10 +141,12 @@ export default function TripDetailsPage() {
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <MapPin className="size-4" />
+                <span className="font-medium text-foreground">Start location:</span>
                 <span>{mainDestination}</span>
               </div>
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Calendar className="size-4" />
+                <span className="font-medium text-foreground">Dates:</span>
                 <span>
                   {trip.startDate} to {trip.endDate}
                 </span>
@@ -152,6 +154,7 @@ export default function TripDetailsPage() {
               {trip.startTime && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Clock className="size-4" />
+                  <span className="font-medium text-foreground">Time:</span>
                   <span>
                     {startTime} - {endTime}
                   </span>
@@ -249,11 +252,6 @@ export default function TripDetailsPage() {
                         <div key={actIdx} className="text-sm bg-muted/30 rounded p-3">
                           <div className="flex items-start justify-between gap-2 mb-1">
                             <p className="font-medium">{activity.title}</p>
-                            {activity.isAIGenerated && (
-                              <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded">
-                                AI Generated
-                              </span>
-                            )}
                           </div>
                           <p className="text-xs text-muted-foreground mb-2">
                             {activity.timeSlot.startTime} - {activity.timeSlot.endTime}
