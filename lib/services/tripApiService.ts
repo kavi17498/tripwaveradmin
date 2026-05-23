@@ -29,6 +29,18 @@ export type TripApiItem = {
   endTime?: string;
   startLocation: string;
   organizer: string;
+  organizerProfile?: {
+    id?: string;
+    firstName?: string;
+    lastName?: string;
+    profileImage?: string;
+    bio?: string;
+    city?: string;
+    country?: string;
+    isVerified?: boolean;
+    overallRating?: number | null;
+    totalReviews?: number;
+  };
   organizerName?: string;
   price: number;
   itinerary?: {
@@ -99,14 +111,39 @@ export const tripApiService = {
       method: "GET",
     });
 
+    // Normalize response: support both server styles: { data: Trip } and raw Trip
+    let tripData: TripApiItem | null = null;
+    let baseResponse: any = {};
+
     if (response && typeof response === "object" && "data" in response) {
-      return response as ServiceResponse<TripApiItem | null>;
+      tripData = (response as any).data as TripApiItem | null;
+      baseResponse = { ...response };
+    } else {
+      tripData = response as TripApiItem | null;
+      baseResponse = {};
+    }
+
+    // If trip found, try to fetch organizer public profile (non-critical)
+    if (tripData && typeof tripData.organizer === 'string' && tripData.organizer) {
+      try {
+        const profile = await apiClient.request<any>(`/users/organizer/${encodeURIComponent(tripData.organizer)}`);
+          if (profile && profile.organizer) {
+            tripData.organizerProfile = {
+              ...profile.organizer,
+              overallRating: profile.overallRating ?? null,
+              totalReviews: profile.totalReviews ?? 0,
+            };
+        }
+      } catch (_err) {
+        // ignore profile fetch errors - trip should still load
+      }
     }
 
     return {
-      data: response ?? null,
-      message: "Trip loaded successfully",
-    };
+      ...(baseResponse || {}),
+      data: tripData ?? null,
+      message: baseResponse.message || "Trip loaded successfully",
+    } as ServiceResponse<TripApiItem | null>;
   },
 
   async updateTrip(id: string, payload: CreateTripApiPayload, token: string): Promise<ServiceResponse<unknown>> {

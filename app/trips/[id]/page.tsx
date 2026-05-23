@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { tripApiService, type TripApiItem } from "@/lib/services/tripApiService";
 import { userSessionService } from "@/lib/services/userSessionService";
 import { formatCurrencyRs } from "@/lib/utils";
-import { MapPin, Calendar, Users, MapPinIcon, Clock } from "lucide-react";
+import { MapPin, Calendar, Users, MapPinIcon, Clock, Star } from "lucide-react";
 
 const isTripExpired = (trip: TripApiItem) => {
   const endOfDay = new Date(`${trip.endDate}T23:59:59.999`);
@@ -169,10 +169,47 @@ export default function TripDetailsPage() {
             </div>
 
             <div className="border-t border-border pt-4">
-              <p className="text-sm text-muted-foreground">
+              <div className="text-sm text-muted-foreground">
                 <span className="font-medium text-foreground">Organized by: </span>
-                {trip.organizer}
-              </p>
+                {trip.organizerProfile ? (
+                  <div className="mt-2 flex items-start gap-4">
+                    <Link href={`/organizers/${trip.organizerProfile.id}`} className="flex-shrink-0">
+                      <img
+                        src={trip.organizerProfile.profileImage || '/default-avatar.png'}
+                        alt={`${trip.organizerProfile.firstName || ''} ${trip.organizerProfile.lastName || ''}`.trim()}
+                        className="h-14 w-14 rounded-full object-cover border border-border"
+                      />
+                    </Link>
+
+                    <div className="flex flex-col">
+                      <Link href={`/organizers/${trip.organizerProfile.id}`} className="inline-flex items-center gap-2">
+                        <span className="font-semibold text-foreground text-sm">{`${trip.organizerProfile.firstName || ''} ${trip.organizerProfile.lastName || ''}`.trim() || trip.organizer}</span>
+                        {trip.organizerProfile.isVerified && (
+                          <span className="ml-1 text-xs text-emerald-600">✓ Verified</span>
+                        )}
+                        {trip.organizerProfile.overallRating != null && (
+                          <span className="ml-3 inline-flex items-center text-sm text-muted-foreground">
+                            <Star className="h-4 w-4 text-amber-500" />
+                            <span className="ml-1">{trip.organizerProfile.overallRating}</span>
+                            <span className="ml-1 text-xs text-muted-foreground">({trip.organizerProfile.totalReviews ?? 0})</span>
+                          </span>
+                        )}
+                      </Link>
+
+                      {trip.organizerProfile.bio && (
+                        <p className="mt-1 text-xs text-muted-foreground max-w-xl">{trip.organizerProfile.bio}</p>
+                      )}
+
+                      <div className="mt-2 text-xs text-muted-foreground flex gap-3">
+                        {trip.organizerProfile.city && <span>{trip.organizerProfile.city}</span>}
+                        {trip.organizerProfile.country && <span>{trip.organizerProfile.country}</span>}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <span className="block mt-2">{trip.organizer}</span>
+                )}
+              </div>
               <p className="text-sm text-muted-foreground">
                 <span className="font-medium text-foreground">Category: </span>
                 {trip.tripCategory}
