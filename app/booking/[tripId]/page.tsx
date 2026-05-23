@@ -100,8 +100,9 @@ export default function BookingPage() {
   const [loadingSubmission, setLoadingSubmission] = useState(false);
   const [status, setStatus] = useState<"idle" | "processing" | "success" | "failed">("idle");
   const [error, setError] = useState("");
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
-  const bookedParticipantsCount = trip?.participants?.length ?? 0;
+  const bookedParticipantsCount = trip?.participants?.filter((p: any) => p.status !== 'rejected').length ?? 0;
   const allowedBookingCount = Math.max(0, (trip?.maxParticipants ?? 0) - bookedParticipantsCount);
   const mainDestination = trip?.mainDestinations?.[0]?.name || trip?.destinations?.[0]?.name || trip?.startLocation || "Not specified";
   const pricePerPerson = trip?.price ?? 0;
@@ -285,7 +286,7 @@ export default function BookingPage() {
       await tripService.submitTripParticipants(tripId, participantsPayload, token ?? undefined, paymentMethod);
       setStatus("success");
       setLoadingSubmission(false);
-      router.push(`/chat?tripId=${encodeURIComponent(tripId)}`);
+      setShowSuccessModal(true);
     };
 
     (async () => {
@@ -513,6 +514,35 @@ export default function BookingPage() {
         </aside>
       </main>
       <Footer />
+
+      {/* Success Modal */}
+      {showSuccessModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="mx-4 w-full max-w-md scale-95 border border-border bg-card p-6 shadow-2xl rounded-xl transition-all duration-300">
+            <div className="flex flex-col items-center text-center space-y-4">
+              {/* Green Signal Circle Icon */}
+              <div className="flex h-16 w-16 items-center justify-center bg-emerald-50 rounded-full border border-emerald-100">
+                <span className="h-4 w-4 bg-emerald-500 rounded-full animate-ping absolute" />
+                <span className="h-4 w-4 bg-emerald-500 rounded-full relative" />
+              </div>
+
+              <div className="space-y-2">
+                <h3 className="text-xl font-bold tracking-tight text-foreground">Booking Request Sent!</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  Your booking request has been successfully sent to the guide. After it is accepted, you will be notified through notifications and email.
+                </p>
+              </div>
+
+              <Button 
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium shadow-sm transition-all py-2 rounded-lg"
+                onClick={() => router.push("/")}
+              >
+                OK
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

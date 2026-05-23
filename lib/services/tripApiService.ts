@@ -189,4 +189,30 @@ export const tripApiService = {
       message: "Booking canceled successfully",
     };
   },
+
+  async updateParticipantsStatus(
+    tripId: string,
+    participantIds: string[],
+    status: "accepted" | "rejected",
+    token: string
+  ): Promise<ServiceResponse<unknown>> {
+    const response = await apiClient.authenticatedRequest<unknown | ServiceResponse<unknown>>(
+      `/trips/${tripId}/participants/status`,
+      token,
+      {
+        method: "PATCH",
+        body: { participantIds, status },
+      }
+    );
+
+    if (response && typeof response === "object" && "data" in response) {
+      return response as ServiceResponse<unknown>;
+    }
+
+    return {
+      data: response,
+      message: `Participants status updated to ${status}`,
+    };
+  },
 };
+
