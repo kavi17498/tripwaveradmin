@@ -107,4 +107,31 @@ export const chatService = {
 
     return { data: response as ChatMessage, message: "Message sent" };
   },
+
+  async createChatGroup(
+    payload: {
+      tripId: string;
+      name: string;
+      adminId: string;
+      adminName: string;
+      description?: string;
+      members?: string[];
+    },
+    token: string
+  ): Promise<ServiceResponse<ChatGroup>> {
+    const response = await apiClient.authenticatedRequest<ChatGroup | ServiceResponse<ChatGroup>>(
+      "/chatgroups",
+      token,
+      {
+        method: "POST",
+        body: payload,
+      }
+    );
+
+    if (response && typeof response === "object" && "data" in response) {
+      return response as ServiceResponse<ChatGroup>;
+    }
+
+    return { data: response as ChatGroup, message: "Chat group created" };
+  },
 };

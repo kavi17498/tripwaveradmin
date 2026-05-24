@@ -61,6 +61,24 @@ export default function ChatLandingPageClient() {
     return [first, last].filter(Boolean).join(" ") || name || currentUser.email || "You";
   }, [currentUser]);
 
+  const getGroupName = (group: any) => {
+    if (!group) return "";
+    if (group.tripId?.startsWith("dm-") && group.name?.includes("|")) {
+      const parts = group.name.split("|").map((p: string) => p.trim());
+      const otherName = parts.find((part: string) => {
+        const normalizedPart = part.toLowerCase();
+        const isMe =
+          normalizedPart === displayName.toLowerCase() ||
+          (currentUser?.email && normalizedPart === currentUser.email.toLowerCase()) ||
+          (currentUser?.firstName && normalizedPart === currentUser.firstName.toLowerCase()) ||
+          (currentUser?.lastName && normalizedPart === currentUser.lastName.toLowerCase());
+        return !isMe;
+      });
+      return otherName || parts[0];
+    }
+    return group.name;
+  };
+
   useEffect(() => {
     fetchGroups();
   }, [fetchGroups]);
@@ -300,7 +318,7 @@ export default function ChatLandingPageClient() {
                   >
                     <div>
                       <div className="font-medium text-left">
-                        {g.name}
+                        {getGroupName(g)}
                       </div>
                       <div className="text-xs text-muted-foreground">{g.adminName ?? '—'}</div>
                     </div>
@@ -334,7 +352,7 @@ export default function ChatLandingPageClient() {
                       onClick={() => void openGroupDetails(selected)}
                       className="text-lg font-semibold hover:underline text-left cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded-sm"
                     >
-                      {selected.name}
+                      {getGroupName(selected)}
                     </button>
                   ) : (
                     <h2 className="text-lg font-semibold">Select a Chat Group</h2>
@@ -393,8 +411,8 @@ export default function ChatLandingPageClient() {
 
       <Modal
         open={detailsOpen}
-        title={detailsContext?.chatGroup?.name ?? "Chat group details"}
-        description={detailsContext ? detailsContext.trip.tripName : "Trip summary, organizer, and participants"}
+        title={detailsContext?.chatGroup ? getGroupName(detailsContext.chatGroup) : "Chat group details"}
+        description={detailsContext ? (detailsContext.trip.tripName === "Direct Message" ? "Private 1-on-1 direct conversation." : detailsContext.trip.tripName) : "Trip summary, organizer, and participants"}
         onClose={closeGroupDetails}
       >
         {detailsLoading ? (
@@ -403,18 +421,22 @@ export default function ChatLandingPageClient() {
           </div>
         ) : detailsContext ? (
           <div className="space-y-4">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Trip summary</p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {detailsContext.trip.description || detailsContext.trip.mainDestinations?.[0]?.name || detailsContext.trip.startLocation || "Coordinate your trip here."}
-              </p>
-              <p className="mt-2 text-xs text-muted-foreground">
-                {detailsContext.trip.startDate} to {detailsContext.trip.endDate}
-              </p>
-            </div>
+            {detailsContext.trip.tripName !== "Direct Message" && (
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Trip summary</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {detailsContext.trip.description || detailsContext.trip.mainDestinations?.[0]?.name || detailsContext.trip.startLocation || "Coordinate your trip here."}
+                </p>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {detailsContext.trip.startDate} to {detailsContext.trip.endDate}
+                </p>
+              </div>
+            )}
 
             <div className="rounded-md border border-border p-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Organizer</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                {detailsContext.trip.tripName === "Direct Message" ? "Contact Info" : "Organizer"}
+              </p>
               <div className="mt-3 flex items-center gap-3">
                 {renderAvatar(
                   `${detailsContext.organizer.firstName} ${detailsContext.organizer.lastName}`.trim() || detailsContext.organizer.email || "Organizer",
@@ -429,28 +451,30 @@ export default function ChatLandingPageClient() {
               </div>
             </div>
 
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Participants</p>
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                {detailsContext.participants.map(({ participant, profile }) => {
-                  const displayName = profile
-                    ? `${profile.firstName} ${profile.lastName}`.trim() || profile.email
-                    : participant.name;
+            {detailsContext.trip.tripName !== "Direct Message" && (
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Participants</p>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  {detailsContext.participants.map(({ participant, profile }) => {
+                    const displayName = profile
+                      ? `${profile.firstName} ${profile.lastName}`.trim() || profile.email
+                      : participant.name;
 
-                  return (
-                    <div key={participant.participantId ?? `${participant.name}-${participant.email ?? "na"}`} className="flex items-center gap-3 rounded-md border border-border p-3">
-                      {renderAvatar(displayName, profile?.profileImage)}
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium">{displayName}</p>
-                        <p className="truncate text-xs text-muted-foreground">
-                          {participant.email || profile?.email || participant.phone || "Participant"}
-                        </p>
+                    return (
+                      <div key={participant.participantId ?? `${participant.name}-${participant.email ?? "na"}`} className="flex items-center gap-3 rounded-md border border-border p-3">
+                        {renderAvatar(displayName, profile?.profileImage)}
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium">{displayName}</p>
+                          <p className="truncate text-xs text-muted-foreground">
+                            {participant.email || profile?.email || participant.phone || "Participant"}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         ) : (
           <p className="text-sm text-muted-foreground">No details available for this chat group.</p>

@@ -8,6 +8,9 @@ import { Footer } from "@/components/layout/footer";
 import { EmptyState } from "@/components/feedback/empty-state";
 import { Button } from "@/components/ui/button";
 import { userService } from "@/lib/services/userService";
+import { chatService } from "@/lib/services/chatService";
+import { userSessionService } from "@/lib/services/userSessionService";
+import { useToast } from "@/components/feedback/toast-provider";
 import { formatCurrencyRs } from "@/lib/utils";
 import { 
   MapPin, 
@@ -29,12 +32,84 @@ import {
   Calendar,
   Users
 } from "lucide-react";
+
 export default function OrganizerProfilePage() {
   const router = useRouter();
   const { id } = useParams<{ id: string }>();
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [creatingChat, setCreatingChat] = useState(false);
+  const { pushToast } = useToast();
+
+  useEffect(() => {
+    setCurrentUser(userSessionService.getUserProfile<any>());
+  }, []);
+
+  const handleMessageOrganizer = async () => {
+    if (!currentUser) {
+      pushToast({
+        title: "Authentication Required",
+        description: "Please sign in to message this organizer.",
+        type: "error",
+      });
+      router.push(`/login?redirect=/organizers/${id}`);
+      return;
+    }
+
+    const token = userSessionService.getToken();
+    if (!token) {
+      pushToast({
+        title: "Authentication Required",
+        description: "Please sign in to message this organizer.",
+        type: "error",
+      });
+      router.push(`/login?redirect=/organizers/${id}`);
+      return;
+    }
+
+    try {
+      setCreatingChat(true);
+      const travelerId = currentUser.id;
+      const guideId = id as string;
+
+      const sortedIds = [travelerId, guideId].sort();
+      const dmTripId = `dm-${sortedIds[0]}-${sortedIds[1]}`;
+
+      const travelerName = `${currentUser.firstName || ""} ${currentUser.lastName || ""}`.trim() || "Traveler";
+      const guideNameVal = organizerName;
+      const dmName = `${travelerName} | ${guideNameVal}`;
+
+      const response = await chatService.createChatGroup({
+        tripId: dmTripId,
+        name: dmName,
+        adminId: travelerId,
+        adminName: travelerName,
+        description: `Direct message group between ${travelerName} and ${guideNameVal}`,
+        members: [travelerId, guideId],
+      }, token);
+
+      if (response.data) {
+        pushToast({
+          title: "Chat Initialized",
+          description: `Opening conversation with ${guideNameVal}...`,
+          type: "success",
+        });
+        router.push(`/chat?tripId=${dmTripId}`);
+      } else {
+        throw new Error(response.message || "Could not start chat");
+      }
+    } catch (err: any) {
+      pushToast({
+        title: "Error Starting Chat",
+        description: err?.message || "Failed to start direct message. Please try again.",
+        type: "error",
+      });
+    } finally {
+      setCreatingChat(false);
+    }
+  };
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -194,6 +269,17 @@ export default function OrganizerProfilePage() {
                     <span>{joinedDate}</span>
                   </div>
                 </div>
+
+                {(!currentUser || currentUser.id !== id) && (
+                  <Button
+                    onClick={handleMessageOrganizer}
+                    disabled={creatingChat}
+                    className="w-full max-w-sm mt-1 gap-2 font-bold cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90"
+                  >
+                    <MessageSquare className="size-4" />
+                    {creatingChat ? "Starting Chat..." : "Message Guide"}
+                  </Button>
+                )}
 
                 {/* High Impact Statistics Summary */}
                 <div className="grid grid-cols-3 gap-3 text-center w-full max-w-sm">

@@ -27,7 +27,7 @@ const explorerLinks = [
 const creatorLinks = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/chat", label: "Chats" },
-  
+  { href: "/dashboard/organizers", label: "Organizers" },
 ];
 
 const APP_MODE_STORAGE_KEY = "tripwaver:app-mode";
