@@ -8,7 +8,6 @@ const dashboardLinks = [
   { href: "/dashboard", label: "Overview" },
   { href: "/dashboard/my-trips", label: "My Trips" },
   { href: "/dashboard/create-trip", label: "Create Trip" },
-  { href: "/dashboard/organizers", label: "Organizers" },
   { href: "/dashboard/earnings", label: "Earnings" },
   { href: "/dashboard/reviews", label: "Reviews" },
   { href: "/dashboard/verification", label: "Verification" },

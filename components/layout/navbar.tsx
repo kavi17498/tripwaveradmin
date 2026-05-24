@@ -20,6 +20,7 @@ type AppMode = "explorer" | "creator";
 const explorerLinks = [
   { href: "/", label: "Home" },
   { href: "/trips", label: "Trips" },
+  { href: "/organizers", label: "Organizers" },
   { href: "/bookings", label: "Bookings" },
   { href: "/chat", label: "Chats" },
 ];
@@ -27,7 +28,6 @@ const explorerLinks = [
 const creatorLinks = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/chat", label: "Chats" },
-  { href: "/dashboard/organizers", label: "Organizers" },
 ];
 
 const APP_MODE_STORAGE_KEY = "tripwaver:app-mode";
