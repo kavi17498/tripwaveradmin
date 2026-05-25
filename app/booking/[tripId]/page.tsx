@@ -125,6 +125,10 @@ export default function BookingPage() {
             setError('This trip has already been booked and is no longer available.');
           }
 
+          if (currentUser && loadedTrip.organizer === currentUser.id) {
+            setError('You cannot book a trip that you organized.');
+          }
+
           // If current user already has a booking, block additional bookings
           if (currentUser && Array.isArray(loadedTrip.participants)) {
             const already = loadedTrip.participants.find((p: any) => p.parentUserId && p.parentUserId === currentUser.id);

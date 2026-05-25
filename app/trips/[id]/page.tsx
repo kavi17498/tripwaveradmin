@@ -114,12 +114,16 @@ export default function TripDetailsPage() {
   const endTime = trip.endTime || "Not specified";
   const startTime = trip.startTime || "Not specified";
   const expired = isTripExpired(trip);
-  const bookingAllowed = canBookTrip(trip);
-  const bookingMessage = expired
-    ? "This trip has expired."
-    : trip.status !== "approved"
-      ? "Booking is available after the trip is approved."
-      : "Booking is currently unavailable.";
+  const profile = userSessionService.getUserProfile<{ id?: string }>();
+  const isOrganizer = profile?.id === trip.organizer;
+  const bookingAllowed = canBookTrip(trip) && !isOrganizer;
+  const bookingMessage = isOrganizer
+    ? "You cannot book a trip that you organized."
+    : expired
+      ? "This trip has expired."
+      : trip.status !== "approved"
+        ? "Booking is available after the trip is approved."
+        : "Booking is currently unavailable.";
 
   return (
     <div>
