@@ -245,7 +245,12 @@ export interface CreateTripApiPayload {
   coverImage: string;
   description: string;
   maxParticipants: number;
-  pickupType: "Free Pickup" | "Pickup Available" | "Meet at Location";
+  pickupType:
+    | "Free Pickup"
+    | "Pickup Available"
+    | "Free Pickup from Bandaranaike International Airport"
+    | "Free Pickup from Mattala Airport"
+    | "Meet at Location";
   pickupCostPerKm?: number;
   pickupStartLocation?: {
     name: string;

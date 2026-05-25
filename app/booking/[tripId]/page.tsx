@@ -17,6 +17,25 @@ import LocationPicker from "@/components/common/locationpicker";
 
 type ParticipantGender = "male" | "female" | "other" | "";
 type TripPaymentMethod = NonNullable<TripApiItem["paymentMethods"]>[number];
+type PickupType = NonNullable<TripApiItem["pickupType"]>;
+
+const airportPickupLocations: Partial<Record<PickupType, { lat: number; lng: number; address: string }>> = {
+  "Free Pickup from Bandaranaike International Airport": {
+    lat: 7.1808,
+    lng: 79.8841,
+    address: "Bandaranaike International Airport",
+  },
+  "Free Pickup from Mattala Airport": {
+    lat: 6.2844,
+    lng: 81.1241,
+    address: "Mattala Rajapaksa International Airport",
+  },
+};
+
+const isAirportPickupType = (pickupType: TripApiItem["pickupType"] | "") =>
+  pickupType === "Free Pickup from Bandaranaike International Airport" || pickupType === "Free Pickup from Mattala Airport";
+
+const getPickupLocationAddress = (location: { name?: string; address?: string }) => location.name ?? location.address ?? "";
 
 type ParticipantForm = {
   name: string;
@@ -163,7 +182,7 @@ export default function BookingPage() {
     };
 
     loadTrip();
-  }, [currentUser, tripId, token]);
+  }, [currentUser, passengerPickupLocation, tripId, token]);
 
   useEffect(() => {
     hydrateFromLegacySession();
@@ -171,6 +190,19 @@ export default function BookingPage() {
 
   useEffect(() => {
     if (!trip) return;
+
+    if (!passengerPickupLocation && trip.pickupType && trip.pickupType !== "Meet at Location") {
+      const presetPickupLocation =
+        trip.pickupStartLocation ?? (isAirportPickupType(trip.pickupType) ? airportPickupLocations[trip.pickupType] : undefined);
+
+      if (presetPickupLocation) {
+        setPassengerPickupLocation({
+          lat: presetPickupLocation.lat,
+          lng: presetPickupLocation.lng,
+          address: getPickupLocationAddress(presetPickupLocation),
+        });
+      }
+    }
 
     const availablePaymentMethods = trip.paymentMethods ?? [];
     if (availablePaymentMethods.length === 1) {
@@ -257,12 +289,13 @@ export default function BookingPage() {
 
     setPickupDistanceKm(distance);
 
-    if (trip.pickupType === "Pickup Available") {
-      const cost = distance * (trip.pickupCostPerKm ?? 0);
-      setPickupCost(Number(cost.toFixed(2)));
-    } else {
-      setPickupCost(0); // Free Pickup
+    if (trip.pickupType === "Free Pickup") {
+      setPickupCost(0);
+      return;
     }
+
+    const cost = distance * (trip.pickupCostPerKm ?? 0);
+    setPickupCost(Number(cost.toFixed(2)));
   }, [passengerPickupLocation, trip]);
 
   const updateParticipant = (index: number, field: keyof ParticipantForm, value: string) => {
@@ -531,13 +564,20 @@ export default function BookingPage() {
                     <div className="rounded-lg bg-muted/40 p-3 border border-border text-sm">
                       <p className="font-medium text-foreground">🚕 Pickup Details</p>
                       <p className="text-muted-foreground mt-1">
-                        Pickup from your location is {trip.pickupType === "Free Pickup" ? "Free" : `Available at Rs. ${trip.pickupCostPerKm}/km`}.
+                        {trip.pickupType === "Free Pickup"
+                          ? "Pickup from your selected location is free."
+                          : `Pickup is calculated at Rs. ${trip.pickupCostPerKm}/km from the configured pickup origin.`}
                       </p>
                       {trip.pickupStartLocation && (
                         <p className="text-xs text-muted-foreground mt-2">
                           Guide starts from: <span className="font-medium">{trip.pickupStartLocation.name}</span>
                         </p>
                       )}
+                      {isAirportPickupType(trip.pickupType ?? "") ? (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          The map defaults to the airport pickup point, but you can move the marker to another location and the fare will update.
+                        </p>
+                      ) : null}
                     </div>
 
                     <div className="space-y-2">

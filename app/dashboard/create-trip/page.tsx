@@ -22,6 +22,8 @@ import TripwaverAIPopup from "@/components/common/tripwaver-ai-popup";
 import { SavingOverlay } from "@/components/common/saving-overlay";
 
 type TripCategory = CreateTripApiPayload["tripCategory"];
+type PickupType = CreateTripApiPayload["pickupType"];
+type AirportPickupType = Exclude<PickupType, "Free Pickup" | "Pickup Available" | "Meet at Location">;
 
 type DestinationFormItem = {
   name: string;
@@ -74,6 +76,42 @@ const paymentMethodOptions = ["Pay Online", "Pay to Guide on Trip Day"] as const
 type PaymentMethod = (typeof paymentMethodOptions)[number];
 
 const leadTimeTripCategories: TripCategory[] = ["Public trip"];
+
+const airportPickupLocations: Record<AirportPickupType, MainDestination> = {
+  "Free Pickup from Bandaranaike International Airport": {
+    lat: 7.1808,
+    lng: 79.8841,
+    address: "Bandaranaike International Airport",
+  },
+  "Free Pickup from Mattala Airport": {
+    lat: 6.2844,
+    lng: 81.1241,
+    address: "Mattala Rajapaksa International Airport",
+  },
+};
+
+const getDefaultPickupLocation = (pickupType: PickupType): MainDestination | null => {
+  if (pickupType === "Free Pickup from Bandaranaike International Airport") {
+    return airportPickupLocations["Free Pickup from Bandaranaike International Airport"];
+  }
+
+  if (pickupType === "Free Pickup from Mattala Airport") {
+    return airportPickupLocations["Free Pickup from Mattala Airport"];
+  }
+
+  return null;
+};
+
+const isAirportPickupType = (pickupType: PickupType) =>
+  pickupType === "Free Pickup from Bandaranaike International Airport" || pickupType === "Free Pickup from Mattala Airport";
+
+const pickupTypeOptions: Array<{ value: PickupType; label: string }> = [
+  { value: "Meet at Location", label: "Meet at Location" },
+  { value: "Free Pickup", label: "Free Pickup" },
+  { value: "Pickup Available", label: "Pickup Available" },
+  { value: "Free Pickup from Bandaranaike International Airport", label: "Free Pickup from Bandaranaike International Airport" },
+  { value: "Free Pickup from Mattala Airport", label: "Free Pickup from Mattala Airport" },
+];
 
 const getLocalDateString = (date: Date) => {
   const year = date.getFullYear();
@@ -203,7 +241,7 @@ export default function CreateTripPage() {
   const [tripCategory, setTripCategory] = useState<TripCategory>("Public trip");
   const [canSelectAllCategories, setCanSelectAllCategories] = useState(false);
   const [description, setDescription] = useState("");
-  const [pickupType, setPickupType] = useState<"Free Pickup" | "Pickup Available" | "Meet at Location">("Meet at Location");
+  const [pickupType, setPickupType] = useState<PickupType>("Meet at Location");
   const [pickupCostPerKm, setPickupCostPerKm] = useState("");
   const [pickupStartLocation, setPickupStartLocation] = useState<MainDestination | null>(null);
 
@@ -312,16 +350,20 @@ export default function CreateTripPage() {
         setPrice(String(trip.price ?? ""));
         setMaxParticipants(String(trip.maxParticipants ?? ""));
         setPaymentMethods((trip.paymentMethods as PaymentMethod[] | undefined) ?? []);
-        setPickupType((trip.pickupType as any) ?? "Meet at Location");
+        const loadedPickupType = (trip.pickupType as PickupType) ?? "Meet at Location";
+        setPickupType(loadedPickupType);
         setPickupCostPerKm(trip.pickupCostPerKm !== undefined ? String(trip.pickupCostPerKm) : "");
-        if (trip.pickupStartLocation) {
-          setPickupStartLocation({
-            lat: trip.pickupStartLocation.lat,
-            lng: trip.pickupStartLocation.lng,
-            address: trip.pickupStartLocation.name,
-          });
-        } else {
-          setPickupStartLocation(null);
+        const loadedPickupStartLocation = trip.pickupStartLocation
+          ? {
+              lat: trip.pickupStartLocation.lat,
+              lng: trip.pickupStartLocation.lng,
+              address: trip.pickupStartLocation.name,
+            }
+          : getDefaultPickupLocation(loadedPickupType);
+
+        setPickupStartLocation(loadedPickupStartLocation ?? null);
+        if (loadedPickupStartLocation) {
+          setStartLocation(loadedPickupStartLocation.address);
         }
         if (trip.included) {
           setHotelFacilitiesEditor((trip.included.hotelFacilities || []).join("\n"));
@@ -757,7 +799,7 @@ export default function CreateTripPage() {
     if (pickupType !== "Meet at Location" && !pickupStartLocation) {
       issues.push("Pickup origin (Guide's start location) is required.");
     }
-    if (pickupType === "Pickup Available" && (!pickupCostPerKm.trim() || Number(pickupCostPerKm) <= 0 || Number.isNaN(Number(pickupCostPerKm)))) {
+    if ((pickupType === "Pickup Available" || isAirportPickupType(pickupType)) && (!pickupCostPerKm.trim() || Number(pickupCostPerKm) <= 0 || Number.isNaN(Number(pickupCostPerKm)))) {
       issues.push("Pickup cost per km must be a positive number.");
     }
     if (!organizerId.trim()) issues.push("Organizer id (user id) is required.");
@@ -936,7 +978,7 @@ export default function CreateTripPage() {
           lng: pickupStartLocation.lng,
         },
       } : {}),
-      ...(pickupType === "Pickup Available" ? {
+      ...((pickupType === "Pickup Available" || isAirportPickupType(pickupType)) ? {
         pickupCostPerKm: Number(pickupCostPerKm),
       } : {}),
       included: {
@@ -1114,13 +1156,22 @@ export default function CreateTripPage() {
               <select
                 value={pickupType}
                 onChange={(event) => {
-                  setPickupType(event.target.value as any);
+                  const nextType = event.target.value as PickupType;
+                  setPickupType(nextType);
+
+                  const defaultPickupLocation = getDefaultPickupLocation(nextType);
+                  if (defaultPickupLocation) {
+                    setPickupStartLocation(defaultPickupLocation);
+                    setStartLocation(defaultPickupLocation.address);
+                  }
                 }}
                 className="h-9 w-full border border-input bg-background px-3 text-sm"
               >
-                <option value="Meet at Location">Meet at Location</option>
-                <option value="Free Pickup">Free Pickup</option>
-                <option value="Pickup Available">Pickup Available</option>
+                {pickupTypeOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -1146,7 +1197,7 @@ export default function CreateTripPage() {
                     }}
                   />
                 </div>
-                {pickupType === "Pickup Available" ? (
+                {pickupType === "Pickup Available" || isAirportPickupType(pickupType) ? (
                   <div>
                     <label className="mb-1 block text-sm font-medium">Pickup cost per km (LKR)</label>
                     <Input
