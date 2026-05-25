@@ -12,6 +12,28 @@ export type TripApiDestination = {
   photos: string[];
 };
 
+export type TripApiParticipant = {
+  participantId?: string;
+  parentUserId?: string | null;
+  name: string;
+  gender: string;
+  age: number;
+  address?: string;
+  phone?: string;
+  email?: string;
+  paymentMethod?: CreateTripApiPayload["paymentMethods"][number];
+  status?: "pending" | "accepted" | "rejected";
+  bookingId?: string;
+  pickupLocation?: {
+    name: string;
+    lat: number;
+    lng: number;
+  };
+  pickupDistanceKm?: number;
+  pickupCost?: number;
+  pickupTime?: string;
+};
+
 export type TripApiItem = {
   id: string;
   tripName: string;
@@ -64,7 +86,7 @@ export type TripApiItem = {
     otherInclusions?: string[];
     exclusions?: string[];
   };
-  participants?: unknown[];
+  participants?: TripApiParticipant[];
   photos?: string[];
   coverImage?: string;
   description?: string;
@@ -75,6 +97,27 @@ export type TripApiItem = {
   createdAt?: unknown;
   updatedAt?: unknown;
   status?: string;
+  statusReason?: string;
+  statusUpdatedBy?: string;
+  statusUpdatedByName?: string;
+  statusUpdatedAt?: unknown;
+};
+
+type TripApiResponse = TripApiItem | ServiceResponse<TripApiItem | null>;
+
+type OrganizerProfileResponse = {
+  organizer?: {
+    id?: string;
+    firstName?: string;
+    lastName?: string;
+    profileImage?: string;
+    bio?: string;
+    city?: string;
+    country?: string;
+    isVerified?: boolean;
+  };
+  overallRating?: number | null;
+  totalReviews?: number;
 };
 
 export const tripApiService = {
@@ -110,34 +153,33 @@ export const tripApiService = {
   },
 
   async getTripById(id: string, token: string): Promise<ServiceResponse<TripApiItem | null>> {
-    const response = await apiClient.authenticatedRequest<TripApiItem | ServiceResponse<TripApiItem | null>>(`/trips/${id}`, token, {
+    const response = await apiClient.authenticatedRequest<TripApiResponse>(`/trips/${id}`, token, {
       method: "GET",
     });
 
     // Normalize response: support both server styles: { data: Trip } and raw Trip
     let tripData: TripApiItem | null = null;
-    let baseResponse: any = {};
+    let baseResponse: Partial<ServiceResponse<TripApiItem | null>> = {};
 
     if (response && typeof response === "object" && "data" in response) {
-      tripData = (response as any).data as TripApiItem | null;
-      baseResponse = { ...response };
+      tripData = response.data ?? null;
+      baseResponse = response;
     } else {
-      tripData = response as TripApiItem | null;
-      baseResponse = {};
+      tripData = response ?? null;
     }
 
     // If trip found, try to fetch organizer public profile (non-critical)
-    if (tripData && typeof tripData.organizer === 'string' && tripData.organizer) {
+    if (tripData && typeof tripData.organizer === "string" && tripData.organizer) {
       try {
-        const profile = await apiClient.request<any>(`/users/organizer/${encodeURIComponent(tripData.organizer)}`);
-          if (profile && profile.organizer) {
-            tripData.organizerProfile = {
-              ...profile.organizer,
-              overallRating: profile.overallRating ?? null,
-              totalReviews: profile.totalReviews ?? 0,
-            };
+        const profile = await apiClient.request<OrganizerProfileResponse>(`/users/organizer/${encodeURIComponent(tripData.organizer)}`);
+        if (profile?.organizer) {
+          tripData.organizerProfile = {
+            ...profile.organizer,
+            overallRating: profile.overallRating ?? null,
+            totalReviews: profile.totalReviews ?? 0,
+          };
         }
-      } catch (_err) {
+      } catch {
         // ignore profile fetch errors - trip should still load
       }
     }
@@ -162,6 +204,26 @@ export const tripApiService = {
     return {
       data: response,
       message: "Trip updated successfully",
+    };
+  },
+
+  async cancelTrip(id: string, reason: string, token: string): Promise<ServiceResponse<TripApiItem | null>> {
+    const response = await apiClient.authenticatedRequest<TripApiItem | ServiceResponse<TripApiItem | null>>(
+      `/trips/${id}/cancel`,
+      token,
+      {
+        method: "PATCH",
+        body: { reason },
+      },
+    );
+
+    if (response && typeof response === "object" && "data" in response) {
+      return response as ServiceResponse<TripApiItem | null>;
+    }
+
+    return {
+      data: response ?? null,
+      message: "Trip canceled successfully",
     };
   },
 
