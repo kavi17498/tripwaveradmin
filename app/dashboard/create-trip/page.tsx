@@ -11,7 +11,6 @@ import {
   CreateTripApiPayload,
   TripDestinationPayload,
   TripItineraryDayPayload,
-  TripParticipantPayload,
 } from "@/lib/types";
 import { tripApiService } from "@/lib/services/tripApiService";
 import { userSessionService } from "@/lib/services/userSessionService";
@@ -39,13 +38,6 @@ type ActivityFormItem = {
   endTime: string;
   notesEditor: string;
   isAIGenerated?: boolean;
-};
-
-type ParticipantFormItem = {
-  name: string;
-  address: string;
-  phone: string;
-  email: string;
 };
 
 type StoredUserProfile = {
@@ -184,13 +176,6 @@ const getDayCount = (startDate: string, endDate: string) => {
   return Math.floor(diffMs / (24 * 60 * 60 * 1000)) + 1;
 };
 
-const emptyParticipant = (): ParticipantFormItem => ({
-  name: "",
-  address: "",
-  phone: "",
-  email: "",
-});
-
 const toLines = (value: string) =>
   value
     .split("\n")
@@ -258,7 +243,6 @@ export default function CreateTripPage() {
 
   const [destinations, setDestinations] = useState<DestinationFormItem[]>([emptyDestination()]);
   const [activitiesByDay, setActivitiesByDay] = useState<ActivityFormItem[][]>([[emptyActivity()]]);
-  const [participants, setParticipants] = useState<ParticipantFormItem[]>([emptyParticipant()]);
 
   const [hotelFacilitiesEditor, setHotelFacilitiesEditor] = useState("");
   const [travelMethodsSelected, setTravelMethodsSelected] = useState<string[]>([]);
@@ -414,17 +398,6 @@ export default function CreateTripPage() {
           setActivitiesByDay(activities);
         }
 
-        // participants
-        if (trip.participants && Array.isArray(trip.participants)) {
-          const ppl = trip.participants.map((p: any) => ({
-            name: p.name ?? "",
-            address: p.address ?? "",
-            phone: p.phone ?? "",
-            email: p.email ?? "",
-          }));
-          setParticipants(ppl.length ? ppl : [emptyParticipant()]);
-        }
-
         // photos
         if (trip.photos && trip.photos.length > 0) {
           setTripPhotosEditor(trip.photos.join("\n"));
@@ -530,19 +503,6 @@ export default function CreateTripPage() {
         return day.filter((_, currentActivityIndex) => currentActivityIndex !== activityIndex);
       }),
     );
-  };
-
-  const updateParticipant = (index: number, key: keyof ParticipantFormItem, value: string) => {
-    setParticipants((prev) => prev.map((item, currentIndex) => (currentIndex === index ? { ...item, [key]: value } : item)));
-  };
-
-  const addParticipant = () => {
-    setParticipants((prev) => [...prev, emptyParticipant()]);
-  };
-
-  const removeParticipant = (index: number) => {
-    if (participants.length === 1) return;
-    setParticipants((prev) => prev.filter((_, currentIndex) => currentIndex !== index));
   };
 
   const toggleTravelMethod = (method: string) => {
@@ -854,24 +814,6 @@ export default function CreateTripPage() {
       issues.push("Each activity needs title, start/end time, and at least one note.");
     }
 
-    const hasParticipantInput = participants.some((participant) =>
-      [participant.name, participant.address, participant.phone, participant.email].some((value) => value.trim()),
-    );
-    const hasInvalidParticipant = participants.some((participant) => {
-      const isBlankRow =
-        !participant.name.trim() &&
-        !participant.address.trim() &&
-        !participant.phone.trim() &&
-        !participant.email.trim();
-
-      if (isBlankRow) return false;
-
-      return !participant.name.trim() || !participant.address.trim() || !participant.phone.trim() || !participant.email.trim();
-    });
-    if (hasParticipantInput && hasInvalidParticipant) {
-      issues.push("Each participant must include name, address, phone number, and email.");
-    }
-
     const tripPhotos = toLines(tripPhotosEditor);
     if (tripPhotos.length === 0 && tripPhotoFiles.length === 0) {
       issues.push("Add at least one trip photo (upload or URL).");
@@ -937,15 +879,6 @@ export default function CreateTripPage() {
       };
     });
 
-    const participantsPayload: TripParticipantPayload[] = participants
-      .filter((participant) => [participant.name, participant.address, participant.phone, participant.email].some((value) => value.trim()))
-      .map((participant) => ({
-        name: participant.name.trim(),
-        address: participant.address.trim(),
-        phone: participant.phone.trim(),
-        email: participant.email.trim(),
-      }));
-
     const manualTripPhotos = toLines(tripPhotosEditor);
     const tripPhotos = [...manualTripPhotos];
 
@@ -987,7 +920,7 @@ export default function CreateTripPage() {
         otherInclusions: toLines(otherInclusionsEditor),
         exclusions: toLines(exclusionsEditor),
       },
-      participants: participantsPayload,
+      participants: [],
       photos: tripPhotos,
       coverImage: tripPhotos[0] ?? "",
       description: description.trim(),
@@ -1076,8 +1009,8 @@ export default function CreateTripPage() {
         title={isEditMode ? "Edit Trip" : "Create Trip"}
         description={
           isEditMode
-            ? "Edit and update trip details: schedule, itinerary, participants, and photos."
-            : "Create and submit a trip to API with destinations, itinerary, inclusions, participants, and photos."
+            ? "Edit and update trip details: schedule, itinerary, and photos."
+            : "Create and submit a trip to API with destinations, itinerary, inclusions, and photos."
         }
       />
 
@@ -1188,7 +1121,7 @@ export default function CreateTripPage() {
             ) : (
               <>
                 <div>
-                  <label className="mb-1 block text-sm font-medium">Pickup origin (Guide's start location)</label>
+                  <label className="mb-1 block text-sm font-medium">Pickup origin (Guide&apos;s start location)</label>
                   <LocationPicker
                     value={pickupStartLocation}
                     onChange={(location) => {
@@ -1472,49 +1405,6 @@ export default function CreateTripPage() {
                 placeholder={"Visa fees\nPersonal expenses\nMeals not mentioned"}
               />
             </div>
-          </div>
-        </section>
-
-        <section className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold">Participants</h2>
-            <Button type="button" variant="outline" onClick={addParticipant}>Add participant</Button>
-          </div>
-
-          <div className="space-y-3">
-            {participants.map((participant, index) => (
-              <div key={index} className="space-y-3 border border-border p-3">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium">Participant {index + 1}</p>
-                  <Button type="button" variant="ghost" onClick={() => removeParticipant(index)} disabled={participants.length === 1}>
-                    Remove
-                  </Button>
-                </div>
-
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                  <Input
-                    value={participant.name}
-                    onChange={(event) => updateParticipant(index, "name", event.target.value)}
-                    placeholder="John Doe"
-                  />
-                  <Input
-                    value={participant.address}
-                    onChange={(event) => updateParticipant(index, "address", event.target.value)}
-                    placeholder="123 Main St, New York"
-                  />
-                  <Input
-                    value={participant.phone}
-                    onChange={(event) => updateParticipant(index, "phone", event.target.value)}
-                    placeholder="+1234567890"
-                  />
-                  <Input
-                    value={participant.email}
-                    onChange={(event) => updateParticipant(index, "email", event.target.value)}
-                    placeholder="john@example.com"
-                  />
-                </div>
-              </div>
-            ))}
           </div>
         </section>
 
