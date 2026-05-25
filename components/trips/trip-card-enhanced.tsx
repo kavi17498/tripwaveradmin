@@ -12,16 +12,16 @@ interface TripCardEnhancedProps {
 export function TripCardEnhanced({ trip, href }: TripCardEnhancedProps) {
   const displayedItinerary = trip.itinerary.slice(0, 3);
   const displayedIncluded = trip.included.slice(0, 4);
-  const tripCategoryLabel =
-    trip.tripType === "private"
-      ? "Private Trip"
-      : trip.title.toLowerCase().includes("solo")
-        ? "Solo Trip"
-        : trip.title.toLowerCase().includes("family")
+  const isPrivate = trip.tripType.toLowerCase() === "private trip" || trip.tripType.toLowerCase() === "private";
+  const tripCategoryLabel = isPrivate
+    ? "Private Trip"
+    : trip.capacity === 1
+      ? "Solo Trip"
+      : trip.capacity === 2
+        ? "Couple Trip"
+        : trip.capacity <= 6
           ? "Family Trip"
-          : trip.title.toLowerCase().includes("stranger")
-            ? "Strangers Trip"
-            : "Public Trip";
+          : "Team Trip";
 
   return (
     <article className="group flex flex-col justify-between overflow-hidden rounded-2xl border border-border/80 bg-card hover:border-primary/20 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 h-full">

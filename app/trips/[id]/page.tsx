@@ -212,7 +212,15 @@ export default function TripDetailsPage() {
               </div>
               <p className="text-sm text-muted-foreground">
                 <span className="font-medium text-foreground">Category: </span>
-                {trip.tripCategory}
+                {trip.tripCategory === "Public trip" 
+                  ? (trip.maxParticipants === 1 
+                      ? "Solo Trip with guide" 
+                      : trip.maxParticipants === 2 
+                        ? "Couple Trip" 
+                        : (trip.maxParticipants ?? 0) <= 6 
+                          ? "Family Trip with guide" 
+                          : "Team Trip")
+                  : trip.tripCategory}
               </p>
               {!bookingAllowed && (
                 <p className="mt-3 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">

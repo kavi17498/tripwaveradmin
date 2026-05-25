@@ -212,7 +212,7 @@ export interface BookingParticipantPayload {
 
 export interface CreateTripApiPayload {
   tripName: string;
-  tripCategory: "Solo Trip with guide" | "Family Trip with guide" | "Strangers Trip with guide" | "Private trip";
+  tripCategory: "Public trip" | "Private trip";
   status?: "pending" | "draft";
   paymentMethods: ("Pay Online" | "Pay to Guide on Trip Day")[];
   destinations: TripDestinationPayload[];

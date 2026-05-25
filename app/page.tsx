@@ -191,15 +191,11 @@ export default function HomePage() {
     loadTrips();
   }
 
-  const soloTrips = trips.filter((t) => t.tripType === "Solo Trip with guide");
-  const familyTrips = trips.filter((t) => t.tripType === "Family Trip with guide");
-  const groupTrips = trips.filter((t) => t.tripType === "Strangers Trip with guide");
-  const otherTrips = trips.filter(
-    (t) =>
-      t.tripType !== "Solo Trip with guide" &&
-      t.tripType !== "Family Trip with guide" &&
-      t.tripType !== "Strangers Trip with guide"
-  );
+  const soloTrips = trips.filter((t) => t.capacity === 1);
+  const coupleTrips = trips.filter((t) => t.capacity === 2);
+  const familyTrips = trips.filter((t) => t.capacity > 2 && t.capacity <= 6);
+  const teamTrips = trips.filter((t) => t.capacity > 6);
+  const otherTrips: Trip[] = [];
 
   const currentSlide = heroSlides[activeSlide];
 
@@ -359,7 +355,7 @@ export default function HomePage() {
                     Travel on your own with complete freedom. A verified local guide is always nearby to keep you safe and comfortable.
                   </p>
                   <Button variant="outline" asChild className="w-full sm:w-auto">
-                    <Link href="/trips?category=Solo Trip with guide">Browse Solo Trips</Link>
+                    <Link href="/trips">Browse Solo Trips</Link>
                   </Button>
                 </div>
                 <div className="lg:col-span-2">
@@ -385,6 +381,41 @@ export default function HomePage() {
                 </div>
               </div>
 
+              {/* Couple Trips Row */}
+              <div className="grid grid-cols-1 gap-8 lg:grid-cols-3 border-b border-border pb-16 last:border-0 last:pb-0">
+                <div className="space-y-4">
+                  <span className="text-xs font-semibold tracking-wider text-rose-500 uppercase block">Romantic Getaways</span>
+                  <h3 className="text-2xl font-bold tracking-tight">Ideal for Couples</h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    Plan an intimate escape with your partner. Beautiful stays, private transport options, and relaxing itineraries crafted for two.
+                  </p>
+                  <Button variant="outline" asChild className="w-full sm:w-auto">
+                    <Link href="/trips">Browse Couple Trips</Link>
+                  </Button>
+                </div>
+                <div className="lg:col-span-2">
+                  {coupleTrips.length === 0 ? (
+                    <div className="border border-border bg-card p-8 flex flex-col justify-between h-full min-h-[200px]">
+                      <div>
+                        <h4 className="font-semibold text-sm">Be the first to plan this journey</h4>
+                        <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
+                          No scheduled couple trips are available right now. Plan a trip now and create a custom itinerary.
+                        </p>
+                      </div>
+                      <Button className="mt-6 w-full sm:w-auto self-start" asChild>
+                        <Link href="/dashboard/create-trip">Plan My Trip</Link>
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                      {coupleTrips.slice(0, 2).map((t) => (
+                        <TripCardEnhanced key={t.id} trip={t} />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
               {/* Family Trips Row */}
               <div className="grid grid-cols-1 gap-8 lg:grid-cols-3 border-b border-border pb-16 last:border-0 last:pb-0">
                 <div className="space-y-4">
@@ -394,7 +425,7 @@ export default function HomePage() {
                     Enjoy a relaxed family vacation where everyone feels comfortable. We handle the transport, safe stays, and activities for you.
                   </p>
                   <Button variant="outline" asChild className="w-full sm:w-auto">
-                    <Link href="/trips?category=Family Trip with guide">Browse Family Trips</Link>
+                    <Link href="/trips">Browse Family Trips</Link>
                   </Button>
                 </div>
                 <div className="lg:col-span-2">
@@ -420,25 +451,25 @@ export default function HomePage() {
                 </div>
               </div>
 
-              {/* Shared Group Trips Row */}
+              {/* Team Trips Row */}
               <div className="grid grid-cols-1 gap-8 lg:grid-cols-3 border-b border-border pb-16 last:border-0 last:pb-0">
                 <div className="space-y-4">
-                  <span className="text-xs font-semibold tracking-wider text-purple-600 uppercase block">Travel Together</span>
-                  <h3 className="text-2xl font-bold tracking-tight">Shared Group Trips</h3>
+                  <span className="text-xs font-semibold tracking-wider text-indigo-600 uppercase block">Group Adventures</span>
+                  <h3 className="text-2xl font-bold tracking-tight">Ideal for Teams</h3>
                   <p className="text-sm text-muted-foreground leading-relaxed">
-                    Meet new friends in a relaxed, friendly group. Explore beautiful places together at a comfortable pace with zero pressure.
+                    Plan an adventure with your colleagues, friends, or club. Make payments easy and manage participants stress-free.
                   </p>
                   <Button variant="outline" asChild className="w-full sm:w-auto">
-                    <Link href="/trips?category=Strangers Trip with guide">Browse Group Trips</Link>
+                    <Link href="/trips">Browse Team Trips</Link>
                   </Button>
                 </div>
                 <div className="lg:col-span-2">
-                  {groupTrips.length === 0 ? (
+                  {teamTrips.length === 0 ? (
                     <div className="border border-border bg-card p-8 flex flex-col justify-between h-full min-h-[200px]">
                       <div>
                         <h4 className="font-semibold text-sm">Be the first to plan this journey</h4>
                         <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
-                          No scheduled group trips are available right now. Collaborate with a certified guide to plan your own custom route through Sri Lanka.
+                          No scheduled team trips are available right now. Plan your own custom team route through Sri Lanka.
                         </p>
                       </div>
                       <Button className="mt-6 w-full sm:w-auto self-start" asChild>
@@ -447,36 +478,13 @@ export default function HomePage() {
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                      {groupTrips.slice(0, 2).map((t) => (
+                      {teamTrips.slice(0, 2).map((t) => (
                         <TripCardEnhanced key={t.id} trip={t} />
                       ))}
                     </div>
                   )}
                 </div>
               </div>
-
-              {/* Other Curated Departures Row */}
-              {otherTrips.length > 0 && (
-                <div className="grid grid-cols-1 gap-8 lg:grid-cols-3 border-b border-border pb-16 last:border-0 last:pb-0">
-                  <div className="space-y-4">
-                    <span className="text-xs font-semibold tracking-wider text-amber-600 uppercase block">Curated Departures</span>
-                    <h3 className="text-2xl font-bold tracking-tight">More Sri Lanka Trips</h3>
-                    <p className="text-sm text-muted-foreground leading-relaxed">
-                      Discover more beautiful journeys planned by our community. Find private tours, custom schedules, and unique local routes.
-                    </p>
-                    <Button variant="outline" asChild className="w-full sm:w-auto">
-                      <Link href="/trips">Browse All Trips</Link>
-                    </Button>
-                  </div>
-                  <div className="lg:col-span-2">
-                    <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                      {otherTrips.slice(0, 2).map((t) => (
-                        <TripCardEnhanced key={t.id} trip={t} />
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
           )}
         </section>

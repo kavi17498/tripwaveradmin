@@ -30,7 +30,7 @@ export default function InviteAccessPage() {
               <p className="text-sm text-muted-foreground">Innsbruck • 5 days • Invite-only</p>
             </div>
             <Button className="mt-4" asChild>
-              <Link href="/booking/t3">Join Trip</Link>
+              <Link href={`/booking/${token.replace('trip_', '')}`}>Join Trip</Link>
             </Button>
           </div>
         ) : (

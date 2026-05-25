@@ -90,9 +90,19 @@ export default function TripsPage() {
   const grouped = useMemo(() => {
     const out: Record<string, TripApiItem[]> = {};
     apiTrips.forEach((t) => {
-      const cat = t.tripCategory ?? "Uncategorized";
-      if (!out[cat]) out[cat] = [];
-      out[cat].push(t);
+      const capacity = t.maxParticipants ?? 0;
+      let groupName = "Public Trip";
+      if (capacity === 1) {
+        groupName = "Solo Trip with guide";
+      } else if (capacity === 2) {
+        groupName = "Couple Trip";
+      } else if (capacity > 2 && capacity <= 6) {
+        groupName = "Family Trip with guide";
+      } else if (capacity > 6) {
+        groupName = "Team Trip";
+      }
+      if (!out[groupName]) out[groupName] = [];
+      out[groupName].push(t);
     });
     return out;
   }, [apiTrips]);
@@ -175,24 +185,29 @@ export default function TripsPage() {
             <section className="space-y-14 pt-4">
               {Object.entries(grouped).map(([category, items]) => {
                 const isSolo = category.toLowerCase().includes("solo");
+                const isCouple = category.toLowerCase().includes("couple");
                 const isFamily = category.toLowerCase().includes("family");
-                const isGroup = category.toLowerCase().includes("stranger") || category.toLowerCase().includes("group");
+                const isTeam = category.toLowerCase().includes("team");
                 
                 const titleColor = isSolo 
                   ? "text-sky-600 dark:text-sky-400" 
-                  : isFamily 
-                    ? "text-emerald-600 dark:text-emerald-400" 
-                    : isGroup 
-                      ? "text-purple-600 dark:text-purple-400" 
-                      : "text-foreground";
+                  : isCouple
+                    ? "text-rose-500 dark:text-rose-400"
+                    : isFamily 
+                      ? "text-emerald-600 dark:text-emerald-400" 
+                      : isTeam 
+                        ? "text-indigo-600 dark:text-indigo-400" 
+                        : "text-foreground";
                 
                 const bgBadge = isSolo 
                   ? "bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-500/20" 
-                  : isFamily 
-                    ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20" 
-                    : isGroup 
-                      ? "bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-500/20" 
-                      : "bg-muted text-muted-foreground border-border";
+                  : isCouple
+                    ? "bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/20"
+                    : isFamily 
+                      ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20" 
+                      : isTeam 
+                        ? "bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border-indigo-500/20" 
+                        : "bg-muted text-muted-foreground border-border";
 
                 return (
                   <div key={category} className="space-y-6">

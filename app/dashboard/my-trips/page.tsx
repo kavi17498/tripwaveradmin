@@ -177,9 +177,7 @@ export default function MyTripsPage() {
     today.setHours(0, 0, 0, 0);
 
     const minAllowed = new Date(today);
-    const isGuided = ["Solo Trip with guide", "Family Trip with guide", "Strangers Trip with guide"].includes(
-      selectedTripDetails.tripCategory
-    );
+    const isGuided = selectedTripDetails.tripCategory === "Public trip";
     if (isGuided) {
       minAllowed.setDate(today.getDate() + 3);
     }
@@ -414,9 +412,7 @@ export default function MyTripsPage() {
               const origStart = new Date(selectedTripDetails.startDate + "T00:00:00");
               const origEnd = new Date(selectedTripDetails.endDate + "T00:00:00");
               const durationDays = Math.round((origEnd.getTime() - origStart.getTime()) / (24 * 60 * 60 * 1000)) + 1;
-              const isGuided = ["Solo Trip with guide", "Family Trip with guide", "Strangers Trip with guide"].includes(
-                selectedTripDetails.tripCategory
-              );
+              const isGuided = selectedTripDetails.tripCategory === "Public trip";
 
               return (
                 <>

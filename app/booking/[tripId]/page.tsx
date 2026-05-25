@@ -120,11 +120,9 @@ export default function BookingPage() {
             setError(getBookingBlockedMessage(loadedTrip));
           }
 
-          // Server may mark trips as reserved when a family/solo booking is completed
-          const reservedFor = (loadedTrip as any).reservedFor as string | undefined;
-          if (reservedFor === 'family' || reservedFor === 'solo') {
-            // If reserved by someone else, block booking for everyone
-            setError('This trip has been reserved and is no longer bookable.');
+          const bookedCount = loadedTrip.participants?.filter((p: any) => p.status !== 'rejected').length ?? 0;
+          if (loadedTrip.tripCategory === "Public trip" && bookedCount > 0) {
+            setError('This trip has already been booked and is no longer available.');
           }
 
           // If current user already has a booking, block additional bookings
@@ -527,9 +525,13 @@ export default function BookingPage() {
               </div>
 
               <div className="space-y-2">
-                <h3 className="text-xl font-bold tracking-tight text-foreground">Booking Request Sent!</h3>
+                <h3 className="text-xl font-bold tracking-tight text-foreground">
+                  {trip?.tripCategory === "Public trip" ? "Booking Confirmed!" : "Booking Request Sent!"}
+                </h3>
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                  Your booking request has been successfully sent to the guide. After it is accepted, you will be notified through notifications and email.
+                  {trip?.tripCategory === "Public trip"
+                    ? "Your booking has been successfully confirmed and your payment is complete. You can access the trip in your dashboard."
+                    : "Your booking request has been successfully sent to the guide. After it is accepted, you will be notified through notifications and email."}
                 </p>
               </div>
 

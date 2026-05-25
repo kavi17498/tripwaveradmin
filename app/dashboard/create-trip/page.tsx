@@ -68,12 +68,12 @@ type SelectedTravelDestination = {
   description: string;
 };
 
-const categories: TripCategory[] = ["Solo Trip with guide", "Family Trip with guide", "Strangers Trip with guide", "Private trip"];
+const categories: TripCategory[] = ["Public trip", "Private trip"];
 
 const paymentMethodOptions = ["Pay Online", "Pay to Guide on Trip Day"] as const;
 type PaymentMethod = (typeof paymentMethodOptions)[number];
 
-const leadTimeTripCategories: TripCategory[] = ["Solo Trip with guide", "Family Trip with guide", "Strangers Trip with guide"];
+const leadTimeTripCategories: TripCategory[] = ["Public trip"];
 
 const getLocalDateString = (date: Date) => {
   const year = date.getFullYear();
@@ -200,7 +200,7 @@ export default function CreateTripPage() {
   const editTripId = searchParams?.get("id") ?? null;
 
   const [tripName, setTripName] = useState("");
-  const [tripCategory, setTripCategory] = useState<TripCategory>("Solo Trip with guide");
+  const [tripCategory, setTripCategory] = useState<TripCategory>("Public trip");
   const [canSelectAllCategories, setCanSelectAllCategories] = useState(false);
   const [description, setDescription] = useState("");
 
