@@ -203,6 +203,9 @@ export default function CreateTripPage() {
   const [tripCategory, setTripCategory] = useState<TripCategory>("Public trip");
   const [canSelectAllCategories, setCanSelectAllCategories] = useState(false);
   const [description, setDescription] = useState("");
+  const [pickupType, setPickupType] = useState<"Free Pickup" | "Pickup Available" | "Meet at Location">("Meet at Location");
+  const [pickupCostPerKm, setPickupCostPerKm] = useState("");
+  const [pickupStartLocation, setPickupStartLocation] = useState<MainDestination | null>(null);
 
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -309,6 +312,17 @@ export default function CreateTripPage() {
         setPrice(String(trip.price ?? ""));
         setMaxParticipants(String(trip.maxParticipants ?? ""));
         setPaymentMethods((trip.paymentMethods as PaymentMethod[] | undefined) ?? []);
+        setPickupType((trip.pickupType as any) ?? "Meet at Location");
+        setPickupCostPerKm(trip.pickupCostPerKm !== undefined ? String(trip.pickupCostPerKm) : "");
+        if (trip.pickupStartLocation) {
+          setPickupStartLocation({
+            lat: trip.pickupStartLocation.lat,
+            lng: trip.pickupStartLocation.lng,
+            address: trip.pickupStartLocation.name,
+          });
+        } else {
+          setPickupStartLocation(null);
+        }
         if (trip.included) {
           setHotelFacilitiesEditor((trip.included.hotelFacilities || []).join("\n"));
           setOtherInclusionsEditor((trip.included.otherInclusions || []).join("\n"));
@@ -737,7 +751,15 @@ export default function CreateTripPage() {
       }
     }
     if (!startTime) issues.push("Start time is required.");
-    if (!startLocation.trim()) issues.push("Start location is required.");
+    if (pickupType === "Meet at Location" && !startLocation.trim()) {
+      issues.push("Start location is required.");
+    }
+    if (pickupType !== "Meet at Location" && !pickupStartLocation) {
+      issues.push("Pickup origin (Guide's start location) is required.");
+    }
+    if (pickupType === "Pickup Available" && (!pickupCostPerKm.trim() || Number(pickupCostPerKm) <= 0 || Number.isNaN(Number(pickupCostPerKm)))) {
+      issues.push("Pickup cost per km must be a positive number.");
+    }
     if (!organizerId.trim()) issues.push("Organizer id (user id) is required.");
     if (Number(price) <= 0) issues.push("Price must be greater than 0.");
     if (Number(maxParticipants) <= 0) issues.push("Max participants must be greater than 0.");
@@ -906,6 +928,17 @@ export default function CreateTripPage() {
       itinerary: {
         days: itineraryDaysPayload,
       },
+      pickupType,
+      ...(pickupType !== "Meet at Location" && pickupStartLocation ? {
+        pickupStartLocation: {
+          name: pickupStartLocation.address.trim(),
+          lat: pickupStartLocation.lat,
+          lng: pickupStartLocation.lng,
+        },
+      } : {}),
+      ...(pickupType === "Pickup Available" ? {
+        pickupCostPerKm: Number(pickupCostPerKm),
+      } : {}),
       included: {
         hotelFacilities: dayCount > 1 ? toLines(hotelFacilitiesEditor) : [],
         transportFacilities: travelMethodsSelected,
@@ -1077,14 +1110,56 @@ export default function CreateTripPage() {
               <Input type="time" value={endTime} onChange={(event) => setEndTime(event.target.value)} />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium">Start location</label>
-              <LocationPicker
-                value={startLocation ? { address: startLocation, lat: mainDestination?.lat ?? 0, lng: mainDestination?.lng ?? 0 } : undefined}
-                onChange={(location) => {
-                  setStartLocation(location.address);
+              <label className="mb-1 block text-sm font-medium">Pickup Option</label>
+              <select
+                value={pickupType}
+                onChange={(event) => {
+                  setPickupType(event.target.value as any);
                 }}
-              />
+                className="h-9 w-full border border-input bg-background px-3 text-sm"
+              >
+                <option value="Meet at Location">Meet at Location</option>
+                <option value="Free Pickup">Free Pickup</option>
+                <option value="Pickup Available">Pickup Available</option>
+              </select>
             </div>
+
+            {pickupType === "Meet at Location" ? (
+              <div>
+                <label className="mb-1 block text-sm font-medium">Start location</label>
+                <LocationPicker
+                  value={startLocation ? { address: startLocation, lat: mainDestination?.lat ?? 0, lng: mainDestination?.lng ?? 0 } : undefined}
+                  onChange={(location) => {
+                    setStartLocation(location.address);
+                  }}
+                />
+              </div>
+            ) : (
+              <>
+                <div>
+                  <label className="mb-1 block text-sm font-medium">Pickup origin (Guide's start location)</label>
+                  <LocationPicker
+                    value={pickupStartLocation}
+                    onChange={(location) => {
+                      setPickupStartLocation(location);
+                      setStartLocation(location.address);
+                    }}
+                  />
+                </div>
+                {pickupType === "Pickup Available" ? (
+                  <div>
+                    <label className="mb-1 block text-sm font-medium">Pickup cost per km (LKR)</label>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={pickupCostPerKm}
+                      onChange={(event) => setPickupCostPerKm(event.target.value)}
+                      placeholder="e.g. 100"
+                    />
+                  </div>
+                ) : null}
+              </>
+            )}
             <div>
               <label className="mb-1 block text-sm font-medium">Organizer id (user id)</label>
               <Input value={organizerId} onChange={(event) => setOrganizerId(event.target.value)} placeholder="user_12345" />

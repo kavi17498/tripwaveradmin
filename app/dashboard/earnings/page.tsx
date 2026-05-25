@@ -11,6 +11,8 @@ const emptySummary: OrganizerEarningsSummary = {
   onlineEarned: 0,
   payToGuideEarned: 0,
   uncategorizedEarned: 0,
+  totalPickupEarned: 0,
+  totalBaseTripEarned: 0,
   tripsCount: 0,
   trips: [],
 };
@@ -70,19 +72,19 @@ export default function EarningsPage() {
           meta={`${summary.tripsCount} trip${summary.tripsCount === 1 ? "" : "s"}`}
         />
         <SummaryCard
+          title="Base trip earnings"
+          value={formatCurrencyRs(summary.totalBaseTripEarned)}
+          meta="Excludes pickup fees"
+        />
+        <SummaryCard
+          title="Pickup earnings"
+          value={formatCurrencyRs(summary.totalPickupEarned)}
+          meta="Earned from passenger pickups"
+        />
+        <SummaryCard
           title="Online earnings"
           value={formatCurrencyRs(summary.onlineEarned)}
-          meta="Pay Online"
-        />
-        <SummaryCard
-          title="Pay-to-guide earnings"
-          value={formatCurrencyRs(summary.payToGuideEarned)}
-          meta="Pay to Guide on Trip Day"
-        />
-        <SummaryCard
-          title="Uncategorized"
-          value={formatCurrencyRs(summary.uncategorizedEarned)}
-          meta="Legacy bookings without method"
+          meta={`On-trip: ${formatCurrencyRs(summary.payToGuideEarned)}`}
         />
       </div>
 
@@ -101,9 +103,9 @@ export default function EarningsPage() {
                 <th className="p-3 font-medium">Dates</th>
                 <th className="p-3 font-medium">Status</th>
                 <th className="p-3 font-medium text-right">Participants</th>
-                <th className="p-3 font-medium text-right">Online</th>
-                <th className="p-3 font-medium text-right">Pay to Guide</th>
-                <th className="p-3 font-medium text-right">Total</th>
+                <th className="p-3 font-medium text-right">Base Trip</th>
+                <th className="p-3 font-medium text-right">Pickup Fees</th>
+                <th className="p-3 font-medium text-right">Total Earnings</th>
               </tr>
             </thead>
             <tbody>
@@ -115,8 +117,8 @@ export default function EarningsPage() {
                   </td>
                   <td className="p-3">{toStatusLabel(trip.status)}</td>
                   <td className="p-3 text-right">{trip.participantCount}</td>
-                  <td className="p-3 text-right">{formatCurrencyRs(trip.onlineEarned)}</td>
-                  <td className="p-3 text-right">{formatCurrencyRs(trip.payToGuideEarned)}</td>
+                  <td className="p-3 text-right">{formatCurrencyRs(trip.baseTripEarned)}</td>
+                  <td className="p-3 text-right">{formatCurrencyRs(trip.pickupEarned)}</td>
                   <td className="p-3 text-right font-semibold">{formatCurrencyRs(trip.totalEarned)}</td>
                 </tr>
               ))}

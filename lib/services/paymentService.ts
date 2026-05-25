@@ -35,6 +35,8 @@ export type TripEarningsBreakdown = {
   onlineEarned: number;
   payToGuideEarned: number;
   uncategorizedEarned: number;
+  pickupEarned: number;
+  baseTripEarned: number;
 };
 
 export type OrganizerEarningsSummary = {
@@ -42,6 +44,8 @@ export type OrganizerEarningsSummary = {
   onlineEarned: number;
   payToGuideEarned: number;
   uncategorizedEarned: number;
+  totalPickupEarned: number;
+  totalBaseTripEarned: number;
   tripsCount: number;
   trips: TripEarningsBreakdown[];
 };

@@ -69,6 +69,9 @@ export type TripApiItem = {
   coverImage?: string;
   description?: string;
   maxParticipants?: number;
+  pickupType?: CreateTripApiPayload["pickupType"];
+  pickupCostPerKm?: number;
+  pickupStartLocation?: CreateTripApiPayload["pickupStartLocation"];
   createdAt?: unknown;
   updatedAt?: unknown;
   status?: string;

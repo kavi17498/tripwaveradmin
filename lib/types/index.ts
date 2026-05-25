@@ -208,6 +208,14 @@ export interface BookingParticipantPayload {
   address?: string;
   phone?: string;
   email?: string;
+  pickupLocation?: {
+    name: string;
+    lat: number;
+    lng: number;
+  };
+  pickupDistanceKm?: number;
+  pickupCost?: number;
+  pickupTime?: string;
 }
 
 export interface CreateTripApiPayload {
@@ -237,6 +245,13 @@ export interface CreateTripApiPayload {
   coverImage: string;
   description: string;
   maxParticipants: number;
+  pickupType: "Free Pickup" | "Pickup Available" | "Meet at Location";
+  pickupCostPerKm?: number;
+  pickupStartLocation?: {
+    name: string;
+    lat: number;
+    lng: number;
+  };
 }
 
 export interface FirestoreTimestamp {
