@@ -226,7 +226,6 @@ export default function ProfilePage() {
                       </div>
                     ))}
                   </div>
-
                   <div className="flex flex-wrap items-center gap-3 pt-2">
                     <Button type="submit" disabled={saving}>
                       {saving ? "Saving changes..." : "Save profile"}

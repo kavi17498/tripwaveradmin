@@ -134,4 +134,28 @@ export const chatService = {
 
     return { data: response as ChatGroup, message: "Chat group created" };
   },
+
+  async requestCustomTrip(
+    payload: {
+      guideId: string;
+      travelerId: string;
+      travelerName: string;
+    },
+    token: string
+  ): Promise<ServiceResponse<ChatGroup>> {
+    const response = await apiClient.authenticatedRequest<ChatGroup | ServiceResponse<ChatGroup>>(
+      "/chatgroups/custom-request",
+      token,
+      {
+        method: "POST",
+        body: payload,
+      }
+    );
+
+    if (response && typeof response === "object" && "data" in response) {
+      return response as ServiceResponse<ChatGroup>;
+    }
+
+    return { data: response as ChatGroup, message: "Custom trip request sent successfully" };
+  },
 };

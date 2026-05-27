@@ -363,6 +363,16 @@ export default function ChatLandingPageClient() {
               </header>
 
               <div ref={messagesContainerRef} className="flex-1 overflow-auto space-y-3 pb-4">
+                {selected?.tripId?.startsWith("custom-") && (
+                  <div className="mx-4 my-2 p-4 bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-300 rounded-lg text-sm font-semibold flex flex-col gap-1.5 shadow-sm">
+                    <div className="flex items-center gap-1.5 text-amber-700 dark:text-amber-200">
+                      <span>✨ Custom Trip Request Guidance</span>
+                    </div>
+                    <p className="font-medium text-xs leading-relaxed">
+                      have a chat and organizor and planned your trip he will send u a private trip link for customzied trip
+                    </p>
+                  </div>
+                )}
                 {loadingMessages ? (
                   <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
                     <Loader2 className="mr-2 size-4 animate-spin" /> Loading messages...

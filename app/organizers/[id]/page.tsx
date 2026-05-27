@@ -11,6 +11,7 @@ import { userService } from "@/lib/services/userService";
 import { chatService } from "@/lib/services/chatService";
 import { userSessionService } from "@/lib/services/userSessionService";
 import { useToast } from "@/components/feedback/toast-provider";
+import { Modal } from "@/components/common/modal";
 import { formatCurrencyRs } from "@/lib/utils";
 import { 
   MapPin, 
@@ -30,7 +31,8 @@ import {
   Languages,
   Activity,
   Calendar,
-  Users
+  Users,
+  Check
 } from "lucide-react";
 
 export default function OrganizerProfilePage() {
@@ -41,7 +43,60 @@ export default function OrganizerProfilePage() {
   const [error, setError] = useState("");
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [creatingChat, setCreatingChat] = useState(false);
+  const [sendingRequest, setSendingRequest] = useState(false);
   const { pushToast } = useToast();
+
+  const handleRequestCustomTrip = async () => {
+    if (!currentUser) {
+      pushToast({
+        title: "Authentication Required",
+        description: "Please sign in to request a custom trip.",
+        type: "error",
+      });
+      router.push(`/login?redirect=/organizers/${id}`);
+      return;
+    }
+
+    const tokenVal = userSessionService.getToken();
+    if (!tokenVal) {
+      pushToast({
+        title: "Authentication Required",
+        description: "Please sign in to request a custom trip.",
+        type: "error",
+      });
+      router.push(`/login?redirect=/organizers/${id}`);
+      return;
+    }
+
+    try {
+      setSendingRequest(true);
+      const travelerName = `${currentUser.firstName || ""} ${currentUser.lastName || ""}`.trim() || "Traveler";
+      const response = await chatService.requestCustomTrip({
+        guideId: id as string,
+        travelerId: currentUser.id,
+        travelerName: travelerName,
+      }, tokenVal);
+
+      if (response.data) {
+        pushToast({
+          title: "Request Sent Successfully",
+          description: "Opening custom trip chat group...",
+          type: "success",
+        });
+        router.push(`/chat?tripId=${response.data.tripId}`);
+      } else {
+        throw new Error(response.message || "Failed to submit request.");
+      }
+    } catch (err: any) {
+      pushToast({
+        title: "Request Failed",
+        description: err?.message || "Could not send request. Please try again.",
+        type: "error",
+      });
+    } finally {
+      setSendingRequest(false);
+    }
+  };
 
   useEffect(() => {
     setCurrentUser(userSessionService.getUserProfile<any>());
@@ -271,14 +326,24 @@ export default function OrganizerProfilePage() {
                 </div>
 
                 {(!currentUser || currentUser.id !== id) && (
-                  <Button
-                    onClick={handleMessageOrganizer}
-                    disabled={creatingChat}
-                    className="w-full max-w-sm mt-1 gap-2 font-bold cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90"
-                  >
-                    <MessageSquare className="size-4" />
-                    {creatingChat ? "Starting Chat..." : "Message Guide"}
-                  </Button>
+                  <div className="w-full max-w-sm space-y-2.5 mt-1">
+                    <Button
+                      onClick={handleMessageOrganizer}
+                      disabled={creatingChat}
+                      className="w-full gap-2 font-bold cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90"
+                    >
+                      <MessageSquare className="size-4" />
+                      {creatingChat ? "Starting Chat..." : "Message Guide"}
+                    </Button>
+                    <Button
+                      onClick={handleRequestCustomTrip}
+                      variant="outline"
+                      className="w-full gap-2 font-bold cursor-pointer border-primary text-primary hover:bg-primary/5"
+                    >
+                      <Sparkles className="size-4" />
+                      Request Custom Trips
+                    </Button>
+                  </div>
                 )}
 
                 {/* High Impact Statistics Summary */}
@@ -530,6 +595,9 @@ export default function OrganizerProfilePage() {
         </div>
 
       </main>
+
+
+
       <Footer />
     </div>
   );
