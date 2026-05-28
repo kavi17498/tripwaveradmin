@@ -201,7 +201,7 @@ export default function MyTripsPage() {
   const handleOpenCancel = async (tripId: string) => {
     const trip = await loadTripDetails(tripId);
     if (trip) {
-      setCancelReason(trip.statusReason ?? "");
+      setCancelReason((trip as any).statusReason ?? "");
       setCancelModalOpen(true);
     }
   };
@@ -637,8 +637,17 @@ export default function MyTripsPage() {
             <div className="grid gap-3 md:grid-cols-2">
               <div className="rounded border border-border p-3 text-sm">
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">Trip schedule</p>
-                <p className="mt-1 font-medium">{selectedTripDetails.startDate} to {selectedTripDetails.endDate}</p>
-                <p className="text-xs text-muted-foreground">{selectedTripDetails.startTime ?? "--"} to {selectedTripDetails.endTime ?? "--"}</p>
+                {selectedTripDetails.startDate && selectedTripDetails.endDate ? (
+                  <>
+                    <p className="mt-1 font-medium">{selectedTripDetails.startDate} to {selectedTripDetails.endDate}</p>
+                    <p className="text-xs text-muted-foreground">{selectedTripDetails.startTime ?? "--"} to {selectedTripDetails.endTime ?? "--"}</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="mt-1 font-medium">Flexible Dates</p>
+                    <p className="text-xs text-muted-foreground">Duration: {(selectedTripDetails as any).durationLabel || "On-demand"}</p>
+                  </>
+                )}
               </div>
               <div className="rounded border border-border p-3 text-sm">
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">Pickup setup</p>

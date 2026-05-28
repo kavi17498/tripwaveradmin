@@ -1,40 +1,41 @@
 import Link from "next/link";
 import { CalendarDays, MapPin, Users, CheckCircle2, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Trip } from "@/lib/types";
+import { OnDemandTripTemplateApiItem } from "@/lib/services/onDemandTripService";
 import { formatCurrencyRs } from "@/lib/utils";
 
-interface TripCardEnhancedProps {
-  trip: Trip;
-  href?: string;
+interface OnDemandTripCardProps {
+  trip: OnDemandTripTemplateApiItem;
 }
 
-export function TripCardEnhanced({ trip, href }: TripCardEnhancedProps) {
-  const displayedItinerary = trip.itinerary.slice(0, 3);
-  const displayedIncluded = trip.included.slice(0, 4);
-  const isPrivate = trip.tripType.toLowerCase() === "private trip" || trip.tripType.toLowerCase() === "private";
-  const tripCategoryLabel = isPrivate
-    ? "Private Trip"
-    : trip.capacity === 1
-      ? "Solo Trip"
-      : trip.capacity === 2
-        ? "Couple Trip"
-        : trip.capacity <= 6
-          ? "Family Trip"
-          : "Team Trip";
+export function OnDemandTripCard({ trip }: OnDemandTripCardProps) {
+  const hotelFac = trip.included?.hotelFacilities || [];
+  const transFac = trip.included?.transportFacilities || [];
+  const otherInc = trip.included?.otherInclusions || [];
+  const displayedIncluded = [...hotelFac, ...transFac, ...otherInc].slice(0, 4);
+
+  const destinationsLabel = trip.mainDestinations && trip.mainDestinations.length > 0
+    ? trip.mainDestinations.map((d) => d.name).join(", ")
+    : trip.destinations?.[0]?.name ?? trip.startLocation ?? "Sri Lanka";
 
   return (
     <article className="group flex flex-col justify-between overflow-hidden rounded-2xl border border-border/80 bg-card hover:border-primary/20 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 h-full">
       {/* Cover Image */}
       <div className="relative h-52 w-full overflow-hidden bg-muted">
-        <img 
-          src={trip.coverImage} 
-          alt={trip.title} 
-          className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-105" 
-        />
+        {trip.coverImage ? (
+          <img 
+            src={trip.coverImage} 
+            alt={trip.tripName} 
+            className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-105" 
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-sky-500/20 to-indigo-600/20 text-primary">
+            <span className="text-sm font-bold uppercase tracking-[0.25em]">On-demand</span>
+          </div>
+        )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/10 to-transparent" />
         <div className="absolute left-3 top-3 rounded-full border border-white/20 bg-black/60 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-white backdrop-blur-md">
-          {tripCategoryLabel}
+          On-demand
         </div>
       </div>
 
@@ -43,10 +44,10 @@ export function TripCardEnhanced({ trip, href }: TripCardEnhancedProps) {
         <div className="space-y-2">
           <div className="flex items-center gap-1.5 text-xs font-semibold text-primary/80">
             <MapPin className="size-3.5 shrink-0" />
-            <span className="line-clamp-1">{trip.destination}, {trip.location.country || "Sri Lanka"}</span>
+            <span className="line-clamp-1">{destinationsLabel}</span>
           </div>
           <h3 className="text-lg font-bold leading-snug tracking-tight text-foreground line-clamp-2 group-hover:text-primary transition-colors">
-            {trip.title}
+            {trip.tripName}
           </h3>
           <p className="line-clamp-2 text-xs text-muted-foreground leading-relaxed">{trip.description}</p>
         </div>
@@ -55,25 +56,9 @@ export function TripCardEnhanced({ trip, href }: TripCardEnhancedProps) {
         <div className="flex items-center gap-2 text-xs text-muted-foreground/80 bg-muted/40 p-2.5 rounded-lg border border-border/30">
           <CalendarDays className="size-4 shrink-0 text-primary/60" />
           <span className="font-semibold">
-            {trip.startDate} - {trip.endDate} ({trip.durationDays} days)
+            Flexible Dates ({trip.durationLabel})
           </span>
         </div>
-
-        {/* Itinerary Preview */}
-        {displayedItinerary.length > 0 && (
-          <div className="space-y-2">
-            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Route Highlights</p>
-            <div className="relative pl-4 border-l border-border/80 space-y-3.5 ml-2.5 my-1.5">
-              {displayedItinerary.map((item) => (
-                <div key={item.day} className="relative text-xs">
-                  <div className="absolute -left-[20.5px] top-1 size-2 rounded-full border border-background bg-primary" />
-                  <span className="font-bold text-primary/80 block text-[10px] uppercase tracking-wider">Day {item.day}</span>
-                  <p className="text-muted-foreground leading-snug font-medium">{item.title}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
 
         {/* Included Preview */}
         {displayedIncluded.length > 0 && (
@@ -97,15 +82,15 @@ export function TripCardEnhanced({ trip, href }: TripCardEnhancedProps) {
         <div className="border-t border-border/60 pt-4 flex items-center justify-between">
           <div className="space-y-0.5">
             <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block">Host Guide</span>
-            {trip.organizerId ? (
+            {trip.organizer ? (
               <Link 
-                href={`/organizers/${trip.organizerId}`} 
+                href={`/organizers/${trip.organizer}`} 
                 className="font-bold text-xs text-foreground hover:text-primary transition-colors cursor-pointer block"
               >
-                {trip.organizerName}
+                {trip.organizerName || trip.organizer}
               </Link>
             ) : (
-              <span className="font-bold text-xs text-foreground block">{trip.organizerName}</span>
+              <span className="font-bold text-xs text-foreground block">{trip.organizerName || "Guide"}</span>
             )}
           </div>
           {trip.organizerRating ? (
@@ -126,23 +111,22 @@ export function TripCardEnhanced({ trip, href }: TripCardEnhancedProps) {
           <div className="flex items-end justify-between">
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium">
               <Users className="size-4 text-sky-500" />
-              <span>{trip.bookedCount}/{trip.capacity} Booked</span>
+              <span>{trip.maxParticipants} Max capacity</span>
             </div>
             <div className="text-right">
               <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">Full Price</p>
               <p className="text-xl font-extrabold text-foreground">{formatCurrencyRs(trip.price)}</p>
               <p className="text-[11px] text-muted-foreground font-medium mt-0.5">
-                {formatCurrencyRs(trip.capacity > 0 ? Math.round(trip.price / trip.capacity) : trip.price)} / person
+                {formatCurrencyRs(trip.maxParticipants > 0 ? Math.round(trip.price / trip.maxParticipants) : trip.price)} / person
               </p>
             </div>
           </div>
 
           <Button asChild className="w-full h-10 font-bold transition-all duration-300 shadow-xs hover:shadow-md cursor-pointer">
-            <Link href={href ?? `/trips/${trip.id}`}>View Details</Link>
+            <Link href={`/on-demand/${trip.id}`}>Choose dates & book</Link>
           </Button>
         </div>
       </div>
     </article>
   );
 }
-

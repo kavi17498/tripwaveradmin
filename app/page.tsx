@@ -6,6 +6,7 @@ import { Navbar } from "@/components/layout/navbar";
 import { Footer } from "@/components/layout/footer";
 import { Button } from "@/components/ui/button";
 import { TripCardEnhanced } from "@/components/trips/trip-card-enhanced";
+import { OnDemandTripCard } from "@/components/trips/on-demand-trip-card";
 import { Trip } from "@/lib/types";
 import { tripApiService, type TripApiItem } from "@/lib/services/tripApiService";
 import { onDemandTripService, type OnDemandTripTemplateApiItem } from "@/lib/services/onDemandTripService";
@@ -360,36 +361,7 @@ export default function HomePage() {
             ) : (
               <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
                 {onDemandTrips.map((trip) => (
-                  <div key={trip.id} className="overflow-hidden rounded-3xl border border-border/80 bg-background shadow-sm transition-shadow hover:shadow-md">
-                    <div className="relative aspect-4/3 bg-muted">
-                      {trip.coverImage ? (
-                        <img src={trip.coverImage} alt={trip.tripName} className="h-full w-full object-cover" />
-                      ) : (
-                        <div className="flex h-full w-full items-center justify-center bg-linear-to-br from-sky-500/20 to-indigo-600/20 text-primary">
-                          <span className="text-lg font-bold uppercase tracking-[0.25em]">On-demand</span>
-                        </div>
-                      )}
-                      <div className="absolute inset-0 bg-linear-to-t from-black/70 via-black/10 to-transparent" />
-                      <div className="absolute bottom-4 left-4 right-4 flex items-end justify-between gap-3 text-white">
-                        <div>
-                          <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-white/75">Template</p>
-                          <h3 className="mt-1 line-clamp-2 text-xl font-black leading-tight">{trip.tripName}</h3>
-                        </div>
-                        <div className="rounded-full bg-black/45 px-3 py-1 text-xs font-bold backdrop-blur-sm">{trip.durationLabel}</div>
-                      </div>
-                    </div>
-
-                    <div className="space-y-4 p-5">
-                      <p className="line-clamp-2 text-sm text-muted-foreground">{trip.description}</p>
-                      <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-muted-foreground">
-                        <span className="rounded-full border border-border/60 bg-muted px-2.5 py-1">{trip.organizerName || trip.organizer}</span>
-                        <span className="rounded-full border border-border/60 bg-muted px-2.5 py-1">From {trip.price}</span>
-                      </div>
-                      <Button asChild className="w-full font-bold">
-                        <Link href={`/on-demand/${trip.id}`}>Choose dates & book</Link>
-                      </Button>
-                    </div>
-                  </div>
+                  <OnDemandTripCard key={trip.id} trip={trip} />
                 ))}
               </div>
             )}
