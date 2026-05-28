@@ -49,6 +49,44 @@ const getOrganizerName = (template: OnDemandTripTemplateApiItem | null, profile:
   return fullName || template?.organizerName || "Organizer";
 };
 
+const getDestinationPhotos = (destination: any): string[] => {
+  if (!destination) return [];
+  if (Array.isArray(destination.photos)) {
+    return destination.photos.filter(Boolean);
+  }
+  if (Array.isArray(destination.images)) {
+    return destination.images.filter(Boolean);
+  }
+  if (typeof destination.imageUrl === "string" && destination.imageUrl) {
+    return [destination.imageUrl];
+  }
+  if (typeof destination.image === "string" && destination.image) {
+    return [destination.image];
+  }
+  if (typeof destination.photo === "string" && destination.photo) {
+    return [destination.photo];
+  }
+  return [];
+};
+
+const getDestinationCoords = (destination: any) => {
+  if (!destination) return null;
+  if (destination.geoCode) {
+    const lat = destination.geoCode.latitude ?? destination.geoCode.lat;
+    const lng = destination.geoCode.longitude ?? destination.geoCode.lng;
+    if (lat !== undefined && lng !== undefined) {
+      return `${lat}, ${lng}`;
+    }
+  }
+  if (destination.lat !== undefined && destination.lng !== undefined) {
+    return `${destination.lat}, ${destination.lng}`;
+  }
+  if (destination.latitude !== undefined && destination.longitude !== undefined) {
+    return `${destination.latitude}, ${destination.longitude}`;
+  }
+  return null;
+};
+
 export default function OnDemandTripBookingPage() {
   const router = useRouter();
   const { id } = useParams<{ id: string }>();
@@ -408,34 +446,38 @@ export default function OnDemandTripBookingPage() {
             <h2 className="text-2xl font-semibold mb-4">Destinations</h2>
             <p className="mb-4 text-sm text-muted-foreground">Primary route: {mainDestination}</p>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              {template.destinations.map((destination, idx) => (
-                <div key={`${destination.name}-${idx}`} className="border border-border rounded-lg p-4">
-                  <div className="flex items-start gap-2 mb-2">
-                    <MapPinIcon className="size-4 mt-1 text-primary" />
-                    <div>
-                      <h3 className="font-semibold">{destination.name}</h3>
-                      {destination.geoCode && (
-                        <p className="text-xs text-muted-foreground">
-                          {destination.geoCode.latitude}, {destination.geoCode.longitude}
-                        </p>
-                      )}
+              {template.destinations.map((destination, idx) => {
+                const coords = getDestinationCoords(destination);
+                const photos = getDestinationPhotos(destination);
+                return (
+                  <div key={`${destination.name}-${idx}`} className="border border-border rounded-lg p-4">
+                    <div className="flex items-start gap-2 mb-2">
+                      <MapPinIcon className="size-4 mt-1 text-primary" />
+                      <div>
+                        <h3 className="font-semibold">{destination.name}</h3>
+                        {coords && (
+                          <p className="text-xs text-muted-foreground">
+                            {coords}
+                          </p>
+                        )}
+                      </div>
                     </div>
+                    <p className="text-sm text-muted-foreground">{destination.description}</p>
+                    {photos.length > 0 && (
+                      <div className="mt-3 grid grid-cols-2 gap-2">
+                        {photos.slice(0, 2).map((photo, photoIdx) => (
+                          <img
+                            key={photoIdx}
+                            src={photo}
+                            alt={`${destination.name} ${photoIdx + 1}`}
+                            className="h-24 w-full rounded object-cover"
+                          />
+                        ))}
+                      </div>
+                    )}
                   </div>
-                  <p className="text-sm text-muted-foreground">{destination.description}</p>
-                  {destination.photos && destination.photos.length > 0 && (
-                    <div className="mt-3 grid grid-cols-2 gap-2">
-                      {destination.photos.slice(0, 2).map((photo, photoIdx) => (
-                        <img
-                          key={photoIdx}
-                          src={photo}
-                          alt={`${destination.name} ${photoIdx + 1}`}
-                          className="h-24 w-full rounded object-cover"
-                        />
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
           </section>
         )}

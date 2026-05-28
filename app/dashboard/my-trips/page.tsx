@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/feedback/toast-provider";
 import { userSessionService } from "@/lib/services/userSessionService";
 import { tripApiService, type TripApiItem } from "@/lib/services/tripApiService";
+import { onDemandTripService } from "@/lib/services/onDemandTripService";
 import type { CreateTripApiPayload } from "@/lib/types";
 
 type TripDisplayStatus = "all" | "pending" | "approved" | "rejected" | "expired" | "cancelled" | "draft";
@@ -45,7 +46,7 @@ const getTripDisplayStatus = (trip: TripApiItem): Exclude<TripDisplayStatus, "al
   return normalizeStatus(trip.status) as Exclude<TripDisplayStatus, "all">;
 };
 
-const getTripDestination = (trip: TripApiItem) => trip.mainDestinations?.[0]?.name ?? trip.destinations[0]?.name ?? trip.startLocation ?? "Unknown destination";
+const getTripDestination = (trip: TripApiItem) => trip.mainDestinations?.[0]?.name ?? trip.destinations?.[0]?.name ?? trip.startLocation ?? "Unknown destination";
 
 const countParticipantsByStatus = (participants: TripParticipantRecord[] | undefined) => {
   const list = participants ?? [];
@@ -100,8 +101,32 @@ export default function MyTripsPage() {
     try {
       setLoading(true);
       setError("");
-      const response = await tripApiService.getMyTrips(token);
-      setTrips(response.data);
+      
+      const [tripsResponse, onDemandResponse] = await Promise.all([
+        tripApiService.getMyTrips(token),
+        (async () => {
+          const profile = userSessionService.getUserProfile<{ id?: string }>();
+          if (profile?.id) {
+            try {
+              const res = await onDemandTripService.getTemplatesByOrganizer(profile.id, token);
+              return res.data || [];
+            } catch {
+              return [];
+            }
+          }
+          return [];
+        })(),
+      ]);
+
+      const combinedTrips = [
+        ...(tripsResponse.data || []),
+        ...(onDemandResponse || []).map((t) => ({
+          ...t,
+          tripCategory: t.tripCategory || "On-demand trip",
+        })),
+      ];
+
+      setTrips(combinedTrips as any[]);
     } catch (loadError) {
       const message = loadError instanceof Error ? loadError.message : "Failed to load trips.";
       setError(message);
@@ -126,6 +151,15 @@ export default function MyTripsPage() {
     try {
       const res = await tripApiService.getTripById(tripId, token);
       if (!res.data) {
+        try {
+          const templateRes = await onDemandTripService.getTemplateById(tripId);
+          if (templateRes.data) {
+            setSelectedTripDetails(templateRes.data as any);
+            return templateRes.data;
+          }
+        } catch {
+          // ignore
+        }
         pushToast({ type: "error", title: "Error", description: "Trip details not found." });
         return null;
       }
@@ -133,6 +167,15 @@ export default function MyTripsPage() {
       setSelectedTripDetails(res.data);
       return res.data;
     } catch (err) {
+      try {
+        const templateRes = await onDemandTripService.getTemplateById(tripId);
+        if (templateRes.data) {
+          setSelectedTripDetails(templateRes.data as any);
+          return templateRes.data;
+        }
+      } catch {
+        // ignore
+      }
       const message = err instanceof Error ? err.message : "Failed to load trip details.";
       pushToast({ type: "error", title: "Error", description: message });
       return null;
@@ -405,11 +448,12 @@ export default function MyTripsPage() {
       ) : (
         <div className="grid gap-4 xl:grid-cols-2">
           {filteredTrips.map((trip) => {
+            const isOnDemand = trip.tripCategory === "On-demand trip" || !trip.startDate;
             const displayStatus = getTripDisplayStatus(trip);
             const expired = displayStatus === "expired";
             const canEdit = displayStatus !== "cancelled";
             const canShare = displayStatus === "approved" && !expired;
-            const canCancel = displayStatus !== "cancelled" && displayStatus !== "rejected" && displayStatus !== "draft";
+            const canCancel = !isOnDemand && displayStatus !== "cancelled" && displayStatus !== "rejected" && displayStatus !== "draft";
             const participantStats = countParticipantsByStatus(trip.participants);
             const pickupOrigin = trip.pickupType === "Meet at Location"
               ? trip.startLocation
@@ -429,8 +473,17 @@ export default function MyTripsPage() {
                 <div className="mt-4 grid gap-2 text-sm md:grid-cols-2">
                   <div className="rounded border border-border/70 bg-muted/20 p-3">
                     <p className="text-xs uppercase tracking-wide text-muted-foreground">Date range</p>
-                    <p className="mt-1 font-medium">{trip.startDate} to {trip.endDate}</p>
-                    <p className="text-xs text-muted-foreground">{trip.startTime ?? "--"} to {trip.endTime ?? "--"}</p>
+                    {trip.startDate && trip.endDate ? (
+                      <>
+                        <p className="mt-1 font-medium">{trip.startDate} to {trip.endDate}</p>
+                        <p className="text-xs text-muted-foreground">{trip.startTime ?? "--"} to {trip.endTime ?? "--"}</p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="mt-1 font-medium">Flexible Dates</p>
+                        <p className="text-xs text-muted-foreground">Duration: {(trip as any).durationLabel || "On-demand"}</p>
+                      </>
+                    )}
                   </div>
                   <div className="rounded border border-border/70 bg-muted/20 p-3">
                     <p className="text-xs uppercase tracking-wide text-muted-foreground">Pickup</p>
@@ -467,14 +520,14 @@ export default function MyTripsPage() {
                     <Button size="sm" variant="outline" onClick={() => void handleOpenDetails(trip.id)}>View details</Button>
                     {canEdit ? (
                       <Button size="sm" variant="outline" asChild>
-                        <Link href={`/dashboard/trips/${trip.id}/edit`}>
+                        <Link href={isOnDemand ? `/dashboard/create-trip?mode=edit&id=${trip.id}` : `/dashboard/trips/${trip.id}/edit`}>
                           {displayStatus === "rejected" ? "Edit & Resubmit" : "Edit"}
                         </Link>
                       </Button>
                     ) : (
                       <Button size="sm" variant="outline" disabled title="Cancelled trips cannot be edited">Edit</Button>
                     )}
-                    {trip.status !== "draft" && displayStatus !== "cancelled" ? (
+                    {!isOnDemand && trip.status !== "draft" && displayStatus !== "cancelled" ? (
                       <Button size="sm" variant="outline" onClick={() => void handleOpenDuplicate(trip.id)}>Post with New Date</Button>
                     ) : null}
                   </div>
@@ -484,7 +537,8 @@ export default function MyTripsPage() {
                       <Button
                         size="sm"
                         onClick={() => {
-                          const url = typeof window !== "undefined" ? `${window.location.origin}/trips/${trip.id}` : `/trips/${trip.id}`;
+                          const pathSegment = isOnDemand ? "on-demand" : "trips";
+                          const url = typeof window !== "undefined" ? `${window.location.origin}/${pathSegment}/${trip.id}` : `/${pathSegment}/${trip.id}`;
                           setShareUrl(url);
                           setShareOpen(true);
                         }}

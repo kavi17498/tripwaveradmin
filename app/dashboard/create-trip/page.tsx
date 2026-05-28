@@ -344,20 +344,48 @@ export default function CreateTripPage() {
       }
 
       try {
-        const result = await tripApiService.getTripById(editTripId, token);
-        const trip = result.data;
+        let trip: any = null;
+        let isOnDemand = false;
+
+        try {
+          const result = await tripApiService.getTripById(editTripId, token);
+          trip = result.data;
+        } catch {
+          // If scheduled trip fetch fails, try on-demand template
+        }
+
         if (!trip) {
-          pushToast({ type: "error", title: "Not found", description: "Trip not found." });
+          try {
+            const templateResult = await onDemandTripService.getTemplateById(editTripId);
+            trip = templateResult.data;
+            if (trip) {
+              isOnDemand = true;
+            }
+          } catch {
+            // Ignore
+          }
+        }
+
+        if (!trip) {
+          pushToast({ type: "error", title: "Not found", description: "Trip or template not found." });
           return;
         }
 
         setTripName(trip.tripName ?? "");
         setTripCategory((trip.tripCategory as any) ?? tripCategory);
         setDescription(trip.description ?? "");
-        setStartDate(trip.startDate ?? "");
-        setEndDate(trip.endDate ?? "");
-        setStartTime(trip.startTime ?? "");
-        setEndTime(trip.endTime ?? "");
+
+        if (isOnDemand) {
+          setTripFlow("on-demand");
+          setOnDemandDurationDays(String(trip.durationDays ?? "3"));
+        } else {
+          setTripFlow("scheduled");
+          setStartDate(trip.startDate ?? "");
+          setEndDate(trip.endDate ?? "");
+          setStartTime(trip.startTime ?? "");
+          setEndTime(trip.endTime ?? "");
+        }
+
         setStartLocation(trip.startLocation ?? "");
         setPrice(String(trip.price ?? ""));
         setMaxParticipants(String(trip.maxParticipants ?? ""));
@@ -386,12 +414,12 @@ export default function CreateTripPage() {
 
         if (trip.mainDestinations && trip.mainDestinations.length > 0) {
           const mappedMainDestinations = trip.mainDestinations
-            .map((destination) => toMainDestinationValue({
+            .map((destination: any) => toMainDestinationValue({
               name: destination.name,
               lat: destination.lat,
               lng: destination.lng,
             }))
-            .filter((destination): destination is MainDestination => destination !== null);
+            .filter((destination: any): destination is MainDestination => destination !== null);
 
           setMainDestinations(mappedMainDestinations);
           setMainDestination(mappedMainDestinations[0] ?? null);
@@ -399,7 +427,7 @@ export default function CreateTripPage() {
 
         // map destinations
         if (trip.destinations && trip.destinations.length > 0) {
-          const mapped = trip.destinations.map((d) => ({
+          const mapped = trip.destinations.map((d: any) => ({
             name: d.name ?? "",
             description: d.description ?? "",
             latitude: String(d.geoCode?.latitude ?? ""),
@@ -411,8 +439,8 @@ export default function CreateTripPage() {
 
         // itinerary => activitiesByDay
         if (trip.itinerary?.days && trip.itinerary.days.length > 0) {
-          const activities = trip.itinerary.days.map((day) => {
-            const items: ActivityFormItem[] = (day.activities || []).map((act) => {
+          const activities = trip.itinerary.days.map((day: any) => {
+            const items: ActivityFormItem[] = (day.activities || []).map((act: any) => {
               return {
                 title: act.title ?? "",
                 startTime: parse12HourTo24(act.timeSlot?.startTime ?? "08:00"),
@@ -1092,7 +1120,7 @@ export default function CreateTripPage() {
 
       if (isOnDemandTrip) {
         const payload = buildOnDemandTemplatePayload(status);
-        payload.photos = [...uploadedTripPhotos, ...payload.photos];
+        payload.photos = [...uploadedTripPhotos, ...(payload.photos || [])];
         payload.coverImage = payload.photos[0] ?? "";
 
         if (isEditMode) {
