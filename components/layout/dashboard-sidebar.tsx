@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 const dashboardLinks = [
   { href: "/dashboard", label: "Overview" },
   { href: "/dashboard/my-trips", label: "My Trips" },
+  { href: "/dashboard/calendar", label: "Calendar" },
   { href: "/dashboard/create-trip", label: "Create Trip" },
   { href: "/dashboard/earnings", label: "Earnings" },
   { href: "/dashboard/reviews", label: "Reviews" },

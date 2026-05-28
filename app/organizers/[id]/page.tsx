@@ -258,13 +258,13 @@ export default function OrganizerProfilePage() {
 
     const mergedById = new Map<string, any>();
 
-    ownTrips.forEach((trip) => {
+    ownTrips.forEach((trip: any) => {
       if (trip?.id) {
         mergedById.set(trip.id, trip);
       }
     });
 
-    publicTrips.forEach((trip) => {
+    publicTrips.forEach((trip: any) => {
       if (!trip?.id) {
         return;
       }
@@ -278,7 +278,7 @@ export default function OrganizerProfilePage() {
 
   const upcomingTrips = useMemo(() => {
     return displayTrips
-      .filter((trip) => {
+      .filter((trip: any) => {
         const startDate = trip.startDate ? new Date(trip.startDate) : null;
         const status = String(trip.status || "").toLowerCase();
         const tripCategory = String(trip.tripCategory || "").toLowerCase();
@@ -293,7 +293,7 @@ export default function OrganizerProfilePage() {
 
         return true;
       })
-      .sort((left, right) => {
+      .sort((left: any, right: any) => {
         const leftDate = left.startDate ? new Date(left.startDate).getTime() : 0;
         const rightDate = right.startDate ? new Date(right.startDate).getTime() : 0;
         return leftDate - rightDate;
@@ -302,7 +302,7 @@ export default function OrganizerProfilePage() {
 
   const finishedTrips = useMemo(() => {
     return displayTrips
-      .filter((trip) => {
+      .filter((trip: any) => {
         const endDate = trip.endDate ? new Date(trip.endDate) : null;
         const status = String(trip.status || "").toLowerCase();
 
@@ -311,7 +311,7 @@ export default function OrganizerProfilePage() {
 
         return endDate < todayStart;
       })
-      .sort((left, right) => {
+      .sort((left: any, right: any) => {
         const leftDate = left.endDate ? new Date(left.endDate).getTime() : 0;
         const rightDate = right.endDate ? new Date(right.endDate).getTime() : 0;
         return rightDate - leftDate;
