@@ -331,24 +331,30 @@ export default function OrganizerProfilePage() {
                     <span>{joinedDate}</span>
                   </div>
                   
-                  {profile.organizer.socialLinks && (
+                  {(profile.organizer.socialLinks || profile.organizer.website) && (
                     <div className="flex items-center justify-center lg:justify-start gap-3 pt-1.5">
-                      {profile.organizer.socialLinks.facebook && (
+                      {profile.organizer.website && (
+                        <a href={profile.organizer.website} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary transition-colors flex items-center gap-1 font-bold text-xs" title="Website">
+                          <Globe className="size-5 text-emerald-500" />
+                          <span className="sr-only">Website</span>
+                        </a>
+                      )}
+                      {profile.organizer.socialLinks?.facebook && (
                         <a href={profile.organizer.socialLinks.facebook} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-blue-600 transition-colors" title="Facebook">
                           <Facebook className="size-5" />
                         </a>
                       )}
-                      {profile.organizer.socialLinks.instagram && (
+                      {profile.organizer.socialLinks?.instagram && (
                         <a href={profile.organizer.socialLinks.instagram} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-pink-500 transition-colors" title="Instagram">
                           <Instagram className="size-5" />
                         </a>
                       )}
-                      {profile.organizer.socialLinks.twitter && (
+                      {profile.organizer.socialLinks?.twitter && (
                         <a href={profile.organizer.socialLinks.twitter} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-sky-500 transition-colors" title="Twitter / X">
                           <Twitter className="size-5" />
                         </a>
                       )}
-                      {profile.organizer.socialLinks.linkedin && (
+                      {profile.organizer.socialLinks?.linkedin && (
                         <a href={profile.organizer.socialLinks.linkedin} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-blue-700 transition-colors" title="LinkedIn">
                           <Linkedin className="size-5" />
                         </a>
@@ -464,7 +470,11 @@ export default function OrganizerProfilePage() {
                         <Activity className="size-4.5 text-primary shrink-0 mt-0.5" />
                         <div className="text-xs">
                           <span className="font-bold text-foreground block">Specializations</span>
-                          <span className="text-muted-foreground font-medium">Cultural Heritage, Family Expeditions, Solo Safe Anchors</span>
+                          <span className="text-muted-foreground font-medium">
+                            {profile.organizer.specializations && profile.organizer.specializations.length > 0
+                              ? profile.organizer.specializations.join(", ")
+                              : "Cultural Heritage, Family Expeditions, Solo Safe Anchors"}
+                          </span>
                         </div>
                       </div>
 
@@ -490,14 +500,43 @@ export default function OrganizerProfilePage() {
                     </div>
                   </div>
                 </div>
-
               </div>
-
             </div>
           </div>
 
-          {/* Bottom section: Feed Content */}
-          <div className="space-y-6">
+          {/* Past Trips Photos Gallery Section */}
+          {profile.organizer.tripPhotos && profile.organizer.tripPhotos.length > 0 && (
+            <div className="space-y-6 pt-4">
+              <div className="flex items-center justify-between border-b border-border/80 pb-4">
+                <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
+                  <ImageIcon className="size-5 text-primary" />
+                  Past Organized Trips Gallery
+                </h2>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {profile.organizer.tripPhotos.map((photoUrl: string, idx: number) => (
+                  <div 
+                    key={idx} 
+                    onClick={() => setLightboxImage(photoUrl)}
+                    className="relative aspect-video rounded-xl overflow-hidden border border-border bg-muted shadow-sm hover:shadow-md transition-all duration-300 group cursor-zoom-in"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img 
+                      src={photoUrl} 
+                      alt={`Trip Photo ${idx + 1}`} 
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
+                      <span className="text-white text-xs font-bold px-3 py-1 rounded-full bg-black/50 backdrop-blur-xs">View Image</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+        {/* Bottom section: Feed Content */}
+        <div className="space-y-6">
             
             <div className="flex items-center justify-between border-b border-border/80 pb-4">
               <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
@@ -645,37 +684,6 @@ export default function OrganizerProfilePage() {
             </div>
 
           </div>
-
-          {/* Past Trips Photos Gallery Section */}
-          {profile.organizer.tripPhotos && profile.organizer.tripPhotos.length > 0 && (
-            <div className="space-y-6 pt-8">
-              <div className="flex items-center justify-between border-b border-border/80 pb-4">
-                <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
-                  <ImageIcon className="size-5 text-primary" />
-                  Past Organized Trips Gallery
-                </h2>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {profile.organizer.tripPhotos.map((photoUrl: string, idx: number) => (
-                  <div 
-                    key={idx} 
-                    onClick={() => setLightboxImage(photoUrl)}
-                    className="relative aspect-video rounded-xl overflow-hidden border border-border bg-muted shadow-sm hover:shadow-md transition-all duration-300 group cursor-zoom-in"
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img 
-                      src={photoUrl} 
-                      alt={`Trip Photo ${idx + 1}`} 
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    />
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
-                      <span className="text-white text-xs font-bold px-3 py-1 rounded-full bg-black/50 backdrop-blur-xs">View Image</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
 
         </div>
 

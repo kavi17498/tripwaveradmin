@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Mail, ShieldCheck, UserCircle2, Plus, Trash2, Globe, Image as ImageIcon, Link as LinkIcon, Facebook, Instagram, Twitter, Linkedin } from "lucide-react";
+import { ArrowLeft, Mail, ShieldCheck, UserCircle2, Plus, Trash2, Globe, Image as ImageIcon, Link as LinkIcon, Facebook, Instagram, Twitter, Linkedin, Award } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Navbar } from "@/components/layout/navbar";
@@ -55,6 +55,7 @@ export default function ProfilePage() {
   const [error, setError] = useState("");
   const [newLanguage, setNewLanguage] = useState("");
   const [newPhotoUrl, setNewPhotoUrl] = useState("");
+  const [newSpecialization, setNewSpecialization] = useState("");
 
   const sessionUserId = useMemo(() => currentUser?.id ?? null, [currentUser?.id]);
 
@@ -126,6 +127,8 @@ export default function ProfilePage() {
       socialLinks: profile.socialLinks || {},
       tripPhotos: profile.tripPhotos || [],
       coverImage: profile.coverImage || "",
+      website: profile.website || "",
+      specializations: profile.specializations || [],
     };
 
     try {
@@ -299,6 +302,19 @@ export default function ProfilePage() {
                           />
                         </div>
                       </div>
+
+                      {/* Website URL */}
+                      <div className="space-y-2">
+                        <label className="text-sm font-semibold flex items-center gap-1.5">
+                          <Globe className="size-4 text-primary" /> Guide Website URL
+                        </label>
+                        <Input
+                          type="url"
+                          placeholder="https://example.com"
+                          value={profile.website || ""}
+                          onChange={(e) => handleChange("website", e.target.value)}
+                        />
+                      </div>
                       
                       {/* Languages Spoken Checklist & Add Custom */}
                       <div className="space-y-3">
@@ -372,6 +388,89 @@ export default function ProfilePage() {
                                   type="button"
                                   onClick={() => {
                                     setProfile(curr => curr ? { ...curr, languagesSpoken: (curr.languagesSpoken || []).filter(l => l !== lang) } : null);
+                                  }}
+                                  className="text-muted-foreground hover:text-destructive transition-colors font-black text-sm"
+                                >
+                                  ×
+                                </button>
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Guide Specializations */}
+                      <div className="space-y-3">
+                        <label className="text-sm font-semibold flex items-center gap-1.5">
+                          <Award className="size-4 text-primary" /> Guide Specializations
+                        </label>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 p-3 rounded-lg border border-border bg-muted/10">
+                          {["Cultural Heritage", "Family Expeditions", "Solo Safe Anchors", "Wildlife & Safari", "Adventure & Trekking", "Surfing & Water Sports", "Wellness & Yoga", "Food & Culinary"].map((spec) => {
+                            const isChecked = (profile.specializations || []).includes(spec);
+                            return (
+                              <label key={spec} className="flex items-center gap-2 text-sm font-medium cursor-pointer hover:text-primary transition-colors">
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={(e) => {
+                                    const currentSpecs = profile.specializations || [];
+                                    const updated = e.target.checked
+                                      ? [...currentSpecs, spec]
+                                      : currentSpecs.filter((s) => s !== spec);
+                                    setProfile(curr => curr ? { ...curr, specializations: updated } : null);
+                                  }}
+                                  className="rounded border-input text-primary focus:ring-ring"
+                                />
+                                {spec}
+                              </label>
+                            );
+                          })}
+                        </div>
+                        
+                        {/* Add Custom Specialization */}
+                        <div className="flex gap-2 max-w-md">
+                          <Input
+                            type="text"
+                            placeholder="Add other specialization (e.g. Photography)"
+                            value={newSpecialization}
+                            onChange={(e) => setNewSpecialization(e.target.value)}
+                            className="h-9"
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                if (newSpecialization.trim() && !(profile.specializations || []).includes(newSpecialization.trim())) {
+                                  setProfile(curr => curr ? { ...curr, specializations: [...(curr.specializations || []), newSpecialization.trim()] } : null);
+                                  setNewSpecialization("");
+                                }
+                              }
+                            }}
+                          />
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            className="font-bold cursor-pointer"
+                            onClick={() => {
+                              if (newSpecialization.trim() && !(profile.specializations || []).includes(newSpecialization.trim())) {
+                                setProfile(curr => curr ? { ...curr, specializations: [...(curr.specializations || []), newSpecialization.trim()] } : null);
+                                setNewSpecialization("");
+                              }
+                            }}
+                          >
+                            <Plus className="size-4 mr-1" /> Add
+                          </Button>
+                        </div>
+
+                        {/* Current Specializations tags */}
+                        {(profile.specializations || []).length > 0 && (
+                          <div className="flex flex-wrap gap-2 pt-1">
+                            {(profile.specializations || []).map((spec) => (
+                              <span key={spec} className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-secondary text-secondary-foreground text-xs font-semibold">
+                                {spec}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setProfile(curr => curr ? { ...curr, specializations: (curr.specializations || []).filter(s => s !== spec) } : null);
                                   }}
                                   className="text-muted-foreground hover:text-destructive transition-colors font-black text-sm"
                                 >

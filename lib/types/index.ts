@@ -290,6 +290,8 @@ export interface AdminUserRecord {
   };
   tripPhotos?: string[];
   coverImage?: string;
+  website?: string;
+  specializations?: string[];
   createdAt: FirestoreTimestamp;
   updatedAt: FirestoreTimestamp;
 }
