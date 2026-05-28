@@ -13,6 +13,7 @@ import {
   TripItineraryDayPayload,
 } from "@/lib/types";
 import { tripApiService } from "@/lib/services/tripApiService";
+import { onDemandTripService, type CreateOnDemandTripTemplatePayload } from "@/lib/services/onDemandTripService";
 import { userSessionService } from "@/lib/services/userSessionService";
 import { tripImageUploadService } from "@/lib/services/tripImageUploadService";
 import { tripPlanService, TripPlanLocationResult } from "@/lib/services/tripPlanService";
@@ -23,6 +24,7 @@ import { SavingOverlay } from "@/components/common/saving-overlay";
 type TripCategory = CreateTripApiPayload["tripCategory"];
 type PickupType = CreateTripApiPayload["pickupType"];
 type AirportPickupType = Exclude<PickupType, "Free Pickup" | "Pickup Available" | "Meet at Location">;
+type TripFlow = "scheduled" | "on-demand";
 
 type DestinationFormItem = {
   name: string;
@@ -214,6 +216,16 @@ const toMainDestinationValue = (destination: { name?: string; lat?: number; lng?
   return { lat, lng, address };
 };
 
+const durationOptions: Array<{ label: string; days: number }> = [
+  { label: "Half day", days: 1 },
+  { label: "1 day", days: 1 },
+  { label: "2 days", days: 2 },
+  { label: "3 days", days: 3 },
+  { label: "4 days", days: 4 },
+  { label: "5 days", days: 5 },
+  { label: "7 days", days: 7 },
+];
+
 export default function CreateTripPage() {
   const { pushToast } = useToast();
   const router = useRouter();
@@ -221,6 +233,7 @@ export default function CreateTripPage() {
 
   const isEditMode = searchParams?.get("mode") === "edit";
   const editTripId = searchParams?.get("id") ?? null;
+  const [tripFlow, setTripFlow] = useState<TripFlow>("scheduled");
 
   const [tripName, setTripName] = useState("");
   const [tripCategory, setTripCategory] = useState<TripCategory>("Public trip");
@@ -229,6 +242,7 @@ export default function CreateTripPage() {
   const [pickupType, setPickupType] = useState<PickupType>("Meet at Location");
   const [pickupCostPerKm, setPickupCostPerKm] = useState("");
   const [pickupStartLocation, setPickupStartLocation] = useState<MainDestination | null>(null);
+  const [onDemandDurationDays, setOnDemandDurationDays] = useState("3");
 
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -293,6 +307,20 @@ export default function CreateTripPage() {
 
   const minStartDate = useMemo(() => getMinStartDate(3), []);
   const endDateMin = startDate || minStartDate;
+  const isOnDemandTrip = tripFlow === "on-demand";
+  const dayCount = useMemo(() => getDayCount(startDate, endDate), [startDate, endDate]);
+  const effectiveDayCount = isOnDemandTrip ? Math.max(1, Number(onDemandDurationDays) || 1) : dayCount;
+
+  const syntheticAiDates = useMemo(() => {
+    const start = new Date(`${minStartDate}T00:00:00`);
+    const end = new Date(start);
+    end.setDate(end.getDate() + Math.max(1, effectiveDayCount) - 1);
+
+    return {
+      startDate: isOnDemandTrip ? start.toISOString().slice(0, 10) : startDate,
+      endDate: isOnDemandTrip ? end.toISOString().slice(0, 10) : endDate,
+    };
+  }, [effectiveDayCount, endDate, isOnDemandTrip, minStartDate, startDate]);
 
   useEffect(() => {
     const profile = userSessionService.getUserProfile<StoredUserProfile>();
@@ -434,25 +462,23 @@ export default function CreateTripPage() {
 
   const allowedTripCategory: TripCategory = canSelectAllCategories ? tripCategory : "Private trip";
 
-  const dayCount = useMemo(() => getDayCount(startDate, endDate), [startDate, endDate]);
-
   useEffect(() => {
-    if (dayCount === 0) {
+    if (effectiveDayCount === 0) {
       setActivitiesByDay([]);
       return;
     }
 
     setActivitiesByDay((prev) => {
       const next = [...prev];
-      while (next.length < dayCount) {
+      while (next.length < effectiveDayCount) {
         next.push([emptyActivity()]);
       }
-      while (next.length > dayCount) {
+      while (next.length > effectiveDayCount) {
         next.pop();
       }
       return next;
     });
-  }, [dayCount]);
+  }, [effectiveDayCount]);
 
   const mapQuery = useMemo(() => {
     const names = destinations.map((destination) => destination.name.trim()).filter(Boolean);
@@ -563,13 +589,13 @@ export default function CreateTripPage() {
     const issues: string[] = [];
     if (!tripName.trim()) issues.push("Trip name is required.");
     if (!tripCategory) issues.push("Trip category is required.");
-    if (!isEditMode && leadTimeTripCategories.includes(allowedTripCategory) && (!startDate || startDate < minStartDate)) {
+    if (!isOnDemandTrip && !isEditMode && leadTimeTripCategories.includes(allowedTripCategory) && (!startDate || startDate < minStartDate)) {
       issues.push(`For guided trips, start date must be at least 3 days from today (${minStartDate}).`);
     }
-    if (startDate && endDate && endDate < startDate) {
+    if (!isOnDemandTrip && startDate && endDate && endDate < startDate) {
       issues.push("End date must be the same as or later than the start date.");
     }
-    if (startDate && endDate && startDate === endDate) {
+    if (!isOnDemandTrip && startDate && endDate && startDate === endDate) {
       const startMinutes = timeToMinutes(startTime);
       const endMinutes = timeToMinutes(endTime);
       if (!Number.isNaN(startMinutes) && !Number.isNaN(endMinutes) && endMinutes <= startMinutes) {
@@ -581,10 +607,14 @@ export default function CreateTripPage() {
     if (!hasManualDest && !hasSelectedDest) {
       issues.push("At least one destination with latitude and longitude is required. Add one in Destinations or pick from Travel Destinations.");
     }
-    if (!startDate || !endDate) issues.push("Start date and end date are required.");
-    if (!startTime) issues.push("Start time is required.");
-    if (!endTime) issues.push("End time is required.");
-    if (!startLocation.trim()) issues.push("Start location is required.");
+    if (isOnDemandTrip) {
+      if (Number(onDemandDurationDays) <= 0) issues.push("Select a trip duration.");
+    } else {
+      if (!startDate || !endDate) issues.push("Start date and end date are required.");
+      if (!startTime) issues.push("Start time is required.");
+      if (!endTime) issues.push("End time is required.");
+    }
+    if (!isOnDemandTrip && !startLocation.trim()) issues.push("Start location is required.");
     if (Number(maxParticipants) <= 0) issues.push("Max participants must be greater than 0.");
     const hotel = toLines(hotelFacilitiesEditor);
     if (hotel.length === 0) issues.push("At least one hotel facility is required in Included.");
@@ -643,15 +673,22 @@ export default function CreateTripPage() {
 
     const destinationsPayload = [...manualPayload, ...selectedPayload];
 
+    const generatedStartDate = syntheticAiDates.startDate || minStartDate;
+    const generatedEndDate = syntheticAiDates.endDate || generatedStartDate;
+
     const payload = {
       tripName: tripName.trim(),
       tripCategory: allowedTripCategory,
       destinations: destinationsPayload,
-      startDate,
-      endDate,
-      startTime: to12Hour(startTime),
-      endTime: to12Hour(endTime),
-      startLocation: startLocation.trim(),
+      startDate: generatedStartDate,
+      endDate: generatedEndDate,
+      ...(isOnDemandTrip
+        ? {}
+        : {
+            startTime: to12Hour(startTime),
+            endTime: to12Hour(endTime),
+            startLocation: startLocation.trim(),
+          }),
       included: {
         hotelFacilities: toLines(hotelFacilitiesEditor),
         transportFacilities: travelMethodsSelected,
@@ -666,8 +703,8 @@ export default function CreateTripPage() {
       const resp = await tripPlanService.generateAutoItinerary(payload, token);
       const days: any[] = resp?.days ?? [];
 
-      const next: ActivityFormItem[][] = Array.from({ length: dayCount }, (_, i) => []);
-      for (let i = 0; i < dayCount; i++) {
+      const next: ActivityFormItem[][] = Array.from({ length: effectiveDayCount }, (_, i) => []);
+      for (let i = 0; i < effectiveDayCount; i++) {
         const day = days[i];
         if (!day || !Array.isArray(day.activities) || day.activities.length === 0) {
           next[i] = [emptyActivity()];
@@ -676,8 +713,8 @@ export default function CreateTripPage() {
 
         next[i] = day.activities.map((act: any) => ({
           title: act.activity || act.title || "",
-          startTime: parse12HourTo24(act.startTime || ""),
-          endTime: parse12HourTo24(act.endTime || ""),
+          startTime: isOnDemandTrip ? "" : parse12HourTo24(act.startTime || ""),
+          endTime: isOnDemandTrip ? "" : parse12HourTo24(act.endTime || ""),
           notesEditor: act.description || "",
           isAIGenerated: true,
         }));
@@ -708,7 +745,7 @@ export default function CreateTripPage() {
     const confirmClear = window.confirm("Clear entire generated itinerary? This will reset all activities. Are you sure?");
     if (!confirmClear) return;
 
-    setActivitiesByDay(() => Array.from({ length: dayCount }, () => [emptyActivity()]));
+    setActivitiesByDay(() => Array.from({ length: effectiveDayCount }, () => [emptyActivity()]));
     pushToast({ type: "success", title: "Generated itinerary cleared" });
   };
 
@@ -738,22 +775,22 @@ export default function CreateTripPage() {
     const issues: string[] = [];
 
     if (!tripName.trim()) issues.push("Trip name is required.");
-    if (!startDate || !endDate) issues.push("Start date and end date are required.");
-    if (!isEditMode && leadTimeTripCategories.includes(allowedTripCategory) && (!startDate || startDate < minStartDate)) {
+    if (!isOnDemandTrip && (!startDate || !endDate)) issues.push("Start date and end date are required.");
+    if (!isOnDemandTrip && !isEditMode && leadTimeTripCategories.includes(allowedTripCategory) && (!startDate || startDate < minStartDate)) {
       issues.push(`For guided trips, start date must be at least 3 days from today (${minStartDate}).`);
     }
-    if (startDate && endDate && endDate < startDate) {
+    if (!isOnDemandTrip && startDate && endDate && endDate < startDate) {
       issues.push("End date must be the same as or later than the start date.");
     }
-    if (startDate && endDate && startDate === endDate) {
+    if (!isOnDemandTrip && startDate && endDate && startDate === endDate) {
       const startMinutes = timeToMinutes(startTime);
       const endMinutes = timeToMinutes(endTime);
       if (!Number.isNaN(startMinutes) && !Number.isNaN(endMinutes) && endMinutes <= startMinutes) {
         issues.push("For a one-day trip, end time must be later than start time.");
       }
     }
-    if (!startTime) issues.push("Start time is required.");
-    if (pickupType === "Meet at Location" && !startLocation.trim()) {
+    if (!isOnDemandTrip && !startTime) issues.push("Start time is required.");
+    if (!isOnDemandTrip && pickupType === "Meet at Location" && !startLocation.trim()) {
       issues.push("Start location is required.");
     }
     if (pickupType !== "Meet at Location" && !pickupStartLocation) {
@@ -808,10 +845,15 @@ export default function CreateTripPage() {
     }
 
     const hasInvalidActivities = activitiesByDay.some((day) =>
-      day.some((activity) => !activity.title.trim() || !activity.startTime || !activity.endTime || toLines(activity.notesEditor).length === 0),
+      day.some(
+        (activity) =>
+          !activity.title.trim() ||
+          (!isOnDemandTrip && (!activity.startTime || !activity.endTime)) ||
+          (!isOnDemandTrip && toLines(activity.notesEditor).length === 0),
+      ),
     );
     if (hasInvalidActivities) {
-      issues.push("Each activity needs title, start/end time, and at least one note.");
+      issues.push(isOnDemandTrip ? "Each activity needs a title." : "Each activity needs title, start/end time, and at least one note.");
     }
 
     const tripPhotos = toLines(tripPhotosEditor);
@@ -869,11 +911,15 @@ export default function CreateTripPage() {
         title: `Day ${index + 1}`,
         activities: dayActivities.map((activity) => ({
           title: activity.title.trim(),
-          timeSlot: {
-            startTime: to12Hour(activity.startTime),
-            endTime: to12Hour(activity.endTime),
-          },
-          notes: toLines(activity.notesEditor),
+          ...(isOnDemandTrip
+            ? {}
+            : {
+                timeSlot: {
+                  startTime: to12Hour(activity.startTime),
+                  endTime: to12Hour(activity.endTime),
+                },
+              }),
+          ...(isOnDemandTrip ? {} : { notes: toLines(activity.notesEditor) }),
           isAIGenerated: activity.isAIGenerated ?? false,
         })),
       };
@@ -928,6 +974,97 @@ export default function CreateTripPage() {
     };
   };
 
+  const buildOnDemandTemplatePayload = (status: "pending" | "draft"): CreateOnDemandTripTemplatePayload => {
+    const destinationsPayload = destinations
+      .filter((destination) => {
+        const hasAnyInput = [destination.name, destination.description, destination.latitude, destination.longitude, destination.photosEditor].some((value) => value.trim());
+
+        if (!hasAnyInput) return false;
+
+        return (
+          destination.name.trim() &&
+          destination.description.trim() &&
+          destination.latitude.trim() &&
+          destination.longitude.trim() &&
+          !Number.isNaN(Number(destination.latitude)) &&
+          !Number.isNaN(Number(destination.longitude)) &&
+          toLines(destination.photosEditor).length > 0
+        );
+      })
+      .map((destination) => ({
+        name: destination.name.trim(),
+        description: destination.description.trim(),
+        geoCode: {
+          latitude: Number(destination.latitude),
+          longitude: Number(destination.longitude),
+        },
+        photos: toLines(destination.photosEditor),
+      }));
+
+    const itineraryDaysPayload: TripItineraryDayPayload[] = activitiesByDay.map((dayActivities, index) => ({
+      day: index + 1,
+      title: `Day ${index + 1}`,
+      activities: dayActivities.map((activity) => ({
+        title: activity.title.trim(),
+        ...(isOnDemandTrip
+          ? {}
+          : {
+              timeSlot: {
+                startTime: to12Hour(activity.startTime),
+                endTime: to12Hour(activity.endTime),
+              },
+            }),
+        ...(isOnDemandTrip ? {} : { notes: toLines(activity.notesEditor) }),
+        isAIGenerated: activity.isAIGenerated ?? false,
+      })),
+    }));
+
+    const manualTripPhotos = toLines(tripPhotosEditor);
+    const tripPhotos = [...manualTripPhotos];
+
+    return {
+      status,
+      tripName: tripName.trim(),
+      durationLabel: Number(onDemandDurationDays) === 1 ? "1 day" : `${Number(onDemandDurationDays)} days`,
+      durationDays: Math.max(1, Number(onDemandDurationDays) || 1),
+      tripCategory: "On-demand trip",
+      destinations: destinationsPayload,
+      mainDestinations: mainDestinations.map((destination) => ({
+        name: destination.address.trim(),
+        lat: destination.lat,
+        lng: destination.lng,
+      })),
+      description: description.trim(),
+      organizer: organizerId.trim(),
+      price: Number(price),
+      itinerary: {
+        days: itineraryDaysPayload,
+      },
+      included: {
+        hotelFacilities: toLines(hotelFacilitiesEditor),
+        transportFacilities: travelMethodsSelected,
+        otherInclusions: toLines(otherInclusionsEditor),
+        exclusions: toLines(exclusionsEditor),
+      },
+      paymentMethods,
+      maxParticipants: Number(maxParticipants),
+      photos: tripPhotos,
+      coverImage: tripPhotos[0] ?? "",
+      startLocation: startLocation.trim(),
+      pickupType,
+      ...(pickupType !== "Meet at Location" && pickupStartLocation ? {
+        pickupStartLocation: {
+          name: pickupStartLocation.address.trim(),
+          lat: pickupStartLocation.lat,
+          lng: pickupStartLocation.lng,
+        },
+      } : {}),
+      ...((pickupType === "Pickup Available" || isAirportPickupType(pickupType)) ? {
+        pickupCostPerKm: Number(pickupCostPerKm),
+      } : {}),
+    };
+  };
+
   const submit = async (event?: { preventDefault: () => void }, status: "pending" | "draft" = "pending") => {
     event?.preventDefault();
 
@@ -953,20 +1090,38 @@ export default function CreateTripPage() {
         uploadedTripPhotos = result.downloadUrls;
       }
 
-      const payload = buildTripPayload(status);
-      payload.photos = [...uploadedTripPhotos, ...payload.photos];
-      payload.coverImage = payload.photos[0] ?? "";
+      if (isOnDemandTrip) {
+        const payload = buildOnDemandTemplatePayload(status);
+        payload.photos = [...uploadedTripPhotos, ...payload.photos];
+        payload.coverImage = payload.photos[0] ?? "";
 
-      if (isEditMode) {
-        await tripApiService.updateTrip(editTripId as string, payload, token);
-        pushToast({ type: "success", title: "Trip updated", description: "Trip was updated successfully." });
+        if (isEditMode) {
+          await onDemandTripService.updateTemplate(editTripId as string, payload, token);
+          pushToast({ type: "success", title: "On-demand trip updated", description: "On-demand trip template was updated successfully." });
+        } else {
+          await onDemandTripService.createTemplate(payload, token);
+          pushToast({
+            type: "success",
+            title: status === "draft" ? "Template draft saved" : "On-demand trip created",
+            description: status === "draft" ? "Template draft was saved successfully." : "On-demand trip template was sent for review.",
+          });
+        }
       } else {
-        await tripApiService.createTrip(payload, token);
-        pushToast({
-          type: "success",
-          title: status === "draft" ? "Draft saved" : "Trip created",
-          description: status === "draft" ? "Trip draft was saved successfully." : "Trip was submitted to /trips endpoint.",
-        });
+        const payload = buildTripPayload(status);
+        payload.photos = [...uploadedTripPhotos, ...payload.photos];
+        payload.coverImage = payload.photos[0] ?? "";
+
+        if (isEditMode) {
+          await tripApiService.updateTrip(editTripId as string, payload, token);
+          pushToast({ type: "success", title: "Trip updated", description: "Trip was updated successfully." });
+        } else {
+          await tripApiService.createTrip(payload, token);
+          pushToast({
+            type: "success",
+            title: status === "draft" ? "Draft saved" : "Trip created",
+            description: status === "draft" ? "Trip draft was saved successfully." : "Trip was submitted to /trips endpoint.",
+          });
+        }
       }
       setErrors([]);
       router.push("/dashboard");
@@ -983,7 +1138,7 @@ export default function CreateTripPage() {
   };
 
   const openTripwaverAIpopup = () => {
-    if (!startDate || !endDate || !startLocation.trim()) {
+    if ((!isOnDemandTrip && (!startDate || !endDate)) || !startLocation.trim()) {
       setTripwaverAIError("Start date, end date, and start destination should be selected.");
       return;
     }
@@ -1013,6 +1168,14 @@ export default function CreateTripPage() {
             : "Create and submit a trip to API with destinations, itinerary, inclusions, and photos."
         }
       />
+
+      <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-border bg-card p-2">
+        <Button type="button" variant={tripFlow === "scheduled" ? "default" : "ghost"} onClick={() => setTripFlow("scheduled")}>Scheduled trip</Button>
+        <Button type="button" variant={tripFlow === "on-demand" ? "default" : "ghost"} onClick={() => setTripFlow("on-demand")}>On-demand trip</Button>
+        <p className="ml-auto text-xs text-muted-foreground">
+          {isOnDemandTrip ? "Template trips stay visible until hidden or deleted, then get dated at booking time." : "Fixed-date trips keep the current booking flow."}
+        </p>
+      </div>
 
       <form onSubmit={(event) => void submit(event, "pending")} className="space-y-6 border border-border bg-card p-5">
         <section className="space-y-4">
@@ -1061,98 +1224,120 @@ export default function CreateTripPage() {
         </section>
 
         <section className="space-y-4">
-          <h2 className="text-lg font-semibold">Schedule & Organizer</h2>
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
-            <div>
-              <label className="mb-1 block text-sm font-medium">Start date</label>
-              <Input
-                type="date"
-                value={startDate}
-                min={isEditMode ? undefined : minStartDate}
-                onChange={(event) => setStartDate(event.target.value)}
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium">End date</label>
-              <Input type="date" value={endDate} min={endDateMin} onChange={(event) => setEndDate(event.target.value)} />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium">Start time</label>
-              <Input type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium">End time</label>
-              <Input type="time" value={endTime} onChange={(event) => setEndTime(event.target.value)} />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium">Pickup Option</label>
-              <select
-                value={pickupType}
-                onChange={(event) => {
-                  const nextType = event.target.value as PickupType;
-                  setPickupType(nextType);
-
-                  const defaultPickupLocation = getDefaultPickupLocation(nextType);
-                  if (defaultPickupLocation) {
-                    setPickupStartLocation(defaultPickupLocation);
-                    setStartLocation(defaultPickupLocation.address);
-                  }
-                }}
-                className="h-9 w-full border border-input bg-background px-3 text-sm"
-              >
-                {pickupTypeOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {pickupType === "Meet at Location" ? (
+          <h2 className="text-lg font-semibold">{isOnDemandTrip ? "Template Details" : "Schedule & Organizer"}</h2>
+          {isOnDemandTrip ? (
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
               <div>
-                <label className="mb-1 block text-sm font-medium">Start location</label>
-                <LocationPicker
-                  value={startLocation ? { address: startLocation, lat: mainDestination?.lat ?? 0, lng: mainDestination?.lng ?? 0 } : undefined}
-                  onChange={(location) => {
-                    setStartLocation(location.address);
-                  }}
+                <label className="mb-1 block text-sm font-medium">Duration</label>
+                <select
+                  value={onDemandDurationDays}
+                  onChange={(event) => setOnDemandDurationDays(event.target.value)}
+                  className="h-9 w-full border border-input bg-background px-3 text-sm"
+                >
+                  {durationOptions.map((option) => (
+                    <option key={option.label} value={String(option.days)}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="rounded-xl border border-dashed border-border bg-muted/20 p-4 text-sm text-muted-foreground lg:col-span-2">
+                On-demand trips do not need fixed dates here. The traveler picks the available dates later, and the system creates a dated private trip from this template.
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+              <div>
+                <label className="mb-1 block text-sm font-medium">Start date</label>
+                <Input
+                  type="date"
+                  value={startDate}
+                  min={isEditMode ? undefined : minStartDate}
+                  onChange={(event) => setStartDate(event.target.value)}
                 />
               </div>
-            ) : (
-              <>
+              <div>
+                <label className="mb-1 block text-sm font-medium">End date</label>
+                <Input type="date" value={endDate} min={endDateMin} onChange={(event) => setEndDate(event.target.value)} />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium">Start time</label>
+                <Input type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium">End time</label>
+                <Input type="time" value={endTime} onChange={(event) => setEndTime(event.target.value)} />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium">Pickup Option</label>
+                <select
+                  value={pickupType}
+                  onChange={(event) => {
+                    const nextType = event.target.value as PickupType;
+                    setPickupType(nextType);
+
+                    const defaultPickupLocation = getDefaultPickupLocation(nextType);
+                    if (defaultPickupLocation) {
+                      setPickupStartLocation(defaultPickupLocation);
+                      setStartLocation(defaultPickupLocation.address);
+                    }
+                  }}
+                  className="h-9 w-full border border-input bg-background px-3 text-sm"
+                >
+                  {pickupTypeOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {pickupType === "Meet at Location" ? (
                 <div>
-                  <label className="mb-1 block text-sm font-medium">Pickup origin (Guide&apos;s start location)</label>
+                  <label className="mb-1 block text-sm font-medium">Start location</label>
                   <LocationPicker
-                    value={pickupStartLocation}
+                    value={startLocation ? { address: startLocation, lat: mainDestination?.lat ?? 0, lng: mainDestination?.lng ?? 0 } : undefined}
                     onChange={(location) => {
-                      setPickupStartLocation(location);
                       setStartLocation(location.address);
                     }}
                   />
                 </div>
-                {pickupType === "Pickup Available" || isAirportPickupType(pickupType) ? (
+              ) : (
+                <>
                   <div>
-                    <label className="mb-1 block text-sm font-medium">Pickup cost per km (LKR)</label>
-                    <Input
-                      type="number"
-                      min={0}
-                      value={pickupCostPerKm}
-                      onChange={(event) => setPickupCostPerKm(event.target.value)}
-                      placeholder="e.g. 100"
+                    <label className="mb-1 block text-sm font-medium">Pickup origin (Guide&apos;s start location)</label>
+                    <LocationPicker
+                      value={pickupStartLocation}
+                      onChange={(location) => {
+                        setPickupStartLocation(location);
+                        setStartLocation(location.address);
+                      }}
                     />
                   </div>
-                ) : null}
-              </>
-            )}
-            <div>
-              <label className="mb-1 block text-sm font-medium">Organizer id (user id)</label>
-              <Input value={organizerId} onChange={(event) => setOrganizerId(event.target.value)} placeholder="user_12345" />
+                  {pickupType === "Pickup Available" || isAirportPickupType(pickupType) ? (
+                    <div>
+                      <label className="mb-1 block text-sm font-medium">Pickup cost per km (LKR)</label>
+                      <Input
+                        type="number"
+                        min={0}
+                        value={pickupCostPerKm}
+                        onChange={(event) => setPickupCostPerKm(event.target.value)}
+                        placeholder="e.g. 100"
+                      />
+                    </div>
+                  ) : null}
+                </>
+              )}
+              <div>
+                <label className="mb-1 block text-sm font-medium">Organizer id (user id)</label>
+                <Input value={organizerId} onChange={(event) => setOrganizerId(event.target.value)} placeholder="user_12345" />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium">Organizer name (preview)</label>
+                <Input value={organizerName} readOnly />
+              </div>
             </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium">Organizer name (preview)</label>
-              <Input value={organizerName} readOnly />
-            </div>
-          </div>
+          )}
         </section>
 
 
@@ -1484,7 +1669,7 @@ export default function CreateTripPage() {
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold">itinerary</h2>
             <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">{dayCount} day(s)</span>
+              <span className="text-xs text-muted-foreground">{effectiveDayCount} day(s)</span>
               <Button type="button" variant="outline" size="sm" onClick={generateItinerary} disabled={isGenerating}>
                 {isGenerating ? "Generating..." : "Generate itinerary"}
               </Button>
@@ -1494,8 +1679,10 @@ export default function CreateTripPage() {
             </div>
           </div>
 
-          {dayCount === 0 ? (
-            <p className="text-sm text-muted-foreground">Select start and end dates to build the day plan.</p>
+          {effectiveDayCount === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              {isOnDemandTrip ? "Select a duration to build the day plan." : "Select start and end dates to build the day plan."}
+            </p>
           ) : (
             <div className="space-y-4">
               {activitiesByDay.map((dayActivities, dayIndex) => (
@@ -1528,24 +1715,26 @@ export default function CreateTripPage() {
                           placeholder="Arrival and check-in"
                         />
 
-                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                          <div>
-                            <label className="mb-1 block text-xs font-medium">Start time</label>
-                            <Input
-                              type="time"
-                              value={item.startTime}
-                              onChange={(event) => updateActivity(dayIndex, activityIndex, "startTime", event.target.value)}
-                            />
+                        {!isOnDemandTrip ? (
+                          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                            <div>
+                              <label className="mb-1 block text-xs font-medium">Start time</label>
+                              <Input
+                                type="time"
+                                value={item.startTime}
+                                onChange={(event) => updateActivity(dayIndex, activityIndex, "startTime", event.target.value)}
+                              />
+                            </div>
+                            <div>
+                              <label className="mb-1 block text-xs font-medium">End time</label>
+                              <Input
+                                type="time"
+                                value={item.endTime}
+                                onChange={(event) => updateActivity(dayIndex, activityIndex, "endTime", event.target.value)}
+                              />
+                            </div>
                           </div>
-                          <div>
-                            <label className="mb-1 block text-xs font-medium">End time</label>
-                            <Input
-                              type="time"
-                              value={item.endTime}
-                              onChange={(event) => updateActivity(dayIndex, activityIndex, "endTime", event.target.value)}
-                            />
-                          </div>
-                        </div>
+                        ) : null}
 
                         <div>
                           <label className="mb-1 block text-xs font-medium">Notes (one per line)</label>

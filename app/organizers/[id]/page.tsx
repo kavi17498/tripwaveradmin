@@ -9,6 +9,7 @@ import { EmptyState } from "@/components/feedback/empty-state";
 import { Button } from "@/components/ui/button";
 import { userService } from "@/lib/services/userService";
 import { tripApiService } from "@/lib/services/tripApiService";
+import { onDemandTripService, type OnDemandTripTemplateApiItem } from "@/lib/services/onDemandTripService";
 import { chatService } from "@/lib/services/chatService";
 import { userSessionService } from "@/lib/services/userSessionService";
 import { useToast } from "@/components/feedback/toast-provider";
@@ -52,6 +53,7 @@ export default function OrganizerProfilePage() {
   const [creatingChat, setCreatingChat] = useState(false);
   const [sendingRequest, setSendingRequest] = useState(false);
   const [ownTrips, setOwnTrips] = useState<any[]>([]);
+  const [onDemandTrips, setOnDemandTrips] = useState<OnDemandTripTemplateApiItem[]>([]);
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const { pushToast } = useToast();
 
@@ -134,6 +136,21 @@ export default function OrganizerProfilePage() {
 
     loadOwnTrips();
   }, [currentUser, id]);
+
+  useEffect(() => {
+    const loadOnDemandTrips = async () => {
+      if (!id) return;
+
+      try {
+        const response = await onDemandTripService.getPublicTemplates(id);
+        setOnDemandTrips(response.data || []);
+      } catch {
+        setOnDemandTrips([]);
+      }
+    };
+
+    loadOnDemandTrips();
+  }, [id]);
 
   const handleMessageOrganizer = async () => {
     if (!currentUser) {
@@ -634,6 +651,61 @@ export default function OrganizerProfilePage() {
                     </div>
                   </div>
                 ))}
+
+                {/* On-demand trips */}
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between border-b border-border/80 pb-4">
+                    <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
+                      <Sparkles className="size-5 text-primary" />
+                      On-demand trips ({onDemandTrips.length})
+                    </h2>
+                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                      Book dates later
+                    </span>
+                  </div>
+
+                  {onDemandTrips.length === 0 ? (
+                    <EmptyState
+                      title="No On-demand Trips"
+                      description="This guide has not published any on-demand trip templates yet."
+                    />
+                  ) : (
+                    <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+                      {onDemandTrips.map((trip) => (
+                        <div key={trip.id} className="overflow-hidden rounded-2xl border border-border/80 bg-card shadow-md hover:shadow-lg transition-shadow">
+                          <div className="relative aspect-4/3 bg-muted">
+                            {trip.coverImage ? (
+                              <img src={trip.coverImage} alt={trip.tripName} className="h-full w-full object-cover" />
+                            ) : (
+                              <div className="flex h-full w-full items-center justify-center bg-linear-to-br from-sky-500/20 to-indigo-600/20 text-primary">
+                                <Sparkles className="size-10" />
+                              </div>
+                            )}
+                            <div className="absolute inset-0 bg-linear-to-t from-black/70 via-black/15 to-transparent" />
+                            <div className="absolute left-4 right-4 bottom-4 flex items-end justify-between gap-3 text-white">
+                              <div className="min-w-0">
+                                <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-white/75">On-demand</p>
+                                <h3 className="mt-1 line-clamp-2 text-lg font-black leading-tight">{trip.tripName}</h3>
+                              </div>
+                              <div className="rounded-full bg-black/45 px-3 py-1 text-xs font-bold backdrop-blur-sm">{trip.durationLabel}</div>
+                            </div>
+                          </div>
+
+                          <div className="space-y-4 p-5">
+                            <p className="line-clamp-2 text-xs text-muted-foreground font-medium">{trip.description}</p>
+                            <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-muted-foreground">
+                              <span className="rounded-full border border-border/60 bg-muted px-2.5 py-1">{trip.maxParticipants} max</span>
+                              <span className="rounded-full border border-border/60 bg-muted px-2.5 py-1">LKR {trip.price}</span>
+                            </div>
+                            <Button asChild className="w-full font-bold cursor-pointer">
+                              <Link href={`/on-demand/${trip.id}`}>Choose dates & book</Link>
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}

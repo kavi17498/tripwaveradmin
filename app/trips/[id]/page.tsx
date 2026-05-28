@@ -177,7 +177,7 @@ export default function TripDetailsPage() {
                 <span className="font-medium text-foreground">Organized by: </span>
                 {trip.organizerProfile ? (
                   <div className="mt-2 flex items-start gap-4">
-                    <Link href={`/organizers/${trip.organizerProfile.id}`} className="flex-shrink-0">
+                    <Link href={`/organizers/${trip.organizerProfile.id}`} className="shrink-0">
                       <img
                         src={trip.organizerProfile.profileImage || '/default-avatar.png'}
                         alt={`${trip.organizerProfile.firstName || ''} ${trip.organizerProfile.lastName || ''}`.trim()}
@@ -303,8 +303,10 @@ export default function TripDetailsPage() {
                             <p className="font-medium">{activity.title}</p>
                           </div>
                           <p className="text-xs text-muted-foreground mb-2">
-                            {activity.timeSlot.startTime} - {activity.timeSlot.endTime}
-                          </p>
+                              {activity.timeSlot?.startTime && activity.timeSlot?.endTime
+                                ? `${activity.timeSlot.startTime} - ${activity.timeSlot.endTime}`
+                                : "All day"}
+                            </p>
                           {activity.notes && activity.notes.length > 0 && (
                             <ul className="text-xs text-muted-foreground list-disc list-inside">
                               {activity.notes.map((note, noteIdx) => (

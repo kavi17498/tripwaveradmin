@@ -220,7 +220,9 @@ export default function AdminTripDetailPage() {
                       <div key={`${day.day}-${index}`} className="border border-border p-2">
                         <p className="font-medium">{activity.title}</p>
                         <p className="text-xs text-muted-foreground">
-                          {activity.timeSlot.startTime} - {activity.timeSlot.endTime}
+                          {activity.timeSlot?.startTime && activity.timeSlot?.endTime
+                            ? `${activity.timeSlot.startTime} - ${activity.timeSlot.endTime}`
+                            : "All day"}
                         </p>
                         {activity.notes?.length ? <p className="mt-1 text-xs text-muted-foreground">{activity.notes.join(" • ")}</p> : null}
                       </div>

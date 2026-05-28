@@ -177,7 +177,7 @@ export interface TripItineraryDayPayload {
   title: string;
   activities: Array<{
     title: string;
-    timeSlot: {
+    timeSlot?: {
       startTime: string;
       endTime: string;
     };
@@ -297,6 +297,60 @@ export interface AdminUserRecord {
 }
 
 export type AdminTripStatus = "pending" | "in review" | "approved" | "rejected" | "draft";
+
+export interface AdminOnDemandTripRecord {
+  id: string;
+  tripName: string;
+  durationLabel: string;
+  durationDays: number;
+  tripCategory: string;
+  description: string;
+  organizer: string;
+  price: number;
+  destinations: AdminTripDestination[];
+  mainDestinations?: Array<{
+    name: string;
+    lat: number;
+    lng: number;
+  }>;
+  startLocation: string;
+  itinerary?: {
+    days: Array<{
+      day: number;
+      title: string;
+      activities: Array<{
+        title: string;
+        timeSlot?: {
+          startTime: string;
+          endTime: string;
+        };
+        notes?: string[];
+        isAIGenerated?: boolean;
+      }>;
+    }>;
+  };
+  included?: {
+    hotelFacilities: string[];
+    transportFacilities: string[];
+    otherInclusions: string[];
+    exclusions: string[];
+  };
+  paymentMethods?: ("Pay Online" | "Pay to Guide on Trip Day")[];
+  maxParticipants: number;
+  photos: string[];
+  coverImage: string;
+  pickupType?: string;
+  pickupCostPerKm?: number;
+  pickupStartLocation?: {
+    name: string;
+    lat: number;
+    lng: number;
+  };
+  isHidden?: boolean;
+  status: AdminTripStatus;
+  createdAt: FirestoreTimestamp;
+  updatedAt: FirestoreTimestamp;
+}
 
 export interface AdminTripDestination {
   name: string;
