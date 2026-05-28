@@ -281,6 +281,15 @@ export interface AdminUserRecord {
   dateOfBirth?: string;
   gender?: "male" | "female" | "other";
   isVerified: boolean;
+  languagesSpoken?: string[];
+  socialLinks?: {
+    facebook?: string;
+    instagram?: string;
+    twitter?: string;
+    linkedin?: string;
+  };
+  tripPhotos?: string[];
+  coverImage?: string;
   createdAt: FirestoreTimestamp;
   updatedAt: FirestoreTimestamp;
 }

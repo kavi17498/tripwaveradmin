@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Mail, ShieldCheck, UserCircle2 } from "lucide-react";
+import { ArrowLeft, Mail, ShieldCheck, UserCircle2, Plus, Trash2, Globe, Image as ImageIcon, Link as LinkIcon, Facebook, Instagram, Twitter, Linkedin } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Navbar } from "@/components/layout/navbar";
@@ -53,6 +53,8 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [newLanguage, setNewLanguage] = useState("");
+  const [newPhotoUrl, setNewPhotoUrl] = useState("");
 
   const sessionUserId = useMemo(() => currentUser?.id ?? null, [currentUser?.id]);
 
@@ -120,6 +122,10 @@ export default function ProfilePage() {
       country: profile.country,
       dateOfBirth: profile.dateOfBirth,
       gender: profile.gender as UpdateUserProfilePayload["gender"],
+      languagesSpoken: profile.languagesSpoken || [],
+      socialLinks: profile.socialLinks || {},
+      tripPhotos: profile.tripPhotos || [],
+      coverImage: profile.coverImage || "",
     };
 
     try {
@@ -226,6 +232,361 @@ export default function ProfilePage() {
                       </div>
                     ))}
                   </div>
+
+                  {profile.isVerified && (
+                    <div className="border-t border-border pt-6 mt-6 space-y-6">
+                      <div className="flex items-center gap-2 pb-2 border-b border-border">
+                        <ShieldCheck className="size-5 text-emerald-500" />
+                        <h3 className="text-base font-bold text-foreground">Verified Guide Settings</h3>
+                      </div>
+                      
+                      {/* Cover Image Upload / Input */}
+                      <div className="space-y-3">
+                        <label className="text-sm font-semibold flex items-center gap-1.5">
+                          <ImageIcon className="size-4 text-primary" /> Cover Image Banner
+                        </label>
+                        <div className="relative h-40 w-full rounded-lg overflow-hidden border border-border bg-muted/30">
+                          {profile.coverImage ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={profile.coverImage} alt="Cover Preview" className="h-full w-full object-cover" />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center text-muted-foreground text-xs font-medium">
+                              No custom cover image set. Default Sri Lanka landscape banner will be displayed.
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex flex-col sm:flex-row gap-3">
+                          <div className="relative">
+                            <input
+                              type="file"
+                              accept="image/*"
+                              id="cover-image-upload"
+                              className="hidden"
+                              onChange={async (e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  try {
+                                    setSaving(true);
+                                    const uploadedUrl = await userImageUploadService.uploadProfileImage(file);
+                                    if (uploadedUrl) {
+                                      setProfile(curr => curr ? { ...curr, coverImage: uploadedUrl } : null);
+                                      pushToast({ type: "success", title: "Cover Image Uploaded", description: "Save profile to persist changes." });
+                                    }
+                                  } catch (err: any) {
+                                    pushToast({ type: "error", title: "Upload Failed", description: err.message });
+                                  } finally {
+                                    setSaving(false);
+                                  }
+                                }
+                              }}
+                            />
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="w-full sm:w-auto font-bold cursor-pointer"
+                              onClick={() => document.getElementById("cover-image-upload")?.click()}
+                            >
+                              Upload File
+                            </Button>
+                          </div>
+                          <Input
+                            type="text"
+                            placeholder="Or paste cover image URL (e.g. https://images.unsplash.com/...)"
+                            value={profile.coverImage || ""}
+                            onChange={(e) => handleChange("coverImage", e.target.value)}
+                            className="flex-1 h-9"
+                          />
+                        </div>
+                      </div>
+                      
+                      {/* Languages Spoken Checklist & Add Custom */}
+                      <div className="space-y-3">
+                        <label className="text-sm font-semibold flex items-center gap-1.5">
+                          <Globe className="size-4 text-primary" /> Languages Spoken
+                        </label>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 p-3 rounded-lg border border-border bg-muted/10">
+                          {["English", "Sinhala", "Tamil", "German", "French", "Spanish", "Italian", "Russian", "Chinese", "Japanese"].map((lang) => {
+                            const isChecked = (profile.languagesSpoken || []).includes(lang);
+                            return (
+                              <label key={lang} className="flex items-center gap-2 text-sm font-medium cursor-pointer hover:text-primary transition-colors">
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={(e) => {
+                                    const currentLangs = profile.languagesSpoken || [];
+                                    const updated = e.target.checked
+                                      ? [...currentLangs, lang]
+                                      : currentLangs.filter((l) => l !== lang);
+                                    setProfile(curr => curr ? { ...curr, languagesSpoken: updated } : null);
+                                  }}
+                                  className="rounded border-input text-primary focus:ring-ring"
+                                />
+                                {lang}
+                              </label>
+                            );
+                          })}
+                        </div>
+                        
+                        {/* Add Custom Language */}
+                        <div className="flex gap-2 max-w-md">
+                          <Input
+                            type="text"
+                            placeholder="Add other language (e.g. Arabic)"
+                            value={newLanguage}
+                            onChange={(e) => setNewLanguage(e.target.value)}
+                            className="h-9"
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                if (newLanguage.trim() && !(profile.languagesSpoken || []).includes(newLanguage.trim())) {
+                                  setProfile(curr => curr ? { ...curr, languagesSpoken: [...(curr.languagesSpoken || []), newLanguage.trim()] } : null);
+                                  setNewLanguage("");
+                                }
+                              }
+                            }}
+                          />
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            className="font-bold cursor-pointer"
+                            onClick={() => {
+                              if (newLanguage.trim() && !(profile.languagesSpoken || []).includes(newLanguage.trim())) {
+                                setProfile(curr => curr ? { ...curr, languagesSpoken: [...(curr.languagesSpoken || []), newLanguage.trim()] } : null);
+                                setNewLanguage("");
+                              }
+                            }}
+                          >
+                            <Plus className="size-4 mr-1" /> Add
+                          </Button>
+                        </div>
+
+                        {/* Current languages tags */}
+                        {(profile.languagesSpoken || []).length > 0 && (
+                          <div className="flex flex-wrap gap-2 pt-1">
+                            {(profile.languagesSpoken || []).map((lang) => (
+                              <span key={lang} className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-secondary text-secondary-foreground text-xs font-semibold">
+                                {lang}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setProfile(curr => curr ? { ...curr, languagesSpoken: (curr.languagesSpoken || []).filter(l => l !== lang) } : null);
+                                  }}
+                                  className="text-muted-foreground hover:text-destructive transition-colors font-black text-sm"
+                                >
+                                  ×
+                                </button>
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Social Media Links */}
+                      <div className="space-y-4">
+                        <label className="text-sm font-semibold flex items-center gap-1.5">
+                          <LinkIcon className="size-4 text-primary" /> Social Media Links
+                        </label>
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                              <Facebook className="size-3.5 text-blue-600" /> Facebook
+                            </label>
+                            <Input
+                              type="url"
+                              placeholder="https://facebook.com/username"
+                              value={profile.socialLinks?.facebook || ""}
+                              onChange={(e) => {
+                                setProfile(curr => {
+                                  if (!curr) return null;
+                                  return {
+                                    ...curr,
+                                    socialLinks: {
+                                      ...(curr.socialLinks || {}),
+                                      facebook: e.target.value
+                                    }
+                                  };
+                                });
+                              }}
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                              <Instagram className="size-3.5 text-pink-500" /> Instagram
+                            </label>
+                            <Input
+                              type="url"
+                              placeholder="https://instagram.com/username"
+                              value={profile.socialLinks?.instagram || ""}
+                              onChange={(e) => {
+                                setProfile(curr => {
+                                  if (!curr) return null;
+                                  return {
+                                    ...curr,
+                                    socialLinks: {
+                                      ...(curr.socialLinks || {}),
+                                      instagram: e.target.value
+                                    }
+                                  };
+                                });
+                              }}
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                              <Twitter className="size-3.5 text-sky-500" /> Twitter / X
+                            </label>
+                            <Input
+                              type="url"
+                              placeholder="https://twitter.com/username"
+                              value={profile.socialLinks?.twitter || ""}
+                              onChange={(e) => {
+                                setProfile(curr => {
+                                  if (!curr) return null;
+                                  return {
+                                    ...curr,
+                                    socialLinks: {
+                                      ...(curr.socialLinks || {}),
+                                      twitter: e.target.value
+                                    }
+                                  };
+                                });
+                              }}
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                              <Linkedin className="size-3.5 text-blue-700" /> LinkedIn
+                            </label>
+                            <Input
+                              type="url"
+                              placeholder="https://linkedin.com/in/username"
+                              value={profile.socialLinks?.linkedin || ""}
+                              onChange={(e) => {
+                                setProfile(curr => {
+                                  if (!curr) return null;
+                                  return {
+                                    ...curr,
+                                    socialLinks: {
+                                      ...(curr.socialLinks || {}),
+                                      linkedin: e.target.value
+                                    }
+                                  };
+                                });
+                              }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Past Trips Photos Gallery */}
+                      <div className="space-y-3">
+                        <label className="text-sm font-semibold flex items-center gap-1.5">
+                          <ImageIcon className="size-4 text-primary" /> Past Organized Trip Gallery
+                        </label>
+                        
+                        {/* Previews */}
+                        {(profile.tripPhotos || []).length > 0 ? (
+                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 bg-muted/5 p-3 rounded-lg border border-border">
+                            {(profile.tripPhotos || []).map((photoUrl, idx) => (
+                              <div key={idx} className="relative aspect-video rounded-lg overflow-hidden border border-border group shadow-xs">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img src={photoUrl} alt={`Trip Photo ${idx + 1}`} className="h-full w-full object-cover" />
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setProfile(curr => curr ? { ...curr, tripPhotos: (curr.tripPhotos || []).filter((_, i) => i !== idx) } : null);
+                                  }}
+                                  className="absolute top-1.5 right-1.5 bg-black/80 hover:bg-destructive text-white size-6 rounded-full flex items-center justify-center transition-colors font-bold shadow-xs cursor-pointer"
+                                >
+                                  <Trash2 className="size-3" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-muted-foreground italic bg-muted/10 p-3 rounded-lg border border-border">No photos added to your trip gallery yet.</p>
+                        )}
+
+                        {/* Add Photo controls */}
+                        <div className="flex flex-col sm:flex-row gap-3">
+                          <div>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              id="gallery-image-upload"
+                              className="hidden"
+                              multiple
+                              onChange={async (e) => {
+                                const files = Array.from(e.target.files || []);
+                                if (files.length > 0) {
+                                  try {
+                                    setSaving(true);
+                                    const uploadedUrls: string[] = [];
+                                    for (const file of files) {
+                                      const url = await userImageUploadService.uploadProfileImage(file);
+                                      if (url) uploadedUrls.push(url);
+                                    }
+                                    if (uploadedUrls.length > 0) {
+                                      setProfile(curr => curr ? { ...curr, tripPhotos: [...(curr.tripPhotos || []), ...uploadedUrls] } : null);
+                                      pushToast({ type: "success", title: "Images Uploaded", description: `Successfully uploaded ${uploadedUrls.length} image(s).` });
+                                    }
+                                  } catch (err: any) {
+                                    pushToast({ type: "error", title: "Upload Failed", description: err.message });
+                                  } finally {
+                                    setSaving(false);
+                                  }
+                                }
+                              }}
+                            />
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="w-full sm:w-auto font-bold cursor-pointer"
+                              onClick={() => document.getElementById("gallery-image-upload")?.click()}
+                            >
+                              Upload Image Files
+                            </Button>
+                          </div>
+                          <div className="flex flex-1 gap-2">
+                            <Input
+                              type="text"
+                              placeholder="Or paste photo URL"
+                              value={newPhotoUrl}
+                              onChange={(e) => setNewPhotoUrl(e.target.value)}
+                              className="h-9"
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  if (newPhotoUrl.trim()) {
+                                    setProfile(curr => curr ? { ...curr, tripPhotos: [...(curr.tripPhotos || []), newPhotoUrl.trim()] } : null);
+                                    setNewPhotoUrl("");
+                                  }
+                                }
+                              }}
+                            />
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              size="sm"
+                              className="font-bold cursor-pointer"
+                              onClick={() => {
+                                if (newPhotoUrl.trim()) {
+                                  setProfile(curr => curr ? { ...curr, tripPhotos: [...(curr.tripPhotos || []), newPhotoUrl.trim()] } : null);
+                                  setNewPhotoUrl("");
+                                }
+                              }}
+                            >
+                              <Plus className="size-4 mr-1" /> Add
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="flex flex-wrap items-center gap-3 pt-2">
                     <Button type="submit" disabled={saving}>
                       {saving ? "Saving changes..." : "Save profile"}
@@ -253,6 +614,26 @@ export default function ProfilePage() {
                   <p className="font-semibold">{profile ? `${profile.firstName} ${profile.lastName}`.trim() : "Unknown user"}</p>
                 </div>
               </div>
+
+              {profile?.isVerified && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full gap-2 font-bold cursor-pointer text-xs"
+                  onClick={() => {
+                    const link = `${window.location.origin}/organizers/${profile.id}`;
+                    navigator.clipboard.writeText(link);
+                    pushToast({
+                      type: "success",
+                      title: "Link Copied",
+                      description: "Guide public profile link copied to clipboard."
+                    });
+                  }}
+                >
+                  <LinkIcon className="size-3.5" />
+                  Copy Link to Profile
+                </Button>
+              )}
 
               <div className="space-y-3 text-sm">
                 <div className="flex items-start gap-3 rounded-md border border-border p-3">

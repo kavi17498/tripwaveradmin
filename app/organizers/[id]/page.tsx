@@ -32,7 +32,13 @@ import {
   Activity,
   Calendar,
   Users,
-  Check
+  Check,
+  Share2,
+  Image as ImageIcon,
+  Facebook,
+  Instagram,
+  Twitter,
+  Linkedin
 } from "lucide-react";
 
 export default function OrganizerProfilePage() {
@@ -44,6 +50,7 @@ export default function OrganizerProfilePage() {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [creatingChat, setCreatingChat] = useState(false);
   const [sendingRequest, setSendingRequest] = useState(false);
+  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const { pushToast } = useToast();
 
   const handleRequestCustomTrip = async () => {
@@ -264,8 +271,8 @@ export default function OrganizerProfilePage() {
         <section className="relative h-[220px] md:h-[280px] w-full overflow-hidden bg-zinc-950">
           <div className="absolute inset-0">
             <img 
-              src="https://images.unsplash.com/photo-1546708973-b339540b5162?q=80&w=1600&auto=format&fit=crop" 
-              alt="Ella Rock Sri Lanka Banner" 
+              src={profile.organizer.coverImage || "https://images.unsplash.com/photo-1546708973-b339540b5162?q=80&w=1600&auto=format&fit=crop"} 
+              alt={`${organizerName} Cover Banner`} 
               className="w-full h-full object-cover opacity-60"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-background via-black/30 to-black/60" />
@@ -323,28 +330,71 @@ export default function OrganizerProfilePage() {
                     <CalendarDays className="size-3.5 text-muted-foreground/80 shrink-0" />
                     <span>{joinedDate}</span>
                   </div>
+                  
+                  {profile.organizer.socialLinks && (
+                    <div className="flex items-center justify-center lg:justify-start gap-3 pt-1.5">
+                      {profile.organizer.socialLinks.facebook && (
+                        <a href={profile.organizer.socialLinks.facebook} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-blue-600 transition-colors" title="Facebook">
+                          <Facebook className="size-5" />
+                        </a>
+                      )}
+                      {profile.organizer.socialLinks.instagram && (
+                        <a href={profile.organizer.socialLinks.instagram} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-pink-500 transition-colors" title="Instagram">
+                          <Instagram className="size-5" />
+                        </a>
+                      )}
+                      {profile.organizer.socialLinks.twitter && (
+                        <a href={profile.organizer.socialLinks.twitter} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-sky-500 transition-colors" title="Twitter / X">
+                          <Twitter className="size-5" />
+                        </a>
+                      )}
+                      {profile.organizer.socialLinks.linkedin && (
+                        <a href={profile.organizer.socialLinks.linkedin} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-blue-700 transition-colors" title="LinkedIn">
+                          <Linkedin className="size-5" />
+                        </a>
+                      )}
+                    </div>
+                  )}
                 </div>
 
-                {(!currentUser || currentUser.id !== id) && (
-                  <div className="w-full max-w-sm space-y-2.5 mt-1">
-                    <Button
-                      onClick={handleMessageOrganizer}
-                      disabled={creatingChat}
-                      className="w-full gap-2 font-bold cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90"
-                    >
-                      <MessageSquare className="size-4" />
-                      {creatingChat ? "Starting Chat..." : "Message Guide"}
-                    </Button>
-                    <Button
-                      onClick={handleRequestCustomTrip}
-                      variant="outline"
-                      className="w-full gap-2 font-bold cursor-pointer border-primary text-primary hover:bg-primary/5"
-                    >
-                      <Sparkles className="size-4" />
-                      Request Custom Trips
-                    </Button>
-                  </div>
-                )}
+                <div className="w-full max-w-sm space-y-2.5 mt-1">
+                  {(!currentUser || currentUser.id !== id) && (
+                    <>
+                      <Button
+                        onClick={handleMessageOrganizer}
+                        disabled={creatingChat}
+                        className="w-full gap-2 font-bold cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90"
+                      >
+                        <MessageSquare className="size-4" />
+                        {creatingChat ? "Starting Chat..." : "Message Guide"}
+                      </Button>
+                      <Button
+                        onClick={handleRequestCustomTrip}
+                        variant="outline"
+                        className="w-full gap-2 font-bold cursor-pointer border-primary text-primary hover:bg-primary/5"
+                      >
+                        <Sparkles className="size-4" />
+                        Request Custom Trips
+                      </Button>
+                    </>
+                  )}
+                  <Button
+                    onClick={() => {
+                      const link = window.location.href;
+                      navigator.clipboard.writeText(link);
+                      pushToast({
+                        title: "Profile Shared",
+                        description: "Public profile link copied to clipboard.",
+                        type: "success",
+                      });
+                    }}
+                    variant="outline"
+                    className="w-full gap-2 font-bold cursor-pointer"
+                  >
+                    <Share2 className="size-4" />
+                    Share Profile / Copy Link
+                  </Button>
+                </div>
 
                 {/* High Impact Statistics Summary */}
                 <div className="grid grid-cols-3 gap-3 text-center w-full max-w-sm">
@@ -402,7 +452,11 @@ export default function OrganizerProfilePage() {
                         <Languages className="size-4.5 text-primary shrink-0 mt-0.5" />
                         <div className="text-xs">
                           <span className="font-bold text-foreground block">Languages Spoken</span>
-                          <span className="text-muted-foreground font-medium">English, Sinhala, Tamil</span>
+                          <span className="text-muted-foreground font-medium">
+                            {profile.organizer.languagesSpoken && profile.organizer.languagesSpoken.length > 0
+                              ? profile.organizer.languagesSpoken.join(", ")
+                              : "English, Sinhala, Tamil"}
+                          </span>
                         </div>
                       </div>
 
@@ -592,11 +646,61 @@ export default function OrganizerProfilePage() {
 
           </div>
 
+          {/* Past Trips Photos Gallery Section */}
+          {profile.organizer.tripPhotos && profile.organizer.tripPhotos.length > 0 && (
+            <div className="space-y-6 pt-8">
+              <div className="flex items-center justify-between border-b border-border/80 pb-4">
+                <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
+                  <ImageIcon className="size-5 text-primary" />
+                  Past Organized Trips Gallery
+                </h2>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {profile.organizer.tripPhotos.map((photoUrl: string, idx: number) => (
+                  <div 
+                    key={idx} 
+                    onClick={() => setLightboxImage(photoUrl)}
+                    className="relative aspect-video rounded-xl overflow-hidden border border-border bg-muted shadow-sm hover:shadow-md transition-all duration-300 group cursor-zoom-in"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img 
+                      src={photoUrl} 
+                      alt={`Trip Photo ${idx + 1}`} 
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
+                      <span className="text-white text-xs font-bold px-3 py-1 rounded-full bg-black/50 backdrop-blur-xs">View Image</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
         </div>
 
       </main>
 
-
+      {/* Lightbox Overlay */}
+      {lightboxImage && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 p-4 cursor-zoom-out"
+          onClick={() => setLightboxImage(null)}
+        >
+          <button 
+            onClick={() => setLightboxImage(null)}
+            className="absolute top-4 right-4 text-white hover:text-gray-300 text-3xl font-bold z-50 cursor-pointer"
+          >
+            &times;
+          </button>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img 
+            src={lightboxImage} 
+            alt="Enlarged gallery view" 
+            className="max-h-[90vh] max-w-[90vw] object-contain rounded-lg shadow-2xl"
+          />
+        </div>
+      )}
 
       <Footer />
     </div>
