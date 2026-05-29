@@ -475,7 +475,7 @@ export default function BookOnDemandPage() {
       }
 
       // Card online payment path
-      const amount = pricePerPerson * participantsPayload.length + (template.pickupType !== "Meet at Location" ? pickupCost : 0);
+      const amount = template.price + (template.pickupType !== "Meet at Location" ? pickupCost : 0);
       const createRes = await paymentService.createPayment({
         tripId,
         userId: parentUserId,
@@ -876,16 +876,16 @@ export default function BookOnDemandPage() {
               
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between text-muted-foreground">
-                  <span>Price per Traveler:</span>
+                  <span>Base Booking Price:</span>
                   <span className="font-medium text-foreground">{formatCurrencyRs(pricePerPerson)}</span>
                 </div>
                 <div className="flex justify-between text-muted-foreground">
-                  <span>Number of Travelers:</span>
-                  <span className="font-medium text-foreground">x {participantsCount}</span>
+                  <span>Travelers Group Size:</span>
+                  <span className="font-medium text-foreground">{participantsCount} of {template?.maxParticipants || 10} max</span>
                 </div>
                 <div className="border-t border-border/60 my-2 pt-2 flex justify-between font-medium">
                   <span>Base Price Subtotal:</span>
-                  <span>{formatCurrencyRs(pricePerPerson * Number(participantsCount))}</span>
+                  <span>{formatCurrencyRs(pricePerPerson)}</span>
                 </div>
 
                 {template?.pickupType && template.pickupType !== "Meet at Location" && (
@@ -903,7 +903,7 @@ export default function BookOnDemandPage() {
 
                 <div className="border-t border-border/80 pt-3 flex justify-between items-baseline font-bold text-lg text-primary">
                   <span>Estimated Total:</span>
-                  <span>{formatCurrencyRs(pricePerPerson * Number(participantsCount) + pickupCost)}</span>
+                  <span>{formatCurrencyRs(pricePerPerson + pickupCost)}</span>
                 </div>
               </div>
 
