@@ -14,6 +14,38 @@ import { userSessionService } from "@/lib/services/userSessionService";
 import { useToast } from "@/components/feedback/toast-provider";
 import { Calendar, Clock, MapPin, MapPinIcon, ShieldCheck, Sparkles, Star, Users } from "lucide-react";
 import { formatCurrencyRs } from "@/lib/utils";
+import LocationPicker from "@/components/common/locationpicker";
+import { Input } from "@/components/ui/input";
+
+const airportPickupLocations: Partial<Record<string, { lat: number; lng: number; address: string }>> = {
+  "Free Pickup from Bandaranaike International Airport": {
+    lat: 7.1808,
+    lng: 79.8841,
+    address: "Bandaranaike International Airport",
+  },
+  "Free Pickup from Mattala Airport": {
+    lat: 6.2844,
+    lng: 81.1241,
+    address: "Mattala Rajapaksa International Airport",
+  },
+};
+
+const isAirportPickupType = (pickupType: string | undefined) =>
+  pickupType === "Free Pickup from Bandaranaike International Airport" || pickupType === "Free Pickup from Mattala Airport";
+
+const calculateDistanceKm = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
+  const R = 6371; // Earth's radius in km
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLng / 2) *
+      Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+};
 
 const weekdayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -96,12 +128,20 @@ export default function OnDemandTripBookingPage() {
   const [organizerProfile, setOrganizerProfile] = useState<OrganizerProfile | null>(null);
   const [busyDates, setBusyDates] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
-  const [booking, setBooking] = useState(false);
   const [error, setError] = useState("");
-  const [selectedDate, setSelectedDate] = useState("");
-  const [selectedStartTime, setSelectedStartTime] = useState("08:00");
-  const [viewMonth, setViewMonth] = useState(() => startOfMonth(new Date()));
-  const [bookingModalOpen, setBookingModalOpen] = useState(false);
+  const handleBookRedirect = () => {
+    const token = userSessionService.getToken();
+    if (!token) {
+      pushToast({
+        title: "Authentication Required",
+        description: "Please sign in to continue booking this trip.",
+        type: "error",
+      });
+      router.push(`/login?redirect=/booking/on-demand/${id}`);
+      return;
+    }
+    router.push(`/booking/on-demand/${id}`);
+  };
 
   const busyDateSet = useMemo(() => new Set(busyDates), [busyDates]);
 
@@ -158,14 +198,6 @@ export default function OnDemandTripBookingPage() {
     load();
   }, [id]);
 
-  useEffect(() => {
-    if (template && !selectedDate) {
-      const nextDay = new Date();
-      nextDay.setDate(nextDay.getDate() + 1);
-      setSelectedDate(toDateKey(nextDay));
-    }
-  }, [template, selectedDate]);
-
   const organizerName = getOrganizerName(template, organizerProfile);
   const organizerLink = organizerProfile?.id || template?.organizer ? `/organizers/${organizerProfile?.id || template?.organizer}` : null;
   const tripPhotos = useMemo(() => {
@@ -183,99 +215,7 @@ export default function OnDemandTripBookingPage() {
 
   const mainDestination = template?.mainDestinations?.[0]?.name || template?.destinations?.[0]?.name || template?.startLocation || "Meeting point";
 
-  const selectedDateLabel = useMemo(() => {
-    if (!selectedDate) return "No date selected";
-    const parsed = new Date(`${selectedDate}T00:00:00`);
-    if (Number.isNaN(parsed.getTime())) return selectedDate;
-    return parsed.toLocaleDateString(undefined, {
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
-  }, [selectedDate]);
 
-  const monthDays = useMemo(() => {
-    const firstDay = startOfMonth(viewMonth);
-    const lastDay = endOfMonth(viewMonth);
-    const leadingBlanks = firstDay.getDay();
-    const cells: Array<{ key: string; label: number; date: Date | null }> = [];
-
-    for (let index = 0; index < leadingBlanks; index += 1) {
-      cells.push({ key: `blank-${index}`, label: 0, date: null });
-    }
-
-    for (let day = 1; day <= lastDay.getDate(); day += 1) {
-      const date = new Date(viewMonth.getFullYear(), viewMonth.getMonth(), day);
-      cells.push({ key: toDateKey(date), label: day, date });
-    }
-
-    return cells;
-  }, [viewMonth]);
-
-  const selectedMonthLabel = useMemo(
-    () =>
-      viewMonth.toLocaleDateString(undefined, {
-        month: "long",
-        year: "numeric",
-      }),
-    [viewMonth],
-  );
-
-  const isDateDisabled = (date: Date) => {
-    const key = toDateKey(date);
-    return busyDateSet.has(key) || isPastDate(date);
-  };
-
-  const handleBook = async () => {
-    if (!template) return;
-
-    const token = userSessionService.getToken();
-    if (!token) {
-      pushToast({
-        title: "Authentication Required",
-        description: "Please sign in to continue booking this trip.",
-        type: "error",
-      });
-      router.push(`/login?redirect=/on-demand/${id}`);
-      return;
-    }
-
-    if (!selectedDate) {
-      pushToast({ title: "Pick a date", description: "Select an available booking date first.", type: "error" });
-      return;
-    }
-
-    if (busyDateSet.has(selectedDate)) {
-      pushToast({ title: "Date unavailable", description: "That date is already booked by the guide.", type: "error" });
-      return;
-    }
-
-    try {
-      setBooking(true);
-      const response = await onDemandTripService.bookTemplate(id, { startDate: selectedDate, startTime: selectedStartTime }, token);
-      const tripId = response.data?.tripId;
-      if (!tripId) {
-        throw new Error("Booking could not be created.");
-      }
-
-      pushToast({
-        title: "Booking prepared",
-        description: "Your private trip is ready. Continue with participants and payment.",
-        type: "success",
-      });
-      setBookingModalOpen(false);
-      router.push(`/booking/${tripId}`);
-    } catch (bookError) {
-      pushToast({
-        title: "Booking failed",
-        description: bookError instanceof Error ? bookError.message : "Failed to create the private trip.",
-        type: "error",
-      });
-    } finally {
-      setBooking(false);
-    }
-  };
 
   if (loading) {
     return (
@@ -405,7 +345,7 @@ export default function OnDemandTripBookingPage() {
           <div className="border border-border bg-card p-6 rounded-lg h-fit">
             <p className="text-sm text-muted-foreground">Price per booking</p>
             <p className="text-3xl font-semibold">{formatCurrencyRs(template.price)}</p>
-            <Button className="mt-6 w-full font-bold" onClick={() => setBookingModalOpen(true)}>
+            <Button className="mt-6 w-full font-bold" onClick={handleBookRedirect}>
               Choose Date & Book
             </Button>
             <p className="mt-3 text-xs text-muted-foreground text-center">
@@ -642,7 +582,7 @@ export default function OnDemandTripBookingPage() {
 
         {/* Call to Action */}
         <div className="flex gap-3 justify-center py-6">
-          <Button size="lg" onClick={() => setBookingModalOpen(true)}>
+          <Button size="lg" onClick={handleBookRedirect}>
             Book This Trip Now
           </Button>
           <Button size="lg" variant="outline" onClick={() => router.back()}>
@@ -651,68 +591,6 @@ export default function OnDemandTripBookingPage() {
         </div>
       </main>
       <Footer />
-
-      <Modal
-        open={bookingModalOpen}
-        title="Choose your date"
-        description="Pick an available day from the calendar, then confirm your booking."
-        onClose={() => setBookingModalOpen(false)}
-        onConfirm={() => void handleBook()}
-        confirmText={booking ? "Creating trip..." : "Book now"}
-      >
-        <div className="space-y-4">
-          <div className="flex items-center justify-between gap-3">
-            <Button type="button" variant="outline" size="sm" onClick={() => setViewMonth((current) => addMonths(current, -1))}>
-              Previous
-            </Button>
-            <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-muted-foreground">{selectedMonthLabel}</h3>
-            <Button type="button" variant="outline" size="sm" onClick={() => setViewMonth((current) => addMonths(current, 1))}>
-              Next
-            </Button>
-          </div>
-
-          <div className="grid grid-cols-7 gap-2 text-center text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
-            {weekdayLabels.map((day) => (
-              <div key={day} className="py-2">{day}</div>
-            ))}
-          </div>
-
-          <div className="grid grid-cols-7 gap-2">
-            {monthDays.map((cell) => {
-              if (!cell.date) {
-                return <div key={cell.key} className="h-12 rounded-xl" />;
-              }
-
-              const disabled = isDateDisabled(cell.date);
-              const isSelected = selectedDate === cell.key;
-
-              return (
-                <button
-                  key={cell.key}
-                  type="button"
-                  disabled={disabled}
-                  onClick={() => setSelectedDate(cell.key)}
-                  className={`h-12 rounded-xl border text-sm font-semibold transition ${
-                    isSelected
-                      ? "border-primary bg-primary text-primary-foreground"
-                      : disabled
-                        ? "cursor-not-allowed border-border/40 bg-muted text-muted-foreground/40"
-                        : "border-border bg-card hover:border-primary/50 hover:bg-primary/5"
-                  }`}
-                >
-                  {cell.label}
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="rounded-2xl border border-border bg-muted/30 p-4 text-sm text-muted-foreground">
-            <p className="font-semibold text-foreground">Selected date</p>
-            <p>{selectedDateLabel}</p>
-            <p className="mt-2 text-xs">A default meetup time is used for booking. You only need to choose the date here.</p>
-          </div>
-        </div>
-      </Modal>
     </div>
   );
 }

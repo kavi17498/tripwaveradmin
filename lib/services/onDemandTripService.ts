@@ -159,7 +159,19 @@ export const onDemandTripService = {
     return { data: response as OnDemandTripAvailability, message: "Availability loaded successfully" };
   },
 
-  async bookTemplate(id: string, payload: { startDate: string; startTime: string; note?: string }, token: string): Promise<ServiceResponse<{ tripId: string }>> {
+  async bookTemplate(
+    id: string,
+    payload: {
+      startDate: string;
+      startTime: string;
+      note?: string;
+      pickupLocation?: { name: string; lat: number; lng: number };
+      pickupDistanceKm?: number;
+      pickupCost?: number;
+      participants?: any[];
+    },
+    token: string
+  ): Promise<ServiceResponse<{ tripId: string }>> {
     const response = await apiClient.authenticatedRequest<{ tripId: string } | ServiceResponse<{ tripId: string }>>(
       `/on-demand-trips/${id}/book`,
       token,
