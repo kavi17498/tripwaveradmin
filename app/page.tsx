@@ -270,18 +270,7 @@ export default function HomePage() {
         )}
 
         <section className="mx-auto max-w-7xl px-4 py-16 md:px-6 md:py-24">
-          <div className="mb-8 flex items-center justify-between">
-            <div>
-              <h2 className="text-2xl font-semibold">Featured On-Demand Trips</h2>
-              <p className="mt-1 text-sm text-muted-foreground">Browse flexible on-demand options and choose your dates later.</p>
-            </div>
-            {!isSearchActive && (
-              <Button variant="outline" asChild className="hidden sm:inline-flex">
-                <Link href="/trips">View all trips</Link>
-              </Button>
-            )}
-          </div>
-
+          
           <form onSubmit={handleSearch} className="mb-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end border border-border bg-card p-6 rounded-sm">
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">Trip Name</label>
@@ -500,7 +489,7 @@ export default function HomePage() {
                       </div>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-2">
+                    <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
                       {fixedDateTrips.map((t) => (
                         <TripCardEnhanced key={t.id} trip={t} />
                       ))}

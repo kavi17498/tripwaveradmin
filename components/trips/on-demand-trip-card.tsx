@@ -12,11 +12,11 @@ export function OnDemandTripCard({ trip }: OnDemandTripCardProps) {
     ? trip.mainDestinations.map((d) => d.name).join(", ")
     : trip.destinations?.[0]?.name ?? trip.startLocation ?? "Sri Lanka";
   const rating = trip.organizerRating;
-  const pickupText = determinePickupText(trip.pickupType);
+  const pickupText = determinePickupText(trip);
 
   return (
     <Link href={`/on-demand/${trip.id}`} className="group block h-full">
-      <article className="flex h-full flex-col overflow-hidden rounded-[24px] border border-border/70 bg-card shadow-sm transition-all duration-300 group-hover:-translate-y-1 group-hover:shadow-xl group-hover:border-primary/20">
+      <article className="flex h-[380px] flex-col overflow-hidden rounded-[24px] border border-border/70 bg-card shadow-sm transition-all duration-300 group-hover:-translate-y-1 group-hover:shadow-xl group-hover:border-primary/20 md:h-[388px]">
         <div className="relative aspect-16/10 overflow-hidden bg-muted">
           {trip.coverImage ? (
             <img
@@ -39,14 +39,14 @@ export function OnDemandTripCard({ trip }: OnDemandTripCardProps) {
           </button>
         </div>
 
-        <div className="flex flex-1 flex-col p-3.5 md:p-4">
+        <div className="flex flex-1 flex-col p-3 md:p-3.5">
           <div className="space-y-1.5">
             <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
               <MapPin className="size-4 shrink-0" />
               <span className="line-clamp-1">{destinationsLabel}</span>
             </div>
 
-            <h3 className="line-clamp-2 text-[1.18rem] font-extrabold leading-snug tracking-tight text-foreground group-hover:text-primary">
+            <h3 className="line-clamp-2 text-[1.12rem] font-extrabold leading-snug tracking-tight text-foreground group-hover:text-primary">
               {trip.tripName}
             </h3>
           </div>
@@ -84,8 +84,25 @@ export function OnDemandTripCard({ trip }: OnDemandTripCardProps) {
   );
 }
 
-function determinePickupText(value: unknown) {
-  const normalized = String(value ?? "").toLowerCase();
-  if (normalized.includes("pickup")) return "Pickup available";
+function determinePickupText(trip: unknown) {
+  const normalizedPickupType = String((trip as { pickupType?: unknown } | null)?.pickupType ?? "").trim().toLowerCase();
+  const hasPickupConfig = Boolean(
+    (trip as { pickupCostPerKm?: unknown } | null)?.pickupCostPerKm !== undefined ||
+    (trip as { pickupStartLocation?: unknown } | null)?.pickupStartLocation ||
+    (trip as { pickupCost?: unknown } | null)?.pickupCost !== undefined,
+  );
+
+  if (normalizedPickupType.includes("meet at location") && !hasPickupConfig) {
+    return "Meet at location";
+  }
+
+  if (
+    normalizedPickupType.includes("pickup") ||
+    normalizedPickupType.includes("airport") ||
+    hasPickupConfig
+  ) {
+    return "Pickup available";
+  }
+
   return "Meet at location";
 }
