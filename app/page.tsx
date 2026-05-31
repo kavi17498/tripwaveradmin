@@ -327,175 +327,73 @@ export default function HomePage() {
           ) : (
             <div className="space-y-16">
               {/* Solo Trips Row */}
-              <div className="grid grid-cols-1 gap-8 lg:grid-cols-3 border-b border-border pb-16 last:border-0 last:pb-0">
-                <div className="space-y-4">
-                  <span className="text-xs font-semibold tracking-wider text-sky-600 uppercase block">Explore Alone</span>
-                  <h3 className="text-2xl font-bold tracking-tight">On-Demand Solo Trips</h3>
-                  <p className="text-sm text-muted-foreground leading-relaxed">
-                    Travel on your own schedule. Book a verified local guide first, then choose the date that works for you.
-                  </p>
-                  <Button variant="outline" asChild className="w-full sm:w-auto">
-                    <Link href="/organizers">Find Guides</Link>
-                  </Button>
-                </div>
-                <div className="lg:col-span-2">
-                  {soloTrips.length === 0 ? (
-                    <div className="border border-border bg-card p-8 flex flex-col justify-between h-full min-h-[200px]">
-                      <div>
-                        <h4 className="font-semibold text-sm">No solo on-demand options yet</h4>
-                        <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
-                          No on-demand solo templates are available right now. You can still create your own trip and invite a guide.
-                        </p>
-                      </div>
-                      <Button className="mt-6 w-full sm:w-auto self-start" asChild>
-                        <Link href="/dashboard/create-trip">Plan My Trip</Link>
-                      </Button>
-                    </div>
-                  ) : (
-                      <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
-                      {soloTrips.slice(0, 3).map((t) => (
-                        <OnDemandTripCard key={t.id} trip={t} />
-                      ))}
-                    </div>
-                  )}
-                </div>
+              <div className="space-y-4 border-b border-border pb-16 last:border-0 last:pb-0">
+                <h3 className="text-2xl font-bold tracking-tight">Solo Trips</h3>
+                {soloTrips.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No solo trips available.</p>
+                ) : (
+                  <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+                    {soloTrips.slice(0, 3).map((t) => (
+                      <OnDemandTripCard key={t.id} trip={t} />
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Couple Trips Row */}
-              <div className="grid grid-cols-1 gap-8 lg:grid-cols-3 border-b border-border pb-16 last:border-0 last:pb-0">
-                <div className="space-y-4">
-                  <span className="text-xs font-semibold tracking-wider text-rose-500 uppercase block">Romantic Getaways</span>
-                  <h3 className="text-2xl font-bold tracking-tight">On-Demand Trips for Couples</h3>
-                  <p className="text-sm text-muted-foreground leading-relaxed">
-                    Pick a guide and lock your preferred travel dates later. Ideal for flexible couple escapes.
-                  </p>
-                  <Button variant="outline" asChild className="w-full sm:w-auto">
-                    <Link href="/organizers">Find Guides</Link>
-                  </Button>
-                </div>
-                <div className="lg:col-span-2">
-                  {coupleTrips.length === 0 ? (
-                    <div className="border border-border bg-card p-8 flex flex-col justify-between h-full min-h-[200px]">
-                      <div>
-                        <h4 className="font-semibold text-sm">No couple on-demand options yet</h4>
-                        <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
-                          No on-demand templates for couples are available right now. Create a custom trip with your own dates.
-                        </p>
-                      </div>
-                      <Button className="mt-6 w-full sm:w-auto self-start" asChild>
-                        <Link href="/dashboard/create-trip">Plan My Trip</Link>
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
-                      {coupleTrips.slice(0, 3).map((t) => (
-                        <OnDemandTripCard key={t.id} trip={t} />
-                      ))}
-                    </div>
-                  )}
-                </div>
+              <div className="space-y-4 border-b border-border pb-16 last:border-0 last:pb-0">
+                <h3 className="text-2xl font-bold tracking-tight">Couple Trips</h3>
+                {coupleTrips.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No couple trips available.</p>
+                ) : (
+                  <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+                    {coupleTrips.slice(0, 3).map((t) => (
+                      <OnDemandTripCard key={t.id} trip={t} />
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Family Trips Row */}
-              <div className="grid grid-cols-1 gap-8 lg:grid-cols-3 border-b border-border pb-16 last:border-0 last:pb-0">
-                <div className="space-y-4">
-                  <span className="text-xs font-semibold tracking-wider text-emerald-600 uppercase block">Family Journeys</span>
-                  <h3 className="text-2xl font-bold tracking-tight">On-Demand Family Trips</h3>
-                  <p className="text-sm text-muted-foreground leading-relaxed">
-                    Family-friendly templates where you book a guide now and confirm your schedule later.
-                  </p>
-                  <Button variant="outline" asChild className="w-full sm:w-auto">
-                    <Link href="/organizers">Find Guides</Link>
-                  </Button>
-                </div>
-                <div className="lg:col-span-2">
-                  {familyTrips.length === 0 ? (
-                    <div className="border border-border bg-card p-8 flex flex-col justify-between h-full min-h-[200px]">
-                      <div>
-                        <h4 className="font-semibold text-sm">No family on-demand options yet</h4>
-                        <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
-                          No on-demand family templates are available right now. Collaborate with a certified guide to build one.
-                        </p>
-                      </div>
-                      <Button className="mt-6 w-full sm:w-auto self-start" asChild>
-                        <Link href="/dashboard/create-trip">Plan My Trip</Link>
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
-                      {familyTrips.slice(0, 3).map((t) => (
-                        <OnDemandTripCard key={t.id} trip={t} />
-                      ))}
-                    </div>
-                  )}
-                </div>
+              <div className="space-y-4 border-b border-border pb-16 last:border-0 last:pb-0">
+                <h3 className="text-2xl font-bold tracking-tight">Family Trips</h3>
+                {familyTrips.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No family trips available.</p>
+                ) : (
+                  <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+                    {familyTrips.slice(0, 3).map((t) => (
+                      <OnDemandTripCard key={t.id} trip={t} />
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Team Trips Row */}
-              <div className="grid grid-cols-1 gap-8 lg:grid-cols-3 border-b border-border pb-16 last:border-0 last:pb-0">
-                <div className="space-y-4">
-                  <span className="text-xs font-semibold tracking-wider text-indigo-600 uppercase block">Group Adventures</span>
-                  <h3 className="text-2xl font-bold tracking-tight">On-Demand Trips for Teams</h3>
-                  <p className="text-sm text-muted-foreground leading-relaxed">
-                    Great for clubs and teams who need date flexibility. Choose a guide now and lock dates later.
-                  </p>
-                  <Button variant="outline" asChild className="w-full sm:w-auto">
-                    <Link href="/organizers">Find Guides</Link>
-                  </Button>
-                </div>
-                <div className="lg:col-span-2">
-                  {teamTrips.length === 0 ? (
-                    <div className="border border-border bg-card p-8 flex flex-col justify-between h-full min-h-[200px]">
-                      <div>
-                        <h4 className="font-semibold text-sm">No team on-demand options yet</h4>
-                        <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
-                          No on-demand team templates are available right now. Plan your own custom team route through Sri Lanka.
-                        </p>
-                      </div>
-                      <Button className="mt-6 w-full sm:w-auto self-start" asChild>
-                        <Link href="/dashboard/create-trip">Plan My Trip</Link>
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
-                      {teamTrips.slice(0, 3).map((t) => (
-                        <OnDemandTripCard key={t.id} trip={t} />
-                      ))}
-                    </div>
-                  )}
-                </div>
+              <div className="space-y-4 border-b border-border pb-16 last:border-0 last:pb-0">
+                <h3 className="text-2xl font-bold tracking-tight">Team Trips</h3>
+                {teamTrips.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No team trips available.</p>
+                ) : (
+                  <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+                    {teamTrips.slice(0, 3).map((t) => (
+                      <OnDemandTripCard key={t.id} trip={t} />
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Fixed Date Trips Section (last section) */}
-              <div className="grid grid-cols-1 gap-8 lg:grid-cols-3 border-b border-border pb-16 last:border-0 last:pb-0">
-                <div className="space-y-4">
-                  <span className="text-xs font-semibold tracking-wider text-amber-600 uppercase block">Fixed Departures</span>
-                  <h3 className="text-2xl font-bold tracking-tight">Fixed Date Trips</h3>
-                  <p className="text-sm text-muted-foreground leading-relaxed">
-                    These trips already have confirmed departure dates. Browse all available approved fixed date trips.
-                  </p>
-                  <Button variant="outline" asChild className="w-full sm:w-auto">
-                    <Link href="/trips">Browse Fixed Date Trips</Link>
-                  </Button>
-                </div>
-                <div className="lg:col-span-2">
-                  {fixedDateTrips.length === 0 ? (
-                    <div className="border border-border bg-card p-8 flex flex-col justify-between h-full min-h-[200px]">
-                      <div>
-                        <h4 className="font-semibold text-sm">No fixed date trips available right now</h4>
-                        <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
-                          There are currently no approved fixed date departures. Check back soon or explore on-demand options above.
-                        </p>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
-                      {fixedDateTrips.map((t) => (
-                        <TripCardEnhanced key={t.id} trip={t} />
-                      ))}
-                    </div>
-                  )}
-                </div>
+              <div className="space-y-4">
+                <h3 className="text-2xl font-bold tracking-tight">Fixed Date Tours</h3>
+                {fixedDateTrips.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No fixed date tours available.</p>
+                ) : (
+                  <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+                    {fixedDateTrips.map((t) => (
+                      <TripCardEnhanced key={t.id} trip={t} />
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}
