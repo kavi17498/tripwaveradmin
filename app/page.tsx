@@ -202,10 +202,11 @@ export default function HomePage() {
     setHeroSearchResults(null);
   }
 
-  const soloTrips = trips.filter((t) => t.capacity === 1);
-  const coupleTrips = trips.filter((t) => t.capacity === 2);
-  const familyTrips = trips.filter((t) => t.capacity > 2 && t.capacity <= 6);
-  const teamTrips = trips.filter((t) => t.capacity > 6);
+  const fixedDateTrips = trips;
+  const soloTrips = onDemandTrips.filter((t) => t.maxParticipants === 1);
+  const coupleTrips = onDemandTrips.filter((t) => t.maxParticipants === 2);
+  const familyTrips = onDemandTrips.filter((t) => t.maxParticipants > 2 && t.maxParticipants <= 6);
+  const teamTrips = onDemandTrips.filter((t) => t.maxParticipants > 6);
   const searchedTrips = (heroSearchResults?.trips || []).map((trip) => mapApiToTrip(trip as TripApiItem));
   const searchedOnDemandTrips = heroSearchResults?.onDemandTrips || [];
 
@@ -271,8 +272,8 @@ export default function HomePage() {
         <section className="mx-auto max-w-7xl px-4 py-16 md:px-6 md:py-24">
           <div className="mb-8 flex items-center justify-between">
             <div>
-              <h2 className="text-2xl font-semibold">Featured Sri Lanka Trips</h2>
-              <p className="mt-1 text-sm text-muted-foreground">Search or browse by our hand-picked travel options.</p>
+              <h2 className="text-2xl font-semibold">Featured On-Demand Trips</h2>
+              <p className="mt-1 text-sm text-muted-foreground">Browse flexible on-demand options and choose your dates later.</p>
             </div>
             {!isSearchActive && (
               <Button variant="outline" asChild className="hidden sm:inline-flex">
@@ -344,7 +345,7 @@ export default function HomePage() {
               <div className="mb-6 flex items-center justify-between border-b border-border pb-4">
                 <div>
                   <h3 className="text-xl font-bold tracking-tight">Search Results</h3>
-                  <p className="text-sm text-muted-foreground mt-1">Found {trips.length} matching trips in Sri Lanka</p>
+                  <p className="text-sm text-muted-foreground mt-1">Found {trips.length} matching fixed date trips in Sri Lanka</p>
                 </div>
                 <Button variant="outline" size="sm" onClick={handleReset}>Clear All Filters</Button>
               </div>
@@ -364,21 +365,21 @@ export default function HomePage() {
               <div className="grid grid-cols-1 gap-8 lg:grid-cols-3 border-b border-border pb-16 last:border-0 last:pb-0">
                 <div className="space-y-4">
                   <span className="text-xs font-semibold tracking-wider text-sky-600 uppercase block">Explore Alone</span>
-                  <h3 className="text-2xl font-bold tracking-tight">Guided Solo Trips</h3>
+                  <h3 className="text-2xl font-bold tracking-tight">On-Demand Solo Trips</h3>
                   <p className="text-sm text-muted-foreground leading-relaxed">
-                    Travel on your own with complete freedom. A verified local guide is always nearby to keep you safe and comfortable.
+                    Travel on your own schedule. Book a verified local guide first, then choose the date that works for you.
                   </p>
                   <Button variant="outline" asChild className="w-full sm:w-auto">
-                    <Link href="/trips">Browse Solo Trips</Link>
+                    <Link href="/organizers">Find Guides</Link>
                   </Button>
                 </div>
                 <div className="lg:col-span-2">
                   {soloTrips.length === 0 ? (
                     <div className="border border-border bg-card p-8 flex flex-col justify-between h-full min-h-[200px]">
                       <div>
-                        <h4 className="font-semibold text-sm">Be the first to plan this journey</h4>
+                        <h4 className="font-semibold text-sm">No solo on-demand options yet</h4>
                         <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
-                          No scheduled solo trips are available right now. Collaborate with a certified guide to plan your own custom route through Sri Lanka.
+                          No on-demand solo templates are available right now. You can still create your own trip and invite a guide.
                         </p>
                       </div>
                       <Button className="mt-6 w-full sm:w-auto self-start" asChild>
@@ -386,9 +387,9 @@ export default function HomePage() {
                       </Button>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                      {soloTrips.slice(0, 2).map((t) => (
-                        <TripCardEnhanced key={t.id} trip={t} />
+                    <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+                      {soloTrips.slice(0, 3).map((t) => (
+                        <OnDemandTripCard key={t.id} trip={t} />
                       ))}
                     </div>
                   )}
@@ -399,21 +400,21 @@ export default function HomePage() {
               <div className="grid grid-cols-1 gap-8 lg:grid-cols-3 border-b border-border pb-16 last:border-0 last:pb-0">
                 <div className="space-y-4">
                   <span className="text-xs font-semibold tracking-wider text-rose-500 uppercase block">Romantic Getaways</span>
-                  <h3 className="text-2xl font-bold tracking-tight">Ideal for Couples</h3>
+                  <h3 className="text-2xl font-bold tracking-tight">On-Demand Trips for Couples</h3>
                   <p className="text-sm text-muted-foreground leading-relaxed">
-                    Plan an intimate escape with your partner. Beautiful stays, private transport options, and relaxing itineraries crafted for two.
+                    Pick a guide and lock your preferred travel dates later. Ideal for flexible couple escapes.
                   </p>
                   <Button variant="outline" asChild className="w-full sm:w-auto">
-                    <Link href="/trips">Browse Couple Trips</Link>
+                    <Link href="/organizers">Find Guides</Link>
                   </Button>
                 </div>
                 <div className="lg:col-span-2">
                   {coupleTrips.length === 0 ? (
                     <div className="border border-border bg-card p-8 flex flex-col justify-between h-full min-h-[200px]">
                       <div>
-                        <h4 className="font-semibold text-sm">Be the first to plan this journey</h4>
+                        <h4 className="font-semibold text-sm">No couple on-demand options yet</h4>
                         <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
-                          No scheduled couple trips are available right now. Plan a trip now and create a custom itinerary.
+                          No on-demand templates for couples are available right now. Create a custom trip with your own dates.
                         </p>
                       </div>
                       <Button className="mt-6 w-full sm:w-auto self-start" asChild>
@@ -421,9 +422,9 @@ export default function HomePage() {
                       </Button>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                      {coupleTrips.slice(0, 2).map((t) => (
-                        <TripCardEnhanced key={t.id} trip={t} />
+                    <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+                      {coupleTrips.slice(0, 3).map((t) => (
+                        <OnDemandTripCard key={t.id} trip={t} />
                       ))}
                     </div>
                   )}
@@ -434,21 +435,21 @@ export default function HomePage() {
               <div className="grid grid-cols-1 gap-8 lg:grid-cols-3 border-b border-border pb-16 last:border-0 last:pb-0">
                 <div className="space-y-4">
                   <span className="text-xs font-semibold tracking-wider text-emerald-600 uppercase block">Family Journeys</span>
-                  <h3 className="text-2xl font-bold tracking-tight">Family Trips with Guide</h3>
+                  <h3 className="text-2xl font-bold tracking-tight">On-Demand Family Trips</h3>
                   <p className="text-sm text-muted-foreground leading-relaxed">
-                    Enjoy a relaxed family vacation where everyone feels comfortable. We handle the transport, safe stays, and activities for you.
+                    Family-friendly templates where you book a guide now and confirm your schedule later.
                   </p>
                   <Button variant="outline" asChild className="w-full sm:w-auto">
-                    <Link href="/trips">Browse Family Trips</Link>
+                    <Link href="/organizers">Find Guides</Link>
                   </Button>
                 </div>
                 <div className="lg:col-span-2">
                   {familyTrips.length === 0 ? (
                     <div className="border border-border bg-card p-8 flex flex-col justify-between h-full min-h-[200px]">
                       <div>
-                        <h4 className="font-semibold text-sm">Be the first to plan this journey</h4>
+                        <h4 className="font-semibold text-sm">No family on-demand options yet</h4>
                         <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
-                          No scheduled family trips are available right now. Collaborate with a certified guide to plan your own custom route through Sri Lanka.
+                          No on-demand family templates are available right now. Collaborate with a certified guide to build one.
                         </p>
                       </div>
                       <Button className="mt-6 w-full sm:w-auto self-start" asChild>
@@ -456,9 +457,9 @@ export default function HomePage() {
                       </Button>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                      {familyTrips.slice(0, 2).map((t) => (
-                        <TripCardEnhanced key={t.id} trip={t} />
+                    <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+                      {familyTrips.slice(0, 3).map((t) => (
+                        <OnDemandTripCard key={t.id} trip={t} />
                       ))}
                     </div>
                   )}
@@ -469,21 +470,21 @@ export default function HomePage() {
               <div className="grid grid-cols-1 gap-8 lg:grid-cols-3 border-b border-border pb-16 last:border-0 last:pb-0">
                 <div className="space-y-4">
                   <span className="text-xs font-semibold tracking-wider text-indigo-600 uppercase block">Group Adventures</span>
-                  <h3 className="text-2xl font-bold tracking-tight">Ideal for Teams</h3>
+                  <h3 className="text-2xl font-bold tracking-tight">On-Demand Trips for Teams</h3>
                   <p className="text-sm text-muted-foreground leading-relaxed">
-                    Plan an adventure with your colleagues, friends, or club. Make payments easy and manage participants stress-free.
+                    Great for clubs and teams who need date flexibility. Choose a guide now and lock dates later.
                   </p>
                   <Button variant="outline" asChild className="w-full sm:w-auto">
-                    <Link href="/trips">Browse Team Trips</Link>
+                    <Link href="/organizers">Find Guides</Link>
                   </Button>
                 </div>
                 <div className="lg:col-span-2">
                   {teamTrips.length === 0 ? (
                     <div className="border border-border bg-card p-8 flex flex-col justify-between h-full min-h-[200px]">
                       <div>
-                        <h4 className="font-semibold text-sm">Be the first to plan this journey</h4>
+                        <h4 className="font-semibold text-sm">No team on-demand options yet</h4>
                         <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
-                          No scheduled team trips are available right now. Plan your own custom team route through Sri Lanka.
+                          No on-demand team templates are available right now. Plan your own custom team route through Sri Lanka.
                         </p>
                       </div>
                       <Button className="mt-6 w-full sm:w-auto self-start" asChild>
@@ -491,8 +492,40 @@ export default function HomePage() {
                       </Button>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                      {teamTrips.slice(0, 2).map((t) => (
+                    <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+                      {teamTrips.slice(0, 3).map((t) => (
+                        <OnDemandTripCard key={t.id} trip={t} />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Fixed Date Trips Section (last section) */}
+              <div className="grid grid-cols-1 gap-8 lg:grid-cols-3 border-b border-border pb-16 last:border-0 last:pb-0">
+                <div className="space-y-4">
+                  <span className="text-xs font-semibold tracking-wider text-amber-600 uppercase block">Fixed Departures</span>
+                  <h3 className="text-2xl font-bold tracking-tight">Fixed Date Trips</h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    These trips already have confirmed departure dates. Browse all available approved fixed date trips.
+                  </p>
+                  <Button variant="outline" asChild className="w-full sm:w-auto">
+                    <Link href="/trips">Browse Fixed Date Trips</Link>
+                  </Button>
+                </div>
+                <div className="lg:col-span-2">
+                  {fixedDateTrips.length === 0 ? (
+                    <div className="border border-border bg-card p-8 flex flex-col justify-between h-full min-h-[200px]">
+                      <div>
+                        <h4 className="font-semibold text-sm">No fixed date trips available right now</h4>
+                        <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
+                          There are currently no approved fixed date departures. Check back soon or explore on-demand options above.
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+                      {fixedDateTrips.map((t) => (
                         <TripCardEnhanced key={t.id} trip={t} />
                       ))}
                     </div>
