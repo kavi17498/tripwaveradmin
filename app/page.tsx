@@ -243,7 +243,7 @@ export default function HomePage() {
                     {searchedTrips.length === 0 ? (
                       <p className="text-sm text-muted-foreground">No approved public non-expired trips found for this query.</p>
                     ) : (
-                      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+                      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-2">
                         {searchedTrips.map((trip) => (
                           <TripCardEnhanced key={`search-trip-${trip.id}`} trip={trip} />
                         ))}
@@ -256,7 +256,7 @@ export default function HomePage() {
                     {searchedOnDemandTrips.length === 0 ? (
                       <p className="text-sm text-muted-foreground">No approved on-demand trips found for this query.</p>
                     ) : (
-                      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+                      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-2">
                         {searchedOnDemandTrips.map((trip) => (
                           <OnDemandTripCard key={`search-ondemand-${trip.id}`} trip={trip} />
                         ))}
@@ -313,30 +313,6 @@ export default function HomePage() {
             </div>
           </form>
 
-          <section className="mb-12 rounded-3xl border border-border bg-card p-6 md:p-8">
-            <div className="mb-5">
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary/80">On-demand trips</p>
-              <h2 className="mt-1 text-2xl font-black tracking-tight md:text-3xl">Book a guide first, choose dates later</h2>
-            </div>
-
-            {loadingOnDemand ? (
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-                {[0, 1, 2].map((index) => (
-                  <div key={index} className="h-80 animate-pulse rounded-3xl bg-muted" />
-                ))}
-              </div>
-            ) : onDemandTrips.length === 0 ? (
-              <div className="rounded-3xl border border-border bg-muted p-8 text-sm text-muted-foreground">
-                No approved on-demand trips are available right now.
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
-                {onDemandTrips.map((trip) => (
-                  <OnDemandTripCard key={trip.id} trip={trip} />
-                ))}
-              </div>
-            )}
-          </section>
 
           {loading ? (
             <p>Loading trips…</p>
@@ -352,7 +328,7 @@ export default function HomePage() {
               {trips.length === 0 ? (
                 <p className="text-muted-foreground">No trips found.</p>
               ) : (
-                <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+                      <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
                   {trips.map((t) => (
                     <TripCardEnhanced key={t.id} trip={t} />
                   ))}
@@ -387,7 +363,7 @@ export default function HomePage() {
                       </Button>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+                      <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
                       {soloTrips.slice(0, 3).map((t) => (
                         <OnDemandTripCard key={t.id} trip={t} />
                       ))}
@@ -422,7 +398,7 @@ export default function HomePage() {
                       </Button>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+                    <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
                       {coupleTrips.slice(0, 3).map((t) => (
                         <OnDemandTripCard key={t.id} trip={t} />
                       ))}
@@ -457,7 +433,7 @@ export default function HomePage() {
                       </Button>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+                    <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
                       {familyTrips.slice(0, 3).map((t) => (
                         <OnDemandTripCard key={t.id} trip={t} />
                       ))}
@@ -492,7 +468,7 @@ export default function HomePage() {
                       </Button>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+                    <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
                       {teamTrips.slice(0, 3).map((t) => (
                         <OnDemandTripCard key={t.id} trip={t} />
                       ))}
@@ -524,7 +500,7 @@ export default function HomePage() {
                       </div>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+                    <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-2">
                       {fixedDateTrips.map((t) => (
                         <TripCardEnhanced key={t.id} trip={t} />
                       ))}
