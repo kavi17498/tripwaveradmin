@@ -11,46 +11,8 @@ import { OnDemandTripCard } from "@/components/trips/on-demand-trip-card";
 import { Trip } from "@/lib/types";
 import { tripApiService, type TripApiItem } from "@/lib/services/tripApiService";
 import { onDemandTripService, type OnDemandTripTemplateApiItem } from "@/lib/services/onDemandTripService";
+import { searchService, type ComprehensiveSearchResponse } from "@/lib/services/searchService";
 import { useAuthCacheStore } from "@/lib/stores/useAuthCacheStore";
-
-const heroSlides = [
-  {
-    title: "Are you looking to travel with someone?",
-    description:
-      "Let us create an amazing Sri Lanka journey with our verified tour guides, from Galle Fort evenings to Ella sunrise routes.",
-    ctaLabel: "Explore Guided Trips",
-    ctaHref: "/trips",
-    image:
-      "https://images.unsplash.com/photo-1511895426328-dc8714191300?q=80&w=1800&auto=format&fit=crop",
-  },
-  {
-    title: "Planning a family trip without stress?",
-    description:
-      "Choose ready-made family trips in Sri Lanka with guides, safe stays, and transport already planned for you.",
-    ctaLabel: "View Family Trips",
-    ctaHref: "/trips",
-    image:
-      "https://images.unsplash.com/photo-1511895426328-dc8714191300?q=80&w=1800&auto=format&fit=crop",
-  },
-  {
-    title: "Company, club, or institute trip coming up?",
-    description:
-      "Plan your Sri Lanka trip using our AI trip planner, share the link with colleagues, and collect trip payments easily.",
-    ctaLabel: "Create a Team Trip",
-    ctaHref: "/dashboard/create-trip",
-    image:
-      "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?q=80&w=1800&auto=format&fit=crop",
-  },
-  {
-    title: "Want to join a group of new travelers?",
-    description:
-      "Join group trips across Sri Lanka and travel with like-minded people under experienced local guides.",
-    ctaLabel: "Join Group Trips",
-    ctaHref: "/trips",
-    image:
-      "https://images.unsplash.com/photo-1529156069898-49953e39b3ac?q=80&w=1800&auto=format&fit=crop",
-  },
-];
 
 
 
@@ -109,12 +71,14 @@ function mapApiToTrip(item: TripApiItem): Trip {
 }
 
 export default function HomePage() {
-  const [activeSlide, setActiveSlide] = useState(0);
   const [trips, setTrips] = useState<Trip[]>([]);
   const [onDemandTrips, setOnDemandTrips] = useState<OnDemandTripTemplateApiItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingOnDemand, setLoadingOnDemand] = useState(false);
   const [isSearchActive, setIsSearchActive] = useState(false);
+  const [heroQuery, setHeroQuery] = useState("");
+  const [heroSearchLoading, setHeroSearchLoading] = useState(false);
+  const [heroSearchResults, setHeroSearchResults] = useState<ComprehensiveSearchResponse | null>(null);
 
   const [filters, setFilters] = useState({
     tripCategory: "",
@@ -126,14 +90,6 @@ export default function HomePage() {
     minPrice: "",
     maxPrice: "",
   });
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setActiveSlide((current) => (current + 1) % heroSlides.length);
-    }, 5000);
-
-    return () => clearInterval(timer);
-  }, []);
 
   const token = useAuthCacheStore((s) => s.token);
   const currentUser = useAuthCacheStore((s) => s.currentUser);
@@ -211,19 +167,106 @@ export default function HomePage() {
     loadTrips();
   }
 
+  async function handleHeroSearch(query: string) {
+    const normalizedQuery = query.trim();
+    setHeroQuery(normalizedQuery);
+
+    if (!normalizedQuery) {
+      setHeroSearchResults(null);
+      return;
+    }
+
+    try {
+      setHeroSearchLoading(true);
+      const res = await searchService.comprehensiveSearch({
+        q: normalizedQuery,
+        tripLimit: 12,
+        onDemandLimit: 12,
+      });
+
+      setHeroSearchResults(res.data);
+    } catch {
+      setHeroSearchResults({
+        query: normalizedQuery,
+        totals: { trips: 0, onDemandTrips: 0, total: 0 },
+        trips: [],
+        onDemandTrips: [],
+      });
+    } finally {
+      setHeroSearchLoading(false);
+    }
+  }
+
+  function clearHeroSearch() {
+    setHeroQuery("");
+    setHeroSearchResults(null);
+  }
+
   const soloTrips = trips.filter((t) => t.capacity === 1);
   const coupleTrips = trips.filter((t) => t.capacity === 2);
   const familyTrips = trips.filter((t) => t.capacity > 2 && t.capacity <= 6);
   const teamTrips = trips.filter((t) => t.capacity > 6);
-  const otherTrips: Trip[] = [];
-
-  const currentSlide = heroSlides[activeSlide];
+  const searchedTrips = (heroSearchResults?.trips || []).map((trip) => mapApiToTrip(trip as TripApiItem));
+  const searchedOnDemandTrips = heroSearchResults?.onDemandTrips || [];
 
   return (
     <div className="bg-background">
       <Navbar />
       <main>
-        <SmoothScrollHero />
+        <SmoothScrollHero onSearch={handleHeroSearch} isSearching={heroSearchLoading} initialQuery={heroQuery} />
+
+        {heroQuery && (
+          <section className="mx-auto max-w-7xl px-4 pt-10 md:px-6">
+            <div className="rounded-2xl border border-border bg-card p-6 md:p-8">
+              <div className="mb-6 flex flex-col gap-4 border-b border-border pb-5 md:flex-row md:items-end md:justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">Search Results</p>
+                  <h2 className="mt-1 text-2xl font-black tracking-tight">Results for "{heroQuery}"</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {heroSearchResults?.totals.total ?? 0} total matches: {heroSearchResults?.totals.trips ?? 0} trips and {heroSearchResults?.totals.onDemandTrips ?? 0} on-demand trips.
+                  </p>
+                </div>
+                <Button variant="outline" size="sm" onClick={clearHeroSearch}>Clear Search</Button>
+              </div>
+
+              {heroSearchLoading ? (
+                <p className="text-sm text-muted-foreground">Searching trips...</p>
+              ) : (heroSearchResults?.totals.total ?? 0) === 0 ? (
+                <div className="rounded-xl border border-border bg-muted p-6 text-sm text-muted-foreground">
+                  No matching trips found. Try another keyword like a destination, trip name, or guide name.
+                </div>
+              ) : (
+                <div className="space-y-10">
+                  <div>
+                    <h3 className="mb-4 text-lg font-bold tracking-tight">Approved Public Trips</h3>
+                    {searchedTrips.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No approved public non-expired trips found for this query.</p>
+                    ) : (
+                      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+                        {searchedTrips.map((trip) => (
+                          <TripCardEnhanced key={`search-trip-${trip.id}`} trip={trip} />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <h3 className="mb-4 text-lg font-bold tracking-tight">On-demand Trips</h3>
+                    {searchedOnDemandTrips.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No approved on-demand trips found for this query.</p>
+                    ) : (
+                      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+                        {searchedOnDemandTrips.map((trip) => (
+                          <OnDemandTripCard key={`search-ondemand-${trip.id}`} trip={trip} />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
 
         <section className="mx-auto max-w-7xl px-4 py-16 md:px-6 md:py-24">
           <div className="mb-8 flex items-center justify-between">

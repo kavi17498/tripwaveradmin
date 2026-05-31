@@ -7,9 +7,22 @@ import {
   useTransform,
 } from "framer-motion";
 import { FiMapPin } from "react-icons/fi";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 
-export const SmoothScrollHero = () => {
+type SmoothScrollHeroProps = {
+  onSearch?: (query: string) => void;
+  isSearching?: boolean;
+  initialQuery?: string;
+};
+
+export const SmoothScrollHero = ({ onSearch, isSearching = false, initialQuery = "" }: SmoothScrollHeroProps) => {
+  const [query, setQuery] = useState(initialQuery);
+
+  const handleSubmit = (event: React.FormEvent) => {
+    event.preventDefault();
+    onSearch?.(query.trim());
+  };
+
   return (
     <div className="bg-zinc-950">
       <ReactLenis
@@ -21,7 +34,7 @@ export const SmoothScrollHero = () => {
           //   syncTouch: true,
         }}
       >
-        <Hero />
+        <Hero query={query} setQuery={setQuery} onSubmit={handleSubmit} isSearching={isSearching} />
         {/* Schedule removed per request */}
       </ReactLenis>
     </div>
@@ -30,17 +43,31 @@ export const SmoothScrollHero = () => {
 
 const SECTION_HEIGHT = 1500;
 
-const Hero = () => {
+type HeroProps = {
+  query: string;
+  setQuery: (value: string) => void;
+  onSubmit: (event: React.FormEvent) => void;
+  isSearching: boolean;
+};
+
+const Hero = ({ query, setQuery, onSubmit, isSearching }: HeroProps) => {
   return (
     <div className="relative w-full">
-      <CenterImage />
+      <CenterImage query={query} setQuery={setQuery} onSubmit={onSubmit} isSearching={isSearching} />
 
       <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-b from-transparent to-zinc-950" />
     </div>
   );
 };
 
-const CenterImage = () => {
+type CenterImageProps = {
+  query: string;
+  setQuery: (value: string) => void;
+  onSubmit: (event: React.FormEvent) => void;
+  isSearching: boolean;
+};
+
+const CenterImage = ({ query, setQuery, onSubmit, isSearching }: CenterImageProps) => {
   return (
     <motion.section
       className="sticky top-0 h-[70vh] w-full bg-center bg-cover flex items-center justify-center"
@@ -55,16 +82,22 @@ const CenterImage = () => {
         </h1>
         <p className="mb-8 text-lg text-white/90">Find places and things to do</p>
 
-        <div className="mx-auto flex w-full max-w-2xl items-center rounded-full bg-white p-1 shadow-lg">
+        <form onSubmit={onSubmit} className="mx-auto flex w-full max-w-2xl items-center rounded-full bg-white p-1 shadow-lg">
           <input
             aria-label="Search"
             placeholder="Find places and things to do"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
             className="flex-1 rounded-full px-6 py-4 text-gray-800 outline-none"
           />
-          <button className="ml-4 rounded-full bg-blue-600 px-6 py-3 text-white font-semibold">
-            Search
+          <button
+            type="submit"
+            className="ml-4 rounded-full bg-blue-600 px-6 py-3 text-white font-semibold disabled:opacity-60"
+            disabled={isSearching}
+          >
+            {isSearching ? "Searching..." : "Search"}
           </button>
-        </div>
+        </form>
       </div>
     </motion.section>
   );
