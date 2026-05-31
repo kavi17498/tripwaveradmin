@@ -216,9 +216,9 @@ export default function HomePage() {
       <main>
         <SmoothScrollHero onSearch={handleHeroSearch} isSearching={heroSearchLoading} initialQuery={heroQuery} />
 
-        {heroQuery && (
-          <section className="mx-auto max-w-7xl px-4 pt-10 md:px-6">
-            <div className="rounded-2xl border border-border bg-card p-6 md:p-8">
+          {heroQuery && (
+            <section className="mx-auto max-w-7xl px-4 pt-6 md:px-6">
+              <div className="rounded-2xl border border-border bg-card p-4 md:p-6">
               <div className="mb-6 flex flex-col gap-4 border-b border-border pb-5 md:flex-row md:items-end md:justify-between">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">Search Results</p>
@@ -269,7 +269,7 @@ export default function HomePage() {
           </section>
         )}
 
-        <section className="mx-auto max-w-7xl px-4 py-16 md:px-6 md:py-24">
+        <section className="mx-auto max-w-7xl px-4 py-12 md:px-6 md:py-16">
           
           <form onSubmit={handleSearch} className="mb-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end border border-border bg-card p-6 rounded-sm">
             <div className="space-y-1.5">
