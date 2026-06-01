@@ -1,7 +1,5 @@
 import Link from "next/link";
-import { CalendarDays, MapPin, Users, CheckCircle2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { RatingStars } from "@/components/common/rating-stars";
+import { CalendarDays, Heart, MapPin, Star } from "lucide-react";
 import { Trip } from "@/lib/types";
 import { formatCurrencyRs } from "@/lib/utils";
 
@@ -11,107 +9,115 @@ interface TripCardEnhancedProps {
 }
 
 export function TripCardEnhanced({ trip, href }: TripCardEnhancedProps) {
-  const displayedItinerary = trip.itinerary.slice(0, 3);
-  const displayedIncluded = trip.included.slice(0, 4);
-  const tripCategoryLabel =
-    trip.tripType === "private"
-      ? "Private Trip"
-      : trip.title.toLowerCase().includes("solo")
-        ? "Solo Trip"
-        : trip.title.toLowerCase().includes("family")
+  const isPrivate = trip.tripType.toLowerCase() === "private trip" || trip.tripType.toLowerCase() === "private";
+  const tripCategoryLabel = isPrivate
+    ? "Private Trip"
+    : trip.capacity === 1
+      ? "Solo Trip"
+      : trip.capacity === 2
+        ? "Couple Trip"
+        : trip.capacity <= 6
           ? "Family Trip"
-          : trip.title.toLowerCase().includes("stranger")
-            ? "Strangers Trip"
-            : "Public Trip";
+          : "Team Trip";
+  const rating = (trip as any).rating ?? trip.organizerRating;
+  const locationLabel = trip.destination
+    ? `${trip.destination}${trip.location.country ? `, ${trip.location.country}` : ""}`
+    : trip.location.city || "Sri Lanka";
+  const dateLabel = trip.startDate && trip.endDate
+    ? `${trip.startDate} - ${trip.endDate}`
+    : trip.startDate || trip.endDate || "Fixed date trip";
+  const pickupText = determinePickupText(trip);
 
   return (
-    <article className="border border-border bg-card shadow-md overflow-hidden hover:shadow-lg transition-shadow">
-      {/* Cover Image */}
-      <div className="relative h-56 w-full overflow-hidden bg-muted">
-        <img src={trip.coverImage} alt={trip.title} className="h-full w-full object-cover" />
-        <div className="absolute left-3 top-3 rounded-full border border-white/20 bg-slate-950/75 px-3 py-1 text-xs font-medium text-white backdrop-blur">
-          {tripCategoryLabel}
-        </div>
-      </div>
+    <Link href={href ?? `/trips/${trip.id}`} className="group block h-full">
+      <article className="flex h-[380px] flex-col overflow-hidden rounded-[24px] border border-border/70 bg-card shadow-sm transition-all duration-300 group-hover:-translate-y-1 group-hover:shadow-xl group-hover:border-primary/20 md:h-[388px]">
+        <div className="relative aspect-16/10 overflow-hidden bg-muted">
+          {trip.coverImage ? (
+            <img
+              src={trip.coverImage}
+              alt={trip.title}
+              className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center bg-linear-to-br from-sky-500/20 to-indigo-600/20 text-primary">
+              <span className="text-sm font-bold uppercase tracking-[0.25em]">Trip</span>
+            </div>
+          )}
 
-      <div className="space-y-4 p-5">
-        {/* Title & Location Header */}
-        <div className="space-y-2">
-          <h3 className="text-xl font-semibold leading-tight line-clamp-2">{trip.title}</h3>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <MapPin className="size-4 shrink-0" />
-            <span>{trip.destination}, {trip.location.country}</span>
+          <button
+            type="button"
+            aria-label="Save trip"
+            className="absolute right-3 top-3 grid h-10 w-10 place-items-center rounded-full bg-white text-slate-900 shadow-sm transition-transform duration-300 group-hover:scale-105"
+          >
+            <Heart className="size-4" />
+          </button>
+        </div>
+
+        <div className="flex flex-1 flex-col p-3 md:p-3.5">
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+              <MapPin className="size-4 shrink-0" />
+              <span className="line-clamp-1">{locationLabel}</span>
+            </div>
+
+            <h3 className="line-clamp-2 text-[1.12rem] font-extrabold leading-snug tracking-tight text-foreground group-hover:text-primary">
+              {trip.title}
+            </h3>
           </div>
-        </div>
 
-        {/* Description */}
-        <p className="line-clamp-2 text-sm text-muted-foreground">{trip.description}</p>
-
-        {/* Dates & Duration */}
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <CalendarDays className="size-4 shrink-0" />
-          <span>{trip.startDate} to {trip.endDate} ({trip.durationDays} days)</span>
-        </div>
-
-        {/* Organizer Info */}
-        <div className="border-t border-border pt-3">
-          <p className="text-sm">
-            <span className="text-muted-foreground">Organized by </span>
-            <span className="font-medium">{trip.organizerName}</span>
-          </p>
-          <div className="mt-1">
-            <RatingStars rating={trip.organizerRating} />
+          <div className="mt-2.5 flex items-center gap-2 text-sm text-muted-foreground">
+            <CalendarDays className="size-4 shrink-0" />
+            <span className="line-clamp-1">{dateLabel}</span>
+            <span className="text-muted-foreground/70">•</span>
+            <span className="line-clamp-1">{trip.bookedCount}/{trip.capacity} people</span>
           </div>
-        </div>
 
-        {/* Itinerary Preview */}
-        {displayedItinerary.length > 0 && (
-          <div className="border-t border-border pt-3">
-            <p className="text-sm font-semibold mb-2">Itinerary Highlight</p>
+          <div className="mt-2.5 flex flex-wrap gap-2">
+            <span className={`inline-flex items-center rounded-md border bg-white px-2 py-0.75 text-xs font-semibold ${pickupText === "Pickup available" ? "border-amber-500 text-amber-700" : "border-emerald-500 text-emerald-700"}`}>
+              {pickupText === "Pickup available" ? "Pickup available" : "Meet at location"}
+            </span>
+          </div>
+
+          <div className="mt-auto flex items-end justify-between border-t border-border/60 pt-2.5">
             <div className="space-y-1">
-              {displayedItinerary.map((item) => (
-                <div key={item.day} className="text-sm">
-                  <p className="font-medium text-xs text-muted-foreground">Day {item.day}</p>
-                  <p className="text-sm">{item.title}</p>
-                </div>
-              ))}
+              <div className="flex items-center gap-1.5">
+                <Star className="size-4 fill-amber-500 text-amber-500" />
+                <span className="text-sm font-bold text-foreground">
+                  {rating ? rating.toFixed(1) : "New"}
+                </span>
+              </div>
             </div>
-          </div>
-        )}
 
-        {/* Included Preview */}
-        {displayedIncluded.length > 0 && (
-          <div className="border-t border-border pt-3">
-            <p className="text-sm font-semibold mb-2">What&apos;s Included</p>
-            <ul className="space-y-1">
-              {displayedIncluded.map((item, idx) => (
-                <li key={idx} className="flex items-start gap-2 text-sm text-muted-foreground">
-                  <CheckCircle2 className="size-4 shrink-0 mt-0.5 text-green-600" />
-                  <span className="line-clamp-1">{item}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        {/* Participants & Price Section */}
-        <div className="border-t border-border pt-3">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Users className="size-4" />
-              <span>{trip.bookedCount}/{trip.capacity} participants</span>
-            </div>
             <div className="text-right">
-              <p className="text-xs text-muted-foreground">From</p>
-              <p className="text-2xl font-semibold">{formatCurrencyRs(trip.price)}</p>
+              <p className="text-xl font-black tracking-tight text-foreground">{formatCurrencyRs(trip.price)}</p>
             </div>
           </div>
-
-          <Button asChild className="w-full">
-            <Link href={href ?? `/trips/${trip.id}`}>View Full Trip Details</Link>
-          </Button>
         </div>
-      </div>
-    </article>
+      </article>
+    </Link>
   );
 }
+
+function determinePickupText(trip: unknown) {
+  const normalizedPickupType = String((trip as { pickupType?: unknown } | null)?.pickupType ?? "").trim().toLowerCase();
+  const hasPickupConfig = Boolean(
+    (trip as { pickupCostPerKm?: unknown } | null)?.pickupCostPerKm !== undefined ||
+    (trip as { pickupStartLocation?: unknown } | null)?.pickupStartLocation ||
+    (trip as { pickupCost?: unknown } | null)?.pickupCost !== undefined,
+  );
+
+  if (normalizedPickupType.includes("meet at location") && !hasPickupConfig) {
+    return "Meet at location";
+  }
+
+  if (
+    normalizedPickupType.includes("pickup") ||
+    normalizedPickupType.includes("airport") ||
+    hasPickupConfig
+  ) {
+    return "Pickup available";
+  }
+
+  return "Meet at location";
+}
+

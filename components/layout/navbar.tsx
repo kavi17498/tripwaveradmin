@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Bell, UserCircle2 } from "lucide-react";
+import { Bell } from "lucide-react";
 import { getFirestore, collection, query as firestoreQuery, where, onSnapshot } from "firebase/firestore";
 import { app } from "@/lib/config/firebase";
 import { chatService } from "@/lib/services/chatService";
@@ -20,13 +20,14 @@ type AppMode = "explorer" | "creator";
 const explorerLinks = [
   { href: "/", label: "Home" },
   { href: "/trips", label: "Trips" },
-  { href: "/chat", label: "Chat" },
+  { href: "/organizers", label: "Organizers" },
+  { href: "/bookings", label: "Bookings" },
+  { href: "/chat", label: "Chats" },
 ];
 
 const creatorLinks = [
   { href: "/dashboard", label: "Dashboard" },
-  { href: "/chat", label: "Chat" },
-  { href: "/organizer", label: "Organizer" },
+  { href: "/chat", label: "Chats" },
 ];
 
 const APP_MODE_STORAGE_KEY = "tripwaver:app-mode";
@@ -171,8 +172,9 @@ export function Navbar() {
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (!notificationPanelRef.current) return;
-      if (!notificationPanelRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+
+      if (notificationPanelRef.current && !notificationPanelRef.current.contains(target)) {
         setShowNotifications(false);
       }
     };
@@ -208,6 +210,21 @@ export function Navbar() {
       window.removeEventListener("tripwaver:notifications-changed", loadNotifications);
     };
   }, [currentUser, showNotifications]);
+      const token = userSessionService.getToken();
+
+  useEffect(() => {
+    if (pathname.startsWith("/dashboard")) {
+      setMode("creator");
+      localStorage.setItem(APP_MODE_STORAGE_KEY, "creator");
+    } else if (
+      pathname === "/" ||
+      pathname.startsWith("/trips") ||
+      pathname.startsWith("/bookings")
+    ) {
+      setMode("explorer");
+      localStorage.setItem(APP_MODE_STORAGE_KEY, "explorer");
+    }
+  }, [pathname]);
 
   const links = useMemo(() => {
     return mode === "explorer" ? explorerLinks : creatorLinks;
@@ -263,14 +280,20 @@ export function Navbar() {
               key={link.href}
               href={link.href}
               className={cn(
-                "text-sm text-muted-foreground hover:text-foreground",
+                "relative text-sm text-muted-foreground hover:text-foreground",
                 pathname === link.href && "font-medium text-foreground",
               )}
             >
               {link.label}
+              {link.label === "Chats" && chatUnreadCount > 0 && (
+                <span className="absolute -right-2.5 -top-1.5 inline-flex min-w-4 h-4 items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold leading-none text-white shadow-sm">
+                  {chatUnreadCount}
+                </span>
+              )}
             </Link>
           ))}
         </nav>
+
         <div className="flex items-center gap-2">
           {currentUser ? (
             <div className="relative" ref={notificationPanelRef}>
@@ -284,7 +307,7 @@ export function Navbar() {
               >
                 <Bell className="size-5" />
                 {unreadCount > 0 ? (
-                  <span className="absolute -right-1 -top-1 inline-flex min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 py-0.5 text-[10px] font-semibold leading-none text-destructive-foreground">
+                  <span className="absolute -right-1 -top-1 inline-flex min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white">
                     {unreadCount > 9 ? "9+" : unreadCount}
                   </span>
                 ) : null}
@@ -309,7 +332,15 @@ export function Navbar() {
                       notifications.map((item) => (
                         <Link
                           key={item.id}
-                          href="/dashboard/notifications"
+                          href={
+                            item.type === "reminder" && item.tripId
+                              ? `/trips/${item.tripId}/review`
+                              : item.type === "join-request" && item.tripId
+                              ? `/dashboard/trips/${item.tripId}/participants`
+                              : item.tripId
+                              ? `/trips/${item.tripId}`
+                              : "/notifications"
+                          }
                           onClick={() => setShowNotifications(false)}
                           className={cn(
                             "block rounded-md border border-border px-3 py-2 transition-colors hover:bg-accent/20",

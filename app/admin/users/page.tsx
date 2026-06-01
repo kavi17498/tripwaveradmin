@@ -1,14 +1,20 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { Modal } from "@/components/common/modal";
 import { SearchInput } from "@/components/common/search-input";
 import { StatusBadge } from "@/components/common/status-badge";
+import { Button } from "@/components/ui/button";
+import { adminService } from "@/lib/services/adminService";
 import { useAdminDataStore } from "@/lib/stores/useAdminDataStore";
 import { formatFirestoreTimestamp } from "@/lib/utils";
 
 export default function AdminUsersPage() {
   const { users: adminUsers, fetchUsers, loadingUsers } = useAdminDataStore();
   const [query, setQuery] = useState("");
+  const [actionUserId, setActionUserId] = useState<string | null>(null);
+  const [pendingUserId, setPendingUserId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
     void fetchUsers();
@@ -24,6 +30,20 @@ export default function AdminUsersPage() {
     [adminUsers, query],
   );
 
+  const handleSetAsUser = async (userId: string) => {
+    setActionUserId(userId);
+    setActionError(null);
+
+    try {
+      await adminService.assignRole(userId, "user");
+      await fetchUsers();
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Failed to change role to user.");
+    } finally {
+      setActionUserId(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -37,6 +57,8 @@ export default function AdminUsersPage() {
           {loadingUsers ? "Loading users..." : `${filteredUsers.length} users loaded`}
         </div>
       </div>
+
+      {actionError ? <p className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{actionError}</p> : null}
 
       <div className="overflow-x-auto border border-border">
         <table className="w-full min-w-[780px] text-sm">
@@ -60,8 +82,16 @@ export default function AdminUsersPage() {
                 <td className="p-3">{user.city}, {user.country}</td>
                 <td className="p-3"><StatusBadge status={user.isVerified ? "active" : "pending"} /></td>
                 <td className="p-3">{formatFirestoreTimestamp(user.createdAt)}</td>
-                <td className="p-3 text-right text-xs text-muted-foreground">
-                  Review only
+                <td className="p-3 text-right">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setPendingUserId(user.id)}
+                    disabled={loadingUsers || actionUserId === user.id}
+                  >
+                    {actionUserId === user.id ? "Updating..." : "Set as User"}
+                  </Button>
                 </td>
               </tr>
             ))}
@@ -75,6 +105,21 @@ export default function AdminUsersPage() {
           </tbody>
         </table>
       </div>
+
+      <Modal
+        open={Boolean(pendingUserId)}
+        title="Set as User"
+        description="Are you sure you want to change this account role to user? This will set isVerified to false and notify the user."
+        onClose={() => setPendingUserId(null)}
+        onConfirm={() => {
+          const userId = pendingUserId;
+          setPendingUserId(null);
+          if (userId) {
+            void handleSetAsUser(userId);
+          }
+        }}
+        confirmText="Yes"
+      />
     </div>
   );
 }

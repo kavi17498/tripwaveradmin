@@ -8,6 +8,11 @@ export const bookingService = {
     return { data: mockBookings.filter((booking) => booking.tripId === tripId) };
   },
 
+  async getBookingsByUser(userId: string): Promise<ServiceResponse<Booking[]>> {
+    await sleep(450);
+    return { data: mockBookings.filter((booking) => booking.userId === userId) };
+  },
+
   async submitBooking(payload: Omit<Booking, "id" | "status" | "requestedAt">): Promise<ServiceResponse<Booking>> {
     await sleep(600);
     return {

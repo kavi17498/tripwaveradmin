@@ -22,6 +22,34 @@ export type CreatePaymentResult = {
   [k: string]: unknown;
 };
 
+export type TripEarningsBreakdown = {
+  tripId: string;
+  tripName: string;
+  startDate: string;
+  endDate: string;
+  status: string;
+  participantCount: number;
+  onlineParticipantCount: number;
+  payToGuideParticipantCount: number;
+  totalEarned: number;
+  onlineEarned: number;
+  payToGuideEarned: number;
+  uncategorizedEarned: number;
+  pickupEarned: number;
+  baseTripEarned: number;
+};
+
+export type OrganizerEarningsSummary = {
+  totalEarned: number;
+  onlineEarned: number;
+  payToGuideEarned: number;
+  uncategorizedEarned: number;
+  totalPickupEarned: number;
+  totalBaseTripEarned: number;
+  tripsCount: number;
+  trips: TripEarningsBreakdown[];
+};
+
 export const paymentService = {
   async createPayment(payload: CreatePaymentPayload, token?: string): Promise<ServiceResponse<CreatePaymentResult>> {
     const authToken = token || userSessionService.getToken() || undefined;
@@ -69,6 +97,23 @@ export const paymentService = {
     }
 
     return { data: response as Payment | null, message: "Payment loaded" };
+  },
+
+  async getOrganizerEarnings(token?: string): Promise<ServiceResponse<OrganizerEarningsSummary>> {
+    const authToken = token || userSessionService.getToken() || undefined;
+    const response = await apiClient.request<OrganizerEarningsSummary | ServiceResponse<OrganizerEarningsSummary>>(
+      "/payments/earnings/organizer",
+      { method: "GET", token: authToken },
+    );
+
+    if (response && typeof response === "object" && "data" in response) {
+      return response as ServiceResponse<OrganizerEarningsSummary>;
+    }
+
+    return {
+      data: response as OrganizerEarningsSummary,
+      message: "Organizer earnings loaded",
+    };
   },
 };
 

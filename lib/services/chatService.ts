@@ -1,5 +1,28 @@
 import { ChatMessage, ChatGroup, ServiceResponse } from "@/lib/types";
 import { apiClient } from "@/lib/services/apiClient";
+import { TripApiItem } from "@/lib/services/tripApiService";
+import { UserProfileRecord } from "@/lib/services/userService";
+
+export type TripChatParticipant = {
+  participant: {
+    participantId?: string;
+    parentUserId?: string | null;
+    name: string;
+    gender: string;
+    age: number;
+    address?: string;
+    phone?: string;
+    email?: string;
+  };
+  profile: UserProfileRecord | null;
+};
+
+export type TripChatContext = {
+  chatGroup: ChatGroup;
+  trip: TripApiItem;
+  organizer: UserProfileRecord;
+  participants: TripChatParticipant[];
+};
 
 export const chatService = {
   async getChatGroups(token?: string): Promise<ServiceResponse<ChatGroup[]>> {
@@ -27,6 +50,14 @@ export const chatService = {
     } catch (err: any) {
       return { data: null, message: err?.message ?? 'Failed to load chat group' };
     }
+  },
+
+  async getTripChatContext(tripId: string, token?: string): Promise<ServiceResponse<TripChatContext>> {
+    const data = token
+      ? await apiClient.authenticatedRequest<TripChatContext>(`/chatgroups/trip/${tripId}/context`, token)
+      : await apiClient.request<TripChatContext>(`/chatgroups/trip/${tripId}/context`);
+
+    return { data };
   },
 
   async getMessages(chatGroupId: string, token?: string): Promise<ServiceResponse<ChatMessage[]>> {
@@ -75,5 +106,56 @@ export const chatService = {
     }
 
     return { data: response as ChatMessage, message: "Message sent" };
+  },
+
+  async createChatGroup(
+    payload: {
+      tripId: string;
+      name: string;
+      adminId: string;
+      adminName: string;
+      description?: string;
+      members?: string[];
+    },
+    token: string
+  ): Promise<ServiceResponse<ChatGroup>> {
+    const response = await apiClient.authenticatedRequest<ChatGroup | ServiceResponse<ChatGroup>>(
+      "/chatgroups",
+      token,
+      {
+        method: "POST",
+        body: payload,
+      }
+    );
+
+    if (response && typeof response === "object" && "data" in response) {
+      return response as ServiceResponse<ChatGroup>;
+    }
+
+    return { data: response as ChatGroup, message: "Chat group created" };
+  },
+
+  async requestCustomTrip(
+    payload: {
+      guideId: string;
+      travelerId: string;
+      travelerName: string;
+    },
+    token: string
+  ): Promise<ServiceResponse<ChatGroup>> {
+    const response = await apiClient.authenticatedRequest<ChatGroup | ServiceResponse<ChatGroup>>(
+      "/chatgroups/custom-request",
+      token,
+      {
+        method: "POST",
+        body: payload,
+      }
+    );
+
+    if (response && typeof response === "object" && "data" in response) {
+      return response as ServiceResponse<ChatGroup>;
+    }
+
+    return { data: response as ChatGroup, message: "Custom trip request sent successfully" };
   },
 };

@@ -13,9 +13,29 @@ import { paymentService } from "@/lib/services/paymentService";
 import { tripApiService, type TripApiItem } from "@/lib/services/tripApiService";
 import { useRouter } from "next/navigation";
 import { formatCurrencyRs } from "@/lib/utils";
+import LocationPicker from "@/components/common/locationpicker";
 
 type ParticipantGender = "male" | "female" | "other" | "";
 type TripPaymentMethod = NonNullable<TripApiItem["paymentMethods"]>[number];
+type PickupType = NonNullable<TripApiItem["pickupType"]>;
+
+const airportPickupLocations: Partial<Record<PickupType, { lat: number; lng: number; address: string }>> = {
+  "Free Pickup from Bandaranaike International Airport": {
+    lat: 7.1808,
+    lng: 79.8841,
+    address: "Bandaranaike International Airport",
+  },
+  "Free Pickup from Mattala Airport": {
+    lat: 6.2844,
+    lng: 81.1241,
+    address: "Mattala Rajapaksa International Airport",
+  },
+};
+
+const isAirportPickupType = (pickupType: TripApiItem["pickupType"] | "") =>
+  pickupType === "Free Pickup from Bandaranaike International Airport" || pickupType === "Free Pickup from Mattala Airport";
+
+const getPickupLocationAddress = (location: { name?: string; address?: string }) => location.name ?? location.address ?? "";
 
 type ParticipantForm = {
   name: string;
@@ -86,6 +106,20 @@ const getPaymentMethodHelpText = (method: TripPaymentMethod) => {
   return "Reserve your spot now and pay the guide on the trip day.";
 };
 
+const calculateDistanceKm = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
+  const R = 6371; // Earth's radius in km
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLng / 2) *
+      Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+};
+
 export default function BookingPage() {
   const { tripId } = useParams<{ tripId: string }>();
   const router = useRouter();
@@ -100,8 +134,14 @@ export default function BookingPage() {
   const [loadingSubmission, setLoadingSubmission] = useState(false);
   const [status, setStatus] = useState<"idle" | "processing" | "success" | "failed">("idle");
   const [error, setError] = useState("");
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
-  const bookedParticipantsCount = trip?.participants?.length ?? 0;
+  const [passengerPickupLocation, setPassengerPickupLocation] = useState<{ lat: number; lng: number; address: string } | null>(null);
+  const [pickupDistanceKm, setPickupDistanceKm] = useState(0);
+  const [pickupCost, setPickupCost] = useState(0);
+  const [passengerPickupTime, setPassengerPickupTime] = useState("");
+
+  const bookedParticipantsCount = trip?.participants?.filter((p: any) => p.status !== 'rejected').length ?? 0;
   const allowedBookingCount = Math.max(0, (trip?.maxParticipants ?? 0) - bookedParticipantsCount);
   const mainDestination = trip?.mainDestinations?.[0]?.name || trip?.destinations?.[0]?.name || trip?.startLocation || "Not specified";
   const pricePerPerson = trip?.price ?? 0;
@@ -119,11 +159,13 @@ export default function BookingPage() {
             setError(getBookingBlockedMessage(loadedTrip));
           }
 
-          // Server may mark trips as reserved when a family/solo booking is completed
-          const reservedFor = (loadedTrip as any).reservedFor as string | undefined;
-          if (reservedFor === 'family' || reservedFor === 'solo') {
-            // If reserved by someone else, block booking for everyone
-            setError('This trip has been reserved and is no longer bookable.');
+          const bookedCount = loadedTrip.participants?.filter((p: any) => p.status !== 'rejected').length ?? 0;
+          if (loadedTrip.tripCategory === "Public trip" && bookedCount > 0) {
+            setError('This trip has already been booked and is no longer available.');
+          }
+
+          if (currentUser && loadedTrip.organizer === currentUser.id) {
+            setError('You cannot book a trip that you organized.');
           }
 
           // If current user already has a booking, block additional bookings
@@ -140,7 +182,7 @@ export default function BookingPage() {
     };
 
     loadTrip();
-  }, [currentUser, tripId, token]);
+  }, [currentUser, passengerPickupLocation, tripId, token]);
 
   useEffect(() => {
     hydrateFromLegacySession();
@@ -148,6 +190,19 @@ export default function BookingPage() {
 
   useEffect(() => {
     if (!trip) return;
+
+    if (!passengerPickupLocation && trip.pickupType && trip.pickupType !== "Meet at Location") {
+      const presetPickupLocation =
+        trip.pickupStartLocation ?? (isAirportPickupType(trip.pickupType) ? airportPickupLocations[trip.pickupType] : undefined);
+
+      if (presetPickupLocation) {
+        setPassengerPickupLocation({
+          lat: presetPickupLocation.lat,
+          lng: presetPickupLocation.lng,
+          address: getPickupLocationAddress(presetPickupLocation),
+        });
+      }
+    }
 
     const availablePaymentMethods = trip.paymentMethods ?? [];
     if (availablePaymentMethods.length === 1) {
@@ -209,6 +264,40 @@ export default function BookingPage() {
     });
   }, [currentUser]);
 
+  useEffect(() => {
+    if (!trip || trip.pickupType === "Meet at Location" || !passengerPickupLocation) {
+      setPickupDistanceKm(0);
+      setPickupCost(0);
+      return;
+    }
+
+    const startLat = trip.pickupStartLocation?.lat;
+    const startLng = trip.pickupStartLocation?.lng;
+
+    if (typeof startLat !== "number" || typeof startLng !== "number") {
+      setPickupDistanceKm(0);
+      setPickupCost(0);
+      return;
+    }
+
+    const distance = calculateDistanceKm(
+      passengerPickupLocation.lat,
+      passengerPickupLocation.lng,
+      startLat,
+      startLng
+    );
+
+    setPickupDistanceKm(distance);
+
+    if (trip.pickupType === "Free Pickup") {
+      setPickupCost(0);
+      return;
+    }
+
+    const cost = distance * (trip.pickupCostPerKm ?? 0);
+    setPickupCost(Number(cost.toFixed(2)));
+  }, [passengerPickupLocation, trip]);
+
   const updateParticipant = (index: number, field: keyof ParticipantForm, value: string) => {
     setParticipants((currentParticipants) =>
       currentParticipants.map((participant, participantIndex) =>
@@ -249,6 +338,22 @@ export default function BookingPage() {
       return;
     }
 
+    if (trip.pickupType && trip.pickupType !== "Meet at Location") {
+      if (!passengerPickupLocation) {
+        setError("Please select a pickup location on the map.");
+        return;
+      }
+      if (!passengerPickupTime.trim()) {
+        setError("Please select your requested pickup time.");
+        return;
+      }
+    } else if (trip.pickupType === "Meet at Location") {
+      if (!passengerPickupTime.trim()) {
+        setError("Please select your meetup arrival time.");
+        return;
+      }
+    }
+
     const primaryParticipant = participants[0];
     if (!primaryParticipant || !primaryParticipant.name.trim() || !primaryParticipant.age.trim() || !primaryParticipant.gender) {
       setError("Please complete the first participant details.");
@@ -275,6 +380,16 @@ export default function BookingPage() {
           address: participant.address.trim(),
           phone: participant.phone.trim(),
           email: participant.email.trim(),
+          pickupTime: passengerPickupTime.trim(),
+          ...(trip.pickupType && trip.pickupType !== "Meet at Location" && passengerPickupLocation ? {
+            pickupLocation: {
+              name: passengerPickupLocation.address,
+              lat: passengerPickupLocation.lat,
+              lng: passengerPickupLocation.lng,
+            },
+            pickupDistanceKm,
+            pickupCost,
+          } : {}),
         };
       }
 
@@ -285,7 +400,7 @@ export default function BookingPage() {
       await tripService.submitTripParticipants(tripId, participantsPayload, token ?? undefined, paymentMethod);
       setStatus("success");
       setLoadingSubmission(false);
-      router.push(`/dashboard/trips/${tripId}/chat`);
+      setShowSuccessModal(true);
     };
 
     (async () => {
@@ -299,7 +414,7 @@ export default function BookingPage() {
           return;
         }
 
-        const amount = pricePerPerson * participantsPayload.length;
+        const amount = pricePerPerson * participantsPayload.length + (trip.pickupType !== "Meet at Location" ? pickupCost : 0);
         const createRes = await paymentService.createPayment({
           tripId,
           userId: parentUserId,
@@ -416,6 +531,91 @@ export default function BookingPage() {
               </p>
             </div>
 
+            {trip?.pickupType && (
+              <section className="space-y-4 border border-border bg-background p-4 rounded-md">
+                <div>
+                  <h2 className="font-semibold text-base flex items-center gap-2">
+                    <span>🚗</span> Pickup / Meetup Details
+                  </h2>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Configure your pickup location and schedule for this trip.
+                  </p>
+                </div>
+
+                {trip.pickupType === "Meet at Location" ? (
+                  <div className="space-y-3">
+                    <div className="rounded-lg bg-muted/40 p-3 border border-border text-sm">
+                      <p className="font-medium text-foreground">📍 Meetup Point</p>
+                      <p className="text-muted-foreground mt-1">{trip.startLocation}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-sm font-medium block">Meetup Arrival Time</label>
+                      <Input
+                        type="time"
+                        value={passengerPickupTime}
+                        onChange={(e) => setPassengerPickupTime(e.target.value)}
+                        className="max-w-[200px]"
+                      />
+                      <p className="text-xs text-muted-foreground">Select what time you will arrive at the start location.</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="rounded-lg bg-muted/40 p-3 border border-border text-sm">
+                      <p className="font-medium text-foreground">🚕 Pickup Details</p>
+                      <p className="text-muted-foreground mt-1">
+                        {trip.pickupType === "Free Pickup"
+                          ? "Pickup from your selected location is free."
+                          : `Pickup is calculated at Rs. ${trip.pickupCostPerKm}/km from the configured pickup origin.`}
+                      </p>
+                      {trip.pickupStartLocation && (
+                        <p className="text-xs text-muted-foreground mt-2">
+                          Guide starts from: <span className="font-medium">{trip.pickupStartLocation.name}</span>
+                        </p>
+                      )}
+                      {isAirportPickupType(trip.pickupType ?? "") ? (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          The map defaults to the airport pickup point, but you can move the marker to another location and the fare will update.
+                        </p>
+                      ) : null}
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium block">Select Pickup Point on Map</label>
+                      <LocationPicker
+                        value={passengerPickupLocation}
+                        onChange={(location) => setPassengerPickupLocation(location)}
+                      />
+                    </div>
+
+                    {passengerPickupLocation && (
+                      <div className="rounded-lg bg-primary/5 p-3 border border-primary/20 text-sm space-y-1">
+                        <p className="font-medium text-primary">Pickup Distance & Cost</p>
+                        <p className="text-muted-foreground">Distance: <span className="font-semibold text-foreground">{pickupDistanceKm.toFixed(2)} km</span></p>
+                        <p className="text-muted-foreground">
+                          Estimated Cost:{" "}
+                          <span className="font-semibold text-foreground">
+                            {pickupCost === 0 ? "Free" : formatCurrencyRs(pickupCost)}
+                          </span>
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="space-y-1">
+                      <label className="text-sm font-medium block">Requested Pickup Time</label>
+                      <Input
+                        type="time"
+                        value={passengerPickupTime}
+                        onChange={(e) => setPassengerPickupTime(e.target.value)}
+                        className="max-w-[200px]"
+                      />
+                      <p className="text-xs text-muted-foreground">Select the time you would like the guide to pick you up.</p>
+                    </div>
+                  </div>
+                )}
+              </section>
+            )}
+
             {!hydrated ? <p className="text-sm text-muted-foreground">Loading cached profile...</p> : null}
 
             {participants.map((participant, index) => (
@@ -492,7 +692,7 @@ export default function BookingPage() {
           ) : null}
           <p className="mt-3 text-lg font-semibold">{trip?.tripName ?? "Loading trip..."}</p>
           <p className="mt-1 text-sm text-muted-foreground">{trip?.tripCategory ?? "Trip category not available"}</p>
-          <div className="mt-4 space-y-2 text-sm text-muted-foreground">
+          <div className="mt-4 space-y-2 text-sm text-muted-foreground border-b border-border pb-4">
             <p>Destination: {mainDestination}</p>
             <p>
               Dates: {trip?.startDate ?? "--"} to {trip?.endDate ?? "--"}
@@ -505,14 +705,74 @@ export default function BookingPage() {
               Slots left: {allowedBookingCount} of {trip?.maxParticipants ?? "--"}
             </p>
             <p>Participants: {participants.length}</p>
+            {trip?.pickupType && (
+              <p className="font-medium text-foreground">
+                Pickup type: {trip.pickupType}
+              </p>
+            )}
           </div>
-          <p className="mt-4 text-lg font-semibold">{formatCurrencyRs(pricePerPerson * participants.length)}</p>
+
+          <div className="mt-4 space-y-2 text-sm border-b border-border pb-4">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Base Price (x{participants.length})</span>
+              <span>{formatCurrencyRs(pricePerPerson * participants.length)}</span>
+            </div>
+            {trip?.pickupType !== "Meet at Location" && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Pickup Fee</span>
+                <span className={pickupCost === 0 ? "text-emerald-600 font-medium" : ""}>
+                  {pickupCost === 0 ? "Free" : formatCurrencyRs(pickupCost)}
+                </span>
+              </div>
+            )}
+          </div>
+
+          <div className="mt-4 flex justify-between items-center">
+            <span className="font-semibold">Total Amount</span>
+            <span className="text-lg font-bold text-primary">
+              {formatCurrencyRs(pricePerPerson * participants.length + (trip?.pickupType !== "Meet at Location" ? pickupCost : 0))}
+            </span>
+          </div>
+
           <Button variant="outline" className="mt-4 w-full" asChild>
             <Link href={`/trips/${tripId}`}>Back to Trip</Link>
           </Button>
         </aside>
       </main>
       <Footer />
+
+      {/* Success Modal */}
+      {showSuccessModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="mx-4 w-full max-w-md scale-95 border border-border bg-card p-6 shadow-2xl rounded-xl transition-all duration-300">
+            <div className="flex flex-col items-center text-center space-y-4">
+              {/* Green Signal Circle Icon */}
+              <div className="flex h-16 w-16 items-center justify-center bg-emerald-50 rounded-full border border-emerald-100">
+                <span className="h-4 w-4 bg-emerald-500 rounded-full animate-ping absolute" />
+                <span className="h-4 w-4 bg-emerald-500 rounded-full relative" />
+              </div>
+
+              <div className="space-y-2">
+                <h3 className="text-xl font-bold tracking-tight text-foreground">
+                  {trip?.tripCategory === "Public trip" ? "Booking Confirmed!" : "Booking Request Sent!"}
+                </h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  {trip?.tripCategory === "Public trip"
+                    ? "Your booking has been successfully confirmed and your payment is complete. You can access the trip in your dashboard."
+                    : "Your booking request has been successfully sent to the guide. After it is accepted, you will be notified through notifications and email."}
+                </p>
+              </div>
+
+              <Button 
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium shadow-sm transition-all py-2 rounded-lg"
+                onClick={() => router.push("/")}
+              >
+                OK
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

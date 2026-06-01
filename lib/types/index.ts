@@ -26,16 +26,18 @@ export interface Trip {
   description: string;
   startDate: string;
   endDate: string;
+  startTime?: string;
+  endTime?: string;
   price: number;
   capacity: number;
   bookedCount: number;
   durationDays: number;
-  tripType: "public" | "private";
+  tripType: string;
   status: "draft" | "published" | "ongoing" | "completed" | "cancelled";
   coverImage: string;
   organizerId: string;
   organizerName: string;
-  organizerRating: number;
+  organizerRating: number | null;
   location: {
     city: string;
     country: string;
@@ -175,7 +177,7 @@ export interface TripItineraryDayPayload {
   title: string;
   activities: Array<{
     title: string;
-    timeSlot: {
+    timeSlot?: {
       startTime: string;
       endTime: string;
     };
@@ -206,11 +208,19 @@ export interface BookingParticipantPayload {
   address?: string;
   phone?: string;
   email?: string;
+  pickupLocation?: {
+    name: string;
+    lat: number;
+    lng: number;
+  };
+  pickupDistanceKm?: number;
+  pickupCost?: number;
+  pickupTime?: string;
 }
 
 export interface CreateTripApiPayload {
   tripName: string;
-  tripCategory: "Solo Trip with guide" | "Family Trip with guide" | "Strangers Trip with guide" | "Private trip";
+  tripCategory: "Public trip" | "Private trip";
   status?: "pending" | "draft";
   paymentMethods: ("Pay Online" | "Pay to Guide on Trip Day")[];
   destinations: TripDestinationPayload[];
@@ -235,6 +245,18 @@ export interface CreateTripApiPayload {
   coverImage: string;
   description: string;
   maxParticipants: number;
+  pickupType:
+    | "Free Pickup"
+    | "Pickup Available"
+    | "Free Pickup from Bandaranaike International Airport"
+    | "Free Pickup from Mattala Airport"
+    | "Meet at Location";
+  pickupCostPerKm?: number;
+  pickupStartLocation?: {
+    name: string;
+    lat: number;
+    lng: number;
+  };
 }
 
 export interface FirestoreTimestamp {
@@ -248,6 +270,7 @@ export interface AdminUserRecord {
   lastName: string;
   email: string;
   phone: string;
+  role?: UserRole;
   profileImage?: string;
   bio: string;
   street: string;
@@ -258,11 +281,76 @@ export interface AdminUserRecord {
   dateOfBirth?: string;
   gender?: "male" | "female" | "other";
   isVerified: boolean;
+  languagesSpoken?: string[];
+  socialLinks?: {
+    facebook?: string;
+    instagram?: string;
+    twitter?: string;
+    linkedin?: string;
+  };
+  tripPhotos?: string[];
+  coverImage?: string;
+  website?: string;
+  specializations?: string[];
   createdAt: FirestoreTimestamp;
   updatedAt: FirestoreTimestamp;
 }
 
 export type AdminTripStatus = "pending" | "in review" | "approved" | "rejected" | "draft";
+
+export interface AdminOnDemandTripRecord {
+  id: string;
+  tripName: string;
+  durationLabel: string;
+  durationDays: number;
+  tripCategory: string;
+  description: string;
+  organizer: string;
+  price: number;
+  destinations: AdminTripDestination[];
+  mainDestinations?: Array<{
+    name: string;
+    lat: number;
+    lng: number;
+  }>;
+  startLocation: string;
+  itinerary?: {
+    days: Array<{
+      day: number;
+      title: string;
+      activities: Array<{
+        title: string;
+        timeSlot?: {
+          startTime: string;
+          endTime: string;
+        };
+        notes?: string[];
+        isAIGenerated?: boolean;
+      }>;
+    }>;
+  };
+  included?: {
+    hotelFacilities: string[];
+    transportFacilities: string[];
+    otherInclusions: string[];
+    exclusions: string[];
+  };
+  paymentMethods?: ("Pay Online" | "Pay to Guide on Trip Day")[];
+  maxParticipants: number;
+  photos: string[];
+  coverImage: string;
+  pickupType?: string;
+  pickupCostPerKm?: number;
+  pickupStartLocation?: {
+    name: string;
+    lat: number;
+    lng: number;
+  };
+  isHidden?: boolean;
+  status: AdminTripStatus;
+  createdAt: FirestoreTimestamp;
+  updatedAt: FirestoreTimestamp;
+}
 
 export interface AdminTripDestination {
   name: string;

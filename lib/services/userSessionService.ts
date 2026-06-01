@@ -33,6 +33,28 @@ const extractRoleFromToken = (token: string): SessionRole | null => {
   }
 };
 
+export const isTokenExpired = (token: string | null): boolean => {
+  if (!token) return true;
+  if (!token.includes(".")) return false;
+
+  try {
+    const tokenParts = token.split(".");
+    const payloadPart = tokenParts[1];
+    if (!payloadPart) return true;
+
+    const normalizedBase64 = payloadPart.replace(/-/g, "+").replace(/_/g, "/");
+    const paddedBase64 = normalizedBase64 + "=".repeat((4 - (normalizedBase64.length % 4)) % 4);
+    const payload = JSON.parse(atob(paddedBase64)) as Record<string, unknown>;
+
+    if (typeof payload.exp === "number") {
+      return Date.now() / 1000 > payload.exp;
+    }
+    return false;
+  } catch {
+    return true;
+  }
+};
+
 export const userSessionService = {
   saveUserProfile(profile: unknown) {
     if (typeof window === "undefined") return;

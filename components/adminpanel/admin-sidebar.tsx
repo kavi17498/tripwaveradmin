@@ -79,6 +79,13 @@ const adminSections: AdminSidebarSection[] = [
         activePath: "/admin/users",
         icon: Users,
       },
+      {
+        kind: "link",
+        label: "Verifaction request",
+        href: "/admin/verifications",
+        activePath: "/admin/verifications",
+        icon: ShieldCheck,
+      },
     ],
   },
   {

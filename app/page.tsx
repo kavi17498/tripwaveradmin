@@ -4,68 +4,17 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Navbar } from "@/components/layout/navbar";
 import { Footer } from "@/components/layout/footer";
+import { SmoothScrollHero } from "@/components/publicavailable/full_hero";
 import { Button } from "@/components/ui/button";
 import { TripCardEnhanced } from "@/components/trips/trip-card-enhanced";
+import { OnDemandTripCard } from "@/components/trips/on-demand-trip-card";
 import { Trip } from "@/lib/types";
 import { tripApiService, type TripApiItem } from "@/lib/services/tripApiService";
+import { onDemandTripService, type OnDemandTripTemplateApiItem } from "@/lib/services/onDemandTripService";
+import { searchService, type ComprehensiveSearchResponse } from "@/lib/services/searchService";
 import { useAuthCacheStore } from "@/lib/stores/useAuthCacheStore";
 
-const heroSlides = [
-  {
-    title: "Are you looking to travel with someone?",
-    description:
-      "Let us create an amazing Sri Lanka journey with our verified tour guides, from Galle Fort evenings to Ella sunrise routes.",
-    ctaLabel: "Explore Guided Trips",
-    ctaHref: "/trips",
-    image:
-      "https://images.unsplash.com/photo-1566552881560-0be862a7c445?q=80&w=1800&auto=format&fit=crop",
-  },
-  {
-    title: "Planning a family trip without stress?",
-    description:
-      "Choose ready-made family trips in Sri Lanka with guides, safe stays, and transport already planned for you.",
-    ctaLabel: "View Family Trips",
-    ctaHref: "/trips",
-    image:
-      "https://images.unsplash.com/photo-1511895426328-dc8714191300?q=80&w=1800&auto=format&fit=crop",
-  },
-  {
-    title: "Company, club, or institute trip coming up?",
-    description:
-      "Plan your Sri Lanka trip using our AI trip planner, share the link with colleagues, and collect trip payments easily.",
-    ctaLabel: "Create a Team Trip",
-    ctaHref: "/dashboard/create-trip",
-    image:
-      "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?q=80&w=1800&auto=format&fit=crop",
-  },
-  {
-    title: "Want to join a group of new travelers?",
-    description:
-      "Join group trips across Sri Lanka and travel with like-minded people under experienced local guides.",
-    ctaLabel: "Join Group Trips",
-    ctaHref: "/trips",
-    image:
-      "https://images.unsplash.com/photo-1529156069898-49953e39b3ac?q=80&w=1800&auto=format&fit=crop",
-  },
-];
 
-const categoryHighlights = [
-  {
-    name: "Travel with Guide",
-    text: "Verified Sri Lankan guides, curated routes, and cultural storytelling for every stop.",
-    image: "https://images.unsplash.com/photo-1530789253388-582c481c54b0?q=80&w=1400&auto=format&fit=crop",
-  },
-  {
-    name: "Join Group Trip",
-    text: "Join group trips across Sri Lanka and travel with like-minded people.",
-    image: "https://images.unsplash.com/photo-1529156069898-49953e39b3ac?q=80&w=1400&auto=format&fit=crop",
-  },
-  {
-    name: "Family Trip with Guide",
-    text: "Family-friendly itineraries with child-safe activities and verified accommodations.",
-    image: "https://images.unsplash.com/photo-1511895426328-dc8714191300?q=80&w=1400&auto=format&fit=crop",
-  },
-];
 
 function mapApiToTrip(item: TripApiItem): Trip {
   const start = item.startDate ? new Date(item.startDate) : null;
@@ -108,7 +57,7 @@ function mapApiToTrip(item: TripApiItem): Trip {
     coverImage: item.coverImage || (item.photos && item.photos[0]) || "",
     organizerId: item.organizer ?? "",
     organizerName: (item as any).organizerName || String(item.organizer ?? ""),
-    organizerRating: 4.5,
+    organizerRating: (item as any).organizerRating ?? null,
     location: {
       city: mainDest || item.startLocation || "",
       country: mainCountry || "",
@@ -122,9 +71,14 @@ function mapApiToTrip(item: TripApiItem): Trip {
 }
 
 export default function HomePage() {
-  const [activeSlide, setActiveSlide] = useState(0);
   const [trips, setTrips] = useState<Trip[]>([]);
+  const [onDemandTrips, setOnDemandTrips] = useState<OnDemandTripTemplateApiItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingOnDemand, setLoadingOnDemand] = useState(false);
+  const [isSearchActive, setIsSearchActive] = useState(false);
+  const [heroQuery, setHeroQuery] = useState("");
+  const [heroSearchLoading, setHeroSearchLoading] = useState(false);
+  const [heroSearchResults, setHeroSearchResults] = useState<ComprehensiveSearchResponse | null>(null);
 
   const [filters, setFilters] = useState({
     tripCategory: "",
@@ -137,24 +91,36 @@ export default function HomePage() {
     maxPrice: "",
   });
 
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setActiveSlide((current) => (current + 1) % heroSlides.length);
-    }, 5000);
-
-    return () => clearInterval(timer);
-  }, []);
-
   const token = useAuthCacheStore((s) => s.token);
+  const currentUser = useAuthCacheStore((s) => s.currentUser);
   const hydrated = useAuthCacheStore((s) => s.hydrated);
   const hydrateFromLegacySession = useAuthCacheStore((s) => s.hydrateFromLegacySession);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (!hydrated) hydrateFromLegacySession();
-    // load trips when token/hydration changes (ensures auth header is sent when available)
     loadTrips();
+    loadOnDemandTrips();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, hydrated]);
+
+  async function loadOnDemandTrips() {
+    try {
+      setLoadingOnDemand(true);
+      const res = await onDemandTripService.getPublicTemplates();
+      if (res && res.data) {
+        setOnDemandTrips(res.data.filter((trip) => !trip.isHidden && trip.status === "approved"));
+      }
+    } catch {
+      setOnDemandTrips([]);
+    } finally {
+      setLoadingOnDemand(false);
+    }
+  }
 
   async function loadTrips(params?: Record<string, string | number | undefined>) {
     try {
@@ -164,7 +130,6 @@ export default function HomePage() {
         setTrips(res.data.map(mapApiToTrip));
       }
     } catch (err) {
-      // swallow for now; UI can show empty state
       setTrips([]);
     } finally {
       setLoading(false);
@@ -182,126 +147,277 @@ export default function HomePage() {
     Object.entries(filters).forEach(([k, v]) => {
       if (v !== "") params[k] = v;
     });
+    const hasActiveFilters = Object.values(filters).some((v) => v !== "");
+    setIsSearchActive(hasActiveFilters);
     loadTrips(params);
   }
 
-  const currentSlide = heroSlides[activeSlide];
+  function handleReset() {
+    setFilters({
+      tripCategory: "",
+      tripName: "",
+      organizer: "",
+      startLocation: "",
+      startDate: "",
+      endDate: "",
+      minPrice: "",
+      maxPrice: "",
+    });
+    setIsSearchActive(false);
+    loadTrips();
+  }
+
+  async function handleHeroSearch(query: string) {
+    const normalizedQuery = query.trim();
+    setHeroQuery(normalizedQuery);
+
+    if (!normalizedQuery) {
+      setHeroSearchResults(null);
+      return;
+    }
+
+    try {
+      setHeroSearchLoading(true);
+      const res = await searchService.comprehensiveSearch({
+        q: normalizedQuery,
+        tripLimit: 12,
+        onDemandLimit: 12,
+      });
+
+      setHeroSearchResults(res.data);
+    } catch {
+      setHeroSearchResults({
+        query: normalizedQuery,
+        totals: { trips: 0, onDemandTrips: 0, total: 0 },
+        trips: [],
+        onDemandTrips: [],
+      });
+    } finally {
+      setHeroSearchLoading(false);
+    }
+  }
+
+  function clearHeroSearch() {
+    setHeroQuery("");
+    setHeroSearchResults(null);
+  }
+
+  const fixedDateTrips = trips;
+  const soloTrips = onDemandTrips.filter((t) => t.maxParticipants === 1);
+  const coupleTrips = onDemandTrips.filter((t) => t.maxParticipants === 2);
+  const familyTrips = onDemandTrips.filter((t) => t.maxParticipants > 2 && t.maxParticipants <= 6);
+  const teamTrips = onDemandTrips.filter((t) => t.maxParticipants > 6);
+  const searchedTrips = (heroSearchResults?.trips || []).map((trip) => mapApiToTrip(trip as TripApiItem));
+  const searchedOnDemandTrips = heroSearchResults?.onDemandTrips || [];
 
   return (
     <div className="bg-background">
       <Navbar />
       <main>
-        <section className="border-b border-border bg-card">
-          <div className="mx-auto grid max-w-7xl grid-cols-1 gap-8 px-4 py-10 md:grid-cols-2 md:px-6 md:py-14">
-            <div className="space-y-5">
-              <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">All-in-one Sri Lanka travel platform</p>
-              <h1 className="text-3xl font-semibold tracking-tight md:text-5xl">{currentSlide.title}</h1>
-              <p className="text-base text-muted-foreground">{currentSlide.description}</p>
+        <SmoothScrollHero onSearch={handleHeroSearch} isSearching={heroSearchLoading} initialQuery={heroQuery} />
 
-              <div className="flex flex-wrap gap-3">
-                <Button asChild>
-                  <Link href={currentSlide.ctaHref}>{currentSlide.ctaLabel}</Link>
-                </Button>
-                <Button variant="outline" asChild>
-                  <Link href="/dashboard/create-trip">Plan My Trip</Link>
-                </Button>
+          {heroQuery && (
+            <section className="mx-auto max-w-7xl px-4 pt-6 md:px-6">
+              <div className="rounded-2xl border border-border bg-card p-4 md:p-6">
+              <div className="mb-6 flex flex-col gap-4 border-b border-border pb-5 md:flex-row md:items-end md:justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">Search Results</p>
+                  <h2 className="mt-1 text-2xl font-black tracking-tight">Results for "{heroQuery}"</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {heroSearchResults?.totals.total ?? 0} total matches: {heroSearchResults?.totals.trips ?? 0} trips and {heroSearchResults?.totals.onDemandTrips ?? 0} on-demand trips.
+                  </p>
+                </div>
+                <Button variant="outline" size="sm" onClick={clearHeroSearch}>Clear Search</Button>
               </div>
 
-              <div className="flex gap-2 pt-2">
-                {heroSlides.map((slide, index) => (
-                  <button
-                    key={slide.title}
-                    type="button"
-                    aria-label={`Go to slide ${index + 1}`}
-                    onClick={() => setActiveSlide(index)}
-                    className={`h-2.5 transition-all ${index === activeSlide ? "w-10 bg-foreground" : "w-5 bg-border"}`}
-                  />
-                ))}
-              </div>
+              {heroSearchLoading ? (
+                <p className="text-sm text-muted-foreground">Searching trips...</p>
+              ) : (heroSearchResults?.totals.total ?? 0) === 0 ? (
+                <div className="rounded-xl border border-border bg-muted p-6 text-sm text-muted-foreground">
+                  No matching trips found. Try another keyword like a destination, trip name, or guide name.
+                </div>
+              ) : (
+                <div className="space-y-10">
+                  <div>
+                    <h3 className="mb-4 text-lg font-bold tracking-tight">Approved Public Trips</h3>
+                    {searchedTrips.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No approved public non-expired trips found for this query.</p>
+                    ) : (
+                      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-2">
+                        {searchedTrips.map((trip) => (
+                          <TripCardEnhanced key={`search-trip-${trip.id}`} trip={trip} />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <h3 className="mb-4 text-lg font-bold tracking-tight">On-demand Trips</h3>
+                    {searchedOnDemandTrips.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No approved on-demand trips found for this query.</p>
+                    ) : (
+                      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-2">
+                        {searchedOnDemandTrips.map((trip) => (
+                          <OnDemandTripCard key={`search-ondemand-${trip.id}`} trip={trip} />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
+          </section>
+        )}
 
-            <div className="border border-border bg-muted/20 p-2">
-              <img src={currentSlide.image} alt={currentSlide.title} className="h-full w-full object-cover" />
+        <section className="mx-auto max-w-7xl px-4 py-12 md:px-6 md:py-16">
+          
+          <form onSubmit={handleSearch} className="mb-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end border border-border bg-card p-6 rounded-sm">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">Trip Name</label>
+              <input name="tripName" placeholder="Trip name" value={filters.tripName} onChange={handleInputChange} className="input w-full" />
             </div>
-          </div>
-        </section>
-
-        <section className="mx-auto max-w-7xl px-4 py-12 md:px-6">
-          <div className="mb-6 flex items-center justify-between">
-            <h2 className="text-2xl font-semibold">Trip Categories in Sri Lanka</h2>
-            <Button variant="outline" asChild>
-              <Link href="/trips">Browse Categories</Link>
-            </Button>
-          </div>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {categoryHighlights.map((category) => (
-              <article key={category.name} className="border border-border bg-card p-3">
-                <img src={category.image} alt={category.name} className="h-40 w-full object-cover" />
-                <h3 className="mt-3 font-semibold">{category.name}</h3>
-                <p className="mt-2 text-sm text-muted-foreground">{category.text}</p>
-              </article>
-            ))}
-          </div>
-        </section>
-
-        <section className="border-y border-border bg-card">
-          <div className="mx-auto max-w-7xl px-4 py-12 md:px-6">
-            <div className="mb-6 flex items-center justify-between">
-              <h2 className="text-2xl font-semibold">Featured Sri Lanka Trips</h2>
-              <Button variant="outline" asChild>
-                <Link href="/trips">View all trips</Link>
-              </Button>
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">Start Location</label>
+              <input name="startLocation" placeholder="Start location" value={filters.startLocation} onChange={handleInputChange} className="input w-full" />
             </div>
-
-            <form onSubmit={handleSearch} className="mb-6 grid gap-2 md:grid-cols-4">
-              <input name="tripName" placeholder="Trip name" value={filters.tripName} onChange={handleInputChange} className="input" />
-              <input name="startLocation" placeholder="Start location" value={filters.startLocation} onChange={handleInputChange} className="input" />
-              <input name="startDate" type="date" placeholder="Start date" value={filters.startDate} onChange={handleInputChange} className="input" />
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">Start Date</label>
+              <input name="startDate" type="date" placeholder="Start date" value={filters.startDate} onChange={handleInputChange} className="input w-full" />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">Price Range</label>
               <div className="flex gap-2">
-                <input name="minPrice" placeholder="Min price" value={filters.minPrice} onChange={handleInputChange} className="input" />
-                <input name="maxPrice" placeholder="Max price" value={filters.maxPrice} onChange={handleInputChange} className="input" />
+                <input name="minPrice" placeholder="Min price" value={filters.minPrice} onChange={handleInputChange} className="input w-full" />
+                <input name="maxPrice" placeholder="Max price" value={filters.maxPrice} onChange={handleInputChange} className="input w-full" />
               </div>
-              <div className="md:col-span-4 flex gap-2">
-                <Button type="submit">Search</Button>
-                <Button variant="outline" onClick={() => { setFilters({ tripCategory: "", tripName: "", organizer: "", startLocation: "", startDate: "", endDate: "", minPrice: "", maxPrice: "" }); loadTrips(); }}>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider hidden lg:block invisible select-none">Actions</label>
+              <div className="flex gap-2 w-full">
+                <Button type="submit" className="flex-1">Search</Button>
+                <Button variant="outline" className="flex-1" onClick={handleReset}>
                   Reset
                 </Button>
               </div>
-            </form>
+            </div>
+          </form>
 
+
+          {loading ? (
+            <p>Loading trips…</p>
+          ) : isSearchActive ? (
             <div>
-              {loading ? (
-                <p>Loading trips…</p>
-              ) : trips.length === 0 ? (
+              <div className="mb-6 flex items-center justify-between border-b border-border pb-4">
+                <div>
+                  <h3 className="text-xl font-bold tracking-tight">Search Results</h3>
+                  <p className="text-sm text-muted-foreground mt-1">Found {trips.length} matching fixed date trips in Sri Lanka</p>
+                </div>
+                <Button variant="outline" size="sm" onClick={handleReset}>Clear All Filters</Button>
+              </div>
+              {trips.length === 0 ? (
                 <p className="text-muted-foreground">No trips found.</p>
               ) : (
-                <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+                      <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
                   {trips.map((t) => (
                     <TripCardEnhanced key={t.id} trip={t} />
                   ))}
                 </div>
               )}
             </div>
-          </div>
+          ) : (
+            <div className="space-y-16">
+              {/* Solo Trips Row */}
+              <div className="space-y-4 border-b border-border pb-16 last:border-0 last:pb-0">
+                <h3 className="text-2xl font-bold tracking-tight">Solo Trips</h3>
+                {soloTrips.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No solo trips available.</p>
+                ) : (
+                  <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+                    {soloTrips.slice(0, 3).map((t) => (
+                      <OnDemandTripCard key={t.id} trip={t} />
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Couple Trips Row */}
+              <div className="space-y-4 border-b border-border pb-16 last:border-0 last:pb-0">
+                <h3 className="text-2xl font-bold tracking-tight">Couple Trips</h3>
+                {coupleTrips.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No couple trips available.</p>
+                ) : (
+                  <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+                    {coupleTrips.slice(0, 3).map((t) => (
+                      <OnDemandTripCard key={t.id} trip={t} />
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Family Trips Row */}
+              <div className="space-y-4 border-b border-border pb-16 last:border-0 last:pb-0">
+                <h3 className="text-2xl font-bold tracking-tight">Family Trips</h3>
+                {familyTrips.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No family trips available.</p>
+                ) : (
+                  <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+                    {familyTrips.slice(0, 3).map((t) => (
+                      <OnDemandTripCard key={t.id} trip={t} />
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Team Trips Row */}
+              <div className="space-y-4 border-b border-border pb-16 last:border-0 last:pb-0">
+                <h3 className="text-2xl font-bold tracking-tight">Team Trips</h3>
+                {teamTrips.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No team trips available.</p>
+                ) : (
+                  <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+                    {teamTrips.slice(0, 3).map((t) => (
+                      <OnDemandTripCard key={t.id} trip={t} />
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Fixed Date Trips Section (last section) */}
+              <div className="space-y-4">
+                <h3 className="text-2xl font-bold tracking-tight">Fixed Date Tours</h3>
+                {fixedDateTrips.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No fixed date tours available.</p>
+                ) : (
+                  <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+                    {fixedDateTrips.map((t) => (
+                      <TripCardEnhanced key={t.id} trip={t} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </section>
 
-        <section className="mx-auto max-w-7xl px-4 py-12 md:px-6">
-          <div className="border border-border bg-card p-8 text-center">
-            <h2 className="text-3xl font-semibold">Create, share, and manage Sri Lanka trips in one workspace</h2>
-            <p className="mx-auto mt-3 max-w-2xl text-sm text-muted-foreground">
-              From guided family escapes to group adventures and team outings, TripWaver helps with planning, participant tracking,
-              and payment collection from one dashboard.
-            </p>
-            <div className="mt-6 flex justify-center gap-3">
-              <Button asChild>
-                <Link href="/register">Create account</Link>
-              </Button>
-              <Button variant="outline" asChild>
-                <Link href="/dashboard">Open dashboard</Link>
-              </Button>
+        {mounted && !currentUser && (
+          <section className="mx-auto max-w-7xl px-4 pb-24 md:px-6">
+            <div className="border border-border bg-card p-12 md:p-16 text-center rounded-sm">
+              <h2 className="text-3xl font-semibold">Create, share, and manage Sri Lanka trips in one workspace</h2>
+              <p className="mx-auto mt-3 max-w-2xl text-sm text-muted-foreground">
+                From guided family escapes to group adventures and team outings, TripWaver helps with planning, participant tracking,
+                and payment collection from one dashboard.
+              </p>
+              <div className="mt-6 flex justify-center gap-3">
+                <Button asChild>
+                  <Link href="/register">Create account</Link>
+                </Button>
+                <Button variant="outline" asChild>
+                  <Link href="/dashboard">Open dashboard</Link>
+                </Button>
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
+        )}
       </main>
       <Footer />
     </div>

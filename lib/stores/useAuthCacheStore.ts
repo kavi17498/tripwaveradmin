@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
-import { userSessionService } from "@/lib/services/userSessionService";
+import { userSessionService, isTokenExpired } from "@/lib/services/userSessionService";
 import { UserModulePayload } from "@/lib/types";
 
 type CachedUserProfile = Partial<UserModulePayload> & {
@@ -47,6 +47,11 @@ export const useAuthCacheStore = create<AuthCacheState>()(
         const profile = userSessionService.getUserProfile<CachedUserProfile>();
         const legacyToken = userSessionService.getToken();
 
+        if (isTokenExpired(legacyToken)) {
+          set({ currentUser: null, token: null, hydrated: true });
+          return;
+        }
+
         if (profile || legacyToken) {
           set({ currentUser: profile ?? null, token: legacyToken, hydrated: true });
           return;
@@ -59,6 +64,12 @@ export const useAuthCacheStore = create<AuthCacheState>()(
       name: "tripwaver:auth-cache",
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({ currentUser: state.currentUser, token: state.token }),
+      onRehydrateStorage: () => (state) => {
+        if (state && isTokenExpired(state.token)) {
+          state.currentUser = null;
+          state.token = null;
+        }
+      },
     },
   ),
 );
