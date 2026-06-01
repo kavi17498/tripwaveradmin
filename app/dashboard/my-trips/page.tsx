@@ -21,6 +21,14 @@ type ShareNavigator = Navigator & {
   share?: (data: { title?: string; url?: string }) => Promise<void>;
 };
 
+type TripWithMeta = TripApiItem & {
+  createdAt?: unknown;
+  durationLabel?: string;
+  statusReason?: string;
+  statusUpdatedByName?: string;
+  statusUpdatedBy?: string;
+};
+
 const statusFilters: Array<{ value: TripDisplayStatus; label: string }> = [
   { value: "all", label: "All trips" },
   { value: "pending", label: "Pending" },
@@ -65,6 +73,22 @@ const getLocalDateString = (date: Date) => {
   return `${year}-${month}-${day}`;
 };
 
+const getCreatedAtTime = (value: unknown) => {
+  if (!value) return 0;
+  if (typeof value === "string") {
+    const parsed = Date.parse(value);
+    return Number.isNaN(parsed) ? 0 : parsed;
+  }
+  if (typeof value === "number") return value;
+  if (typeof value === "object" && value !== null) {
+    const candidate = value as { toDate?: () => Date; seconds?: number; _seconds?: number };
+    if (typeof candidate.toDate === "function") return candidate.toDate().getTime();
+    if (typeof candidate.seconds === "number") return candidate.seconds * 1000;
+    if (typeof candidate._seconds === "number") return candidate._seconds * 1000;
+  }
+  return 0;
+};
+
 const isTripExpired = (trip: TripApiItem) => {
   const endOfDay = new Date(`${trip.endDate}T23:59:59.999`);
   return Number.isNaN(endOfDay.getTime()) ? false : new Date() > endOfDay;
@@ -75,9 +99,10 @@ export default function MyTripsPage() {
   const [shareOpen, setShareOpen] = useState(false);
   const [shareUrl, setShareUrl] = useState("");
   const [statusFilter, setStatusFilter] = useState<TripDisplayStatus>("all");
-  const [trips, setTrips] = useState<TripApiItem[]>([]);
+  const [trips, setTrips] = useState<TripWithMeta[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [activeTripMenuId, setActiveTripMenuId] = useState<string | null>(null);
 
   const [duplicateModalOpen, setDuplicateModalOpen] = useState(false);
   const [selectedTripDetails, setSelectedTripDetails] = useState<TripApiItem | null>(null);
@@ -124,9 +149,11 @@ export default function MyTripsPage() {
           ...t,
           tripCategory: t.tripCategory || "On-demand trip",
         })),
-      ];
+      ] as TripWithMeta[];
 
-      setTrips(combinedTrips as any[]);
+      combinedTrips.sort((left, right) => getCreatedAtTime(right.createdAt) - getCreatedAtTime(left.createdAt));
+
+      setTrips(combinedTrips);
     } catch (loadError) {
       const message = loadError instanceof Error ? loadError.message : "Failed to load trips.";
       setError(message);
@@ -305,6 +332,32 @@ export default function MyTripsPage() {
     }
   };
 
+  const handleDeleteOnDemandTrip = async (trip: TripWithMeta) => {
+    const isOnDemand = trip.tripCategory === "On-demand trip" || !trip.startDate;
+    if (!isOnDemand) return;
+
+    const confirmed = window.confirm(`Delete "${trip.tripName}"? This action cannot be undone.`);
+    if (!confirmed) return;
+
+    const token = userSessionService.getToken();
+    if (!token) {
+      pushToast({ type: "error", title: "Missing auth token", description: "Please login again." });
+      return;
+    }
+
+    try {
+      await onDemandTripService.deleteTemplate(trip.id, token);
+      pushToast({ type: "success", title: "Trip deleted", description: "On-demand trip template deleted successfully." });
+      if (activeTripMenuId === trip.id) {
+        setActiveTripMenuId(null);
+      }
+      void loadTrips();
+    } catch (deleteError) {
+      const message = deleteError instanceof Error ? deleteError.message : "Failed to delete trip.";
+      pushToast({ type: "error", title: "Delete failed", description: message });
+    }
+  };
+
   const isDateDisabled = (dateVal: Date) => {
     if (!selectedTripDetails) return true;
 
@@ -393,6 +446,15 @@ export default function MyTripsPage() {
     return trips.filter((trip) => getTripDisplayStatus(trip) === statusFilter);
   }, [statusFilter, trips]);
 
+  useEffect(() => {
+    const handleClickOutside = () => setActiveTripMenuId(null);
+    if (activeTripMenuId) {
+      window.addEventListener("click", handleClickOutside);
+      return () => window.removeEventListener("click", handleClickOutside);
+    }
+    return undefined;
+  }, [activeTripMenuId]);
+
   const dashboardSummary = [
     { label: "Pending", value: tripGroups.pending.length, tone: "amber" },
     { label: "Approved", value: tripGroups.approved.length, tone: "emerald" },
@@ -446,7 +508,7 @@ export default function MyTripsPage() {
             : `No ${statusFilter} trips found.`}
         </div>
       ) : (
-        <div className="grid gap-4 xl:grid-cols-2">
+        <div className="space-y-3">
           {filteredTrips.map((trip) => {
             const isOnDemand = trip.tripCategory === "On-demand trip" || !trip.startDate;
             const displayStatus = getTripDisplayStatus(trip);
@@ -458,102 +520,140 @@ export default function MyTripsPage() {
             const pickupOrigin = trip.pickupType === "Meet at Location"
               ? trip.startLocation
               : trip.pickupStartLocation?.name ?? "Configured pickup origin";
+            const isMenuOpen = activeTripMenuId === trip.id;
 
             return (
-              <article key={trip.id} className="rounded border border-border bg-card p-4 shadow-sm">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="space-y-1">
-                    <p className="text-xs uppercase tracking-wide text-muted-foreground">{trip.tripCategory}</p>
-                    <h3 className="text-lg font-semibold leading-tight">{trip.tripName}</h3>
-                    <p className="text-sm text-muted-foreground">{getTripDestination(trip)}</p>
-                  </div>
-                  <StatusBadge status={displayStatus} />
-                </div>
+              <article key={trip.id} className="rounded-xl border border-border bg-card p-4 shadow-sm">
+                <div className="flex flex-col gap-4 md:flex-row md:items-start">
+                  <div className="flex-1 space-y-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">{trip.tripCategory}</p>
+                      <StatusBadge status={displayStatus} />
+                      <span className="rounded-full border border-border px-2 py-1 text-xs text-muted-foreground">
+                        {trip.participants?.length ?? 0} participants
+                      </span>
+                    </div>
 
-                <div className="mt-4 grid gap-2 text-sm md:grid-cols-2">
-                  <div className="rounded border border-border/70 bg-muted/20 p-3">
-                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Date range</p>
-                    {trip.startDate && trip.endDate ? (
-                      <>
-                        <p className="mt-1 font-medium">{trip.startDate} to {trip.endDate}</p>
-                        <p className="text-xs text-muted-foreground">{trip.startTime ?? "--"} to {trip.endTime ?? "--"}</p>
-                      </>
-                    ) : (
-                      <>
-                        <p className="mt-1 font-medium">Flexible Dates</p>
-                        <p className="text-xs text-muted-foreground">Duration: {(trip as any).durationLabel || "On-demand"}</p>
-                      </>
-                    )}
-                  </div>
-                  <div className="rounded border border-border/70 bg-muted/20 p-3">
-                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Pickup</p>
-                    <p className="mt-1 font-medium">{trip.pickupType ?? "Meet at Location"}</p>
-                    <p className="text-xs text-muted-foreground">Origin: {pickupOrigin}</p>
-                  </div>
-                  <div className="rounded border border-border/70 bg-muted/20 p-3">
-                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Participants</p>
-                    <p className="mt-1 font-medium">{participantStats.total} booked</p>
-                    <p className="text-xs text-muted-foreground">Accepted {participantStats.accepted} | Pending {participantStats.pending} | Rejected {participantStats.rejected}</p>
-                  </div>
-                  <div className="rounded border border-border/70 bg-muted/20 p-3">
-                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Organizer</p>
-                    <p className="mt-1 font-medium">{trip.organizerName ?? trip.organizer}</p>
-                    <p className="text-xs text-muted-foreground">Base price {trip.price}</p>
-                  </div>
-                </div>
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="space-y-1">
+                        <h3 className="text-lg font-semibold leading-tight">{trip.tripName}</h3>
+                        <p className="text-sm text-muted-foreground">{getTripDestination(trip)}</p>
+                      </div>
+                      <div className="text-sm text-muted-foreground sm:text-right">
+                        <p className="font-medium text-foreground">{trip.organizerName ?? trip.organizer}</p>
+                        <p>Base price {trip.price}</p>
+                      </div>
+                    </div>
 
-                {trip.statusReason ? (
-                  <div className="mt-3 rounded border border-dashed border-border p-3 text-sm text-muted-foreground">
-                    <p className="text-xs uppercase tracking-wide">Status note</p>
-                    <p className="mt-1">{trip.statusReason}</p>
-                  </div>
-                ) : null}
+                    <div className="grid gap-3 md:grid-cols-3">
+                      <div className="rounded-lg border border-border/70 bg-muted/20 p-3 text-sm">
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground">Date range</p>
+                        {trip.startDate && trip.endDate ? (
+                          <>
+                            <p className="mt-1 font-medium">{trip.startDate} to {trip.endDate}</p>
+                            <p className="text-xs text-muted-foreground">{trip.startTime ?? "--"} to {trip.endTime ?? "--"}</p>
+                          </>
+                        ) : (
+                          <>
+                            <p className="mt-1 font-medium">Flexible Dates</p>
+                            <p className="text-xs text-muted-foreground">Duration: {trip.durationLabel || "On-demand"}</p>
+                          </>
+                        )}
+                      </div>
+                      <div className="rounded-lg border border-border/70 bg-muted/20 p-3 text-sm">
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground">Pickup</p>
+                        <p className="mt-1 font-medium">{trip.pickupType ?? "Meet at Location"}</p>
+                        <p className="text-xs text-muted-foreground">Origin: {pickupOrigin}</p>
+                      </div>
+                      <div className="rounded-lg border border-border/70 bg-muted/20 p-3 text-sm">
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground">Participants</p>
+                        <p className="mt-1 font-medium">Accepted {participantStats.accepted} | Pending {participantStats.pending} | Rejected {participantStats.rejected}</p>
+                        <p className="text-xs text-muted-foreground">Total {participantStats.total}</p>
+                      </div>
+                    </div>
 
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <span className="rounded-full border border-border px-2 py-1 text-xs text-muted-foreground">{trip.pickupType ?? "Meet at Location"}</span>
-                  <span className="rounded-full border border-border px-2 py-1 text-xs text-muted-foreground">{trip.participants?.length ?? 0} participants</span>
-                  <span className="rounded-full border border-border px-2 py-1 text-xs text-muted-foreground">{expired ? "Expired" : displayStatus}</span>
-                </div>
-
-                <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex flex-wrap gap-2">
-                    <Button size="sm" variant="outline" onClick={() => void handleOpenDetails(trip.id)}>View details</Button>
-                    {canEdit ? (
-                      <Button size="sm" variant="outline" asChild>
-                        <Link href={isOnDemand ? `/dashboard/create-trip?mode=edit&id=${trip.id}` : `/dashboard/trips/${trip.id}/edit`}>
-                          {displayStatus === "rejected" ? "Edit & Resubmit" : "Edit"}
-                        </Link>
-                      </Button>
-                    ) : (
-                      <Button size="sm" variant="outline" disabled title="Cancelled trips cannot be edited">Edit</Button>
-                    )}
-                    {!isOnDemand && trip.status !== "draft" && displayStatus !== "cancelled" ? (
-                      <Button size="sm" variant="outline" onClick={() => void handleOpenDuplicate(trip.id)}>Post with New Date</Button>
+                    {trip.statusReason ? (
+                      <div className="rounded border border-dashed border-border p-3 text-sm text-muted-foreground">
+                        <p className="text-xs uppercase tracking-wide">Status note</p>
+                        <p className="mt-1">{trip.statusReason}</p>
+                      </div>
                     ) : null}
                   </div>
 
-                  <div className="flex flex-wrap gap-2">
-                    {canShare ? (
-                      <Button
-                        size="sm"
-                        onClick={() => {
-                          const pathSegment = isOnDemand ? "on-demand" : "trips";
-                          const url = typeof window !== "undefined" ? `${window.location.origin}/${pathSegment}/${trip.id}` : `/${pathSegment}/${trip.id}`;
-                          setShareUrl(url);
-                          setShareOpen(true);
-                        }}
+                  <div className="relative self-start md:pl-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="h-10 w-10 rounded-full"
+                      aria-label={`Open actions for ${trip.tripName}`}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setActiveTripMenuId((current) => (current === trip.id ? null : trip.id));
+                      }}
+                    >
+                      <span className="text-xl leading-none">⋯</span>
+                    </Button>
+
+                    {isMenuOpen ? (
+                      <div
+                        className="absolute right-0 top-12 z-20 w-52 rounded-xl border border-border bg-card p-2 shadow-lg"
+                        onClick={(event) => event.stopPropagation()}
                       >
-                        Share Invite
-                      </Button>
-                    ) : (
-                      <Button size="sm" variant="outline" disabled title={expired ? "Trip has expired" : "Invite unavailable"}>
-                        Share Invite
-                      </Button>
-                    )}
-                    {canCancel ? (
-                      <Button size="sm" variant="outline" className="border-destructive text-destructive hover:bg-destructive/5" onClick={() => void handleOpenCancel(trip.id)}>
-                        Cancel trip
-                      </Button>
+                        <Button type="button" variant="ghost" className="w-full justify-start" onClick={() => { setActiveTripMenuId(null); void handleOpenDetails(trip.id); }}>
+                          View details
+                        </Button>
+                        {canEdit ? (
+                          <Button type="button" variant="ghost" className="w-full justify-start" asChild>
+                            <Link href={isOnDemand ? `/dashboard/create-trip?mode=edit&id=${trip.id}` : `/dashboard/trips/${trip.id}/edit`}>
+                              {displayStatus === "rejected" ? "Edit & Resubmit" : "Edit"}
+                            </Link>
+                          </Button>
+                        ) : (
+                          <Button type="button" variant="ghost" className="w-full justify-start" disabled title="Cancelled trips cannot be edited">
+                            Edit
+                          </Button>
+                        )}
+                        {!isOnDemand && trip.status !== "draft" && displayStatus !== "cancelled" ? (
+                          <Button type="button" variant="ghost" className="w-full justify-start" onClick={() => { setActiveTripMenuId(null); void handleOpenDuplicate(trip.id); }}>
+                            Post with New Date
+                          </Button>
+                        ) : null}
+                        {canShare ? (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            className="w-full justify-start"
+                            onClick={() => {
+                              const pathSegment = isOnDemand ? "on-demand" : "trips";
+                              const url = typeof window !== "undefined" ? `${window.location.origin}/${pathSegment}/${trip.id}` : `/${pathSegment}/${trip.id}`;
+                              setShareUrl(url);
+                              setShareOpen(true);
+                              setActiveTripMenuId(null);
+                            }}
+                          >
+                            Share Invite
+                          </Button>
+                        ) : null}
+                        {canCancel ? (
+                          <Button type="button" variant="ghost" className="w-full justify-start text-destructive hover:text-destructive" onClick={() => { setActiveTripMenuId(null); void handleOpenCancel(trip.id); }}>
+                            Cancel trip
+                          </Button>
+                        ) : null}
+                        {isOnDemand ? (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            className="w-full justify-start text-destructive hover:text-destructive"
+                            onClick={() => {
+                              setActiveTripMenuId(null);
+                              void handleDeleteOnDemandTrip(trip);
+                            }}
+                          >
+                            Delete
+                          </Button>
+                        ) : null}
+                      </div>
                     ) : null}
                   </div>
                 </div>
