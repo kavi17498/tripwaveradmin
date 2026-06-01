@@ -6,7 +6,7 @@ import { PageHeader } from "@/components/common/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/feedback/toast-provider";
-import { Bus, Car, Train, Truck } from "lucide-react";
+import { Bus, Car, ChevronDown, ChevronUp, Train, Truck } from "lucide-react";
 import {
   CreateTripApiPayload,
   TripDestinationPayload,
@@ -304,6 +304,22 @@ export default function CreateTripPage() {
   const [saving, setSaving] = useState(false);
   const [isTripwaverAIOpen, setIsTripwaverAIOpen] = useState(false);
   const [tripwaverAIError, setTripwaverAIError] = useState("");
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({
+    basicDetails: true,
+    schedule: true,
+    mainDestinations: false,
+    travelDestinations: false,
+    selectedDestinations: false,
+    travelBy: false,
+    paymentMethod: false,
+    included: false,
+    pricingPhotos: false,
+    itinerary: false,
+  });
+
+  const toggleSection = (sectionKey: string) => {
+    setOpenSections((prev) => ({ ...prev, [sectionKey]: !prev[sectionKey] }));
+  };
 
   const minStartDate = useMemo(() => getMinStartDate(3), []);
   const endDateMin = startDate || minStartDate;
@@ -1206,581 +1222,739 @@ export default function CreateTripPage() {
       </div>
 
       <form onSubmit={(event) => void submit(event, "pending")} className="space-y-6 border border-border bg-card p-5">
-        <section className="space-y-4">
-          <h2 className="text-lg font-semibold">Basic Details</h2>
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            <div>
-              <label className="mb-1 block text-sm font-medium">Trip name</label>
-              <Input value={tripName} onChange={(event) => setTripName(event.target.value)} placeholder="Sri Lanka Southern Escape" />
+        {/* Section 1: Basic Details */}
+        <div className="border border-border rounded-xl overflow-hidden bg-card transition-all">
+          <button
+            type="button"
+            onClick={() => toggleSection("basicDetails")}
+            className="flex w-full items-center justify-between p-4 bg-muted/30 hover:bg-muted/50 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm font-bold text-foreground uppercase tracking-wider">Basic Details</h2>
+              <span className="text-xs text-muted-foreground hidden sm:inline">- Name, category, description</span>
             </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium">Trip category</label>
-              <select
-                value={tripCategory}
-                onChange={(event) => {
-                  const nextCategory = event.target.value as TripCategory;
-                  if (!canSelectAllCategories) {
-                    setTripCategory("Private trip");
-                    return;
-                  }
-                  setTripCategory(nextCategory);
-                }}
-                className="h-9 w-full border border-input bg-background px-3 text-sm"
-              >
-                {(canSelectAllCategories ? categories : ["Private trip"]).map((categoryItem) => (
-                  <option
-                    key={categoryItem}
-                    value={categoryItem}
-                    disabled={!canSelectAllCategories && categoryItem !== "Private trip"}
+            {openSections.basicDetails ? <ChevronUp className="size-4 text-muted-foreground" /> : <ChevronDown className="size-4 text-muted-foreground" />}
+          </button>
+          
+          {openSections.basicDetails && (
+            <div className="p-5 border-t border-border space-y-4">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-sm font-medium">Trip Name</label>
+                  <Input value={tripName} onChange={(event) => setTripName(event.target.value)} placeholder="e.g., Sri Lanka Southern Escape" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium">Category</label>
+                  <select
+                    value={tripCategory}
+                    onChange={(event) => {
+                      const nextCategory = event.target.value as TripCategory;
+                      if (!canSelectAllCategories) {
+                        setTripCategory("Private trip");
+                        return;
+                      }
+                      setTripCategory(nextCategory);
+                    }}
+                    className="h-9 w-full border border-input bg-background px-3 text-sm rounded-md"
                   >
-                    {categoryItem}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium">Description</label>
-            <textarea
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
-              className="min-h-24 w-full border border-input bg-background px-3 py-2 text-sm"
-              placeholder="A beautiful guided family trip through Sri Lanka's southern coast"
-            />
-          </div>
-        </section>
-
-        <section className="space-y-4">
-          <h2 className="text-lg font-semibold">{isOnDemandTrip ? "Template Details" : "Schedule & Organizer"}</h2>
-          {isOnDemandTrip ? (
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
-              <div>
-                <label className="mb-1 block text-sm font-medium">Duration</label>
-                <select
-                  value={onDemandDurationDays}
-                  onChange={(event) => setOnDemandDurationDays(event.target.value)}
-                  className="h-9 w-full border border-input bg-background px-3 text-sm"
-                >
-                  {durationOptions.map((option) => (
-                    <option key={option.label} value={String(option.days)}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
+                    {(canSelectAllCategories ? categories : ["Private trip"]).map((categoryItem) => (
+                      <option
+                        key={categoryItem}
+                        value={categoryItem}
+                        disabled={!canSelectAllCategories && categoryItem !== "Private trip"}
+                      >
+                        {categoryItem}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
-              <div className="rounded-xl border border-dashed border-border bg-muted/20 p-4 text-sm text-muted-foreground lg:col-span-2">
-                On-demand trips do not need fixed dates here. The traveler picks the available dates later, and the system creates a dated private trip from this template.
-              </div>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+
               <div>
-                <label className="mb-1 block text-sm font-medium">Start date</label>
-                <Input
-                  type="date"
-                  value={startDate}
-                  min={isEditMode ? undefined : minStartDate}
-                  onChange={(event) => setStartDate(event.target.value)}
+                <label className="mb-1 block text-sm font-medium">Description</label>
+                <textarea
+                  value={description}
+                  onChange={(event) => setDescription(event.target.value)}
+                  className="min-h-24 w-full border border-input bg-background px-3 py-2 text-sm rounded-md"
+                  placeholder="Brief overview of this trip..."
                 />
               </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium">End date</label>
-                <Input type="date" value={endDate} min={endDateMin} onChange={(event) => setEndDate(event.target.value)} />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium">Start time</label>
-                <Input type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium">End time</label>
-                <Input type="time" value={endTime} onChange={(event) => setEndTime(event.target.value)} />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium">Pickup Option</label>
-                <select
-                  value={pickupType}
-                  onChange={(event) => {
-                    const nextType = event.target.value as PickupType;
-                    setPickupType(nextType);
+            </div>
+          )}
+        </div>
 
-                    const defaultPickupLocation = getDefaultPickupLocation(nextType);
-                    if (defaultPickupLocation) {
-                      setPickupStartLocation(defaultPickupLocation);
-                      setStartLocation(defaultPickupLocation.address);
-                    }
-                  }}
-                  className="h-9 w-full border border-input bg-background px-3 text-sm"
-                >
-                  {pickupTypeOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {pickupType === "Meet at Location" ? (
-                <div>
-                  <label className="mb-1 block text-sm font-medium">Start location</label>
-                  <LocationPicker
-                    value={startLocation ? { address: startLocation, lat: mainDestination?.lat ?? 0, lng: mainDestination?.lng ?? 0 } : undefined}
-                    onChange={(location) => {
-                      setStartLocation(location.address);
-                    }}
-                  />
+        {/* Section 2: Schedule & Organizer / Template Details */}
+        <div className="border border-border rounded-xl overflow-hidden bg-card transition-all">
+          <button
+            type="button"
+            onClick={() => toggleSection("schedule")}
+            className="flex w-full items-center justify-between p-4 bg-muted/30 hover:bg-muted/50 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm font-bold text-foreground uppercase tracking-wider">
+                {isOnDemandTrip ? "Template Details" : "Schedule & Organizer"}
+              </h2>
+              <span className="text-xs text-muted-foreground hidden sm:inline">
+                - {isOnDemandTrip ? "Duration and flexible rules" : "Dates, times, and pickup settings"}
+              </span>
+            </div>
+            {openSections.schedule ? <ChevronUp className="size-4 text-muted-foreground" /> : <ChevronDown className="size-4 text-muted-foreground" />}
+          </button>
+          
+          {openSections.schedule && (
+            <div className="p-5 border-t border-border space-y-4">
+              {isOnDemandTrip ? (
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+                  <div>
+                    <label className="mb-1 block text-sm font-medium">Duration</label>
+                    <select
+                      value={onDemandDurationDays}
+                      onChange={(event) => setOnDemandDurationDays(event.target.value)}
+                      className="h-9 w-full border border-input bg-background px-3 text-sm rounded-md"
+                    >
+                      {durationOptions.map((option) => (
+                        <option key={option.label} value={String(option.days)}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="rounded-xl border border-dashed border-border bg-muted/20 p-4 text-sm text-muted-foreground lg:col-span-2 flex items-center">
+                    Flexible date trip. Traveler chooses booking dates later.
+                  </div>
                 </div>
               ) : (
-                <>
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
                   <div>
-                    <label className="mb-1 block text-sm font-medium">Pickup origin (Guide&apos;s start location)</label>
-                    <LocationPicker
-                      value={pickupStartLocation}
-                      onChange={(location) => {
-                        setPickupStartLocation(location);
-                        setStartLocation(location.address);
-                      }}
+                    <label className="mb-1 block text-sm font-medium">Start Date</label>
+                    <Input
+                      type="date"
+                      value={startDate}
+                      min={isEditMode ? undefined : minStartDate}
+                      onChange={(event) => setStartDate(event.target.value)}
                     />
                   </div>
-                  {pickupType === "Pickup Available" || isAirportPickupType(pickupType) ? (
+                  <div>
+                    <label className="mb-1 block text-sm font-medium">End Date</label>
+                    <Input type="date" value={endDate} min={endDateMin} onChange={(event) => setEndDate(event.target.value)} />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium">Start Time</label>
+                    <Input type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium">End Time</label>
+                    <Input type="time" value={endTime} onChange={(event) => setEndTime(event.target.value)} />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium">Pickup Option</label>
+                    <select
+                      value={pickupType}
+                      onChange={(event) => {
+                        const nextType = event.target.value as PickupType;
+                        setPickupType(nextType);
+
+                        const defaultPickupLocation = getDefaultPickupLocation(nextType);
+                        if (defaultPickupLocation) {
+                          setPickupStartLocation(defaultPickupLocation);
+                          setStartLocation(defaultPickupLocation.address);
+                        }
+                      }}
+                      className="h-9 w-full border border-input bg-background px-3 text-sm rounded-md"
+                    >
+                      {pickupTypeOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {pickupType === "Meet at Location" ? (
                     <div>
-                      <label className="mb-1 block text-sm font-medium">Pickup cost per km (LKR)</label>
-                      <Input
-                        type="number"
-                        min={0}
-                        value={pickupCostPerKm}
-                        onChange={(event) => setPickupCostPerKm(event.target.value)}
-                        placeholder="e.g. 100"
+                      <label className="mb-1 block text-sm font-medium">Start Location</label>
+                      <LocationPicker
+                        value={startLocation ? { address: startLocation, lat: mainDestination?.lat ?? 0, lng: mainDestination?.lng ?? 0 } : undefined}
+                        onChange={(location) => {
+                          setStartLocation(location.address);
+                        }}
                       />
                     </div>
-                  ) : null}
-                </>
-              )}
-              <div>
-                <label className="mb-1 block text-sm font-medium">Organizer id (user id)</label>
-                <Input value={organizerId} onChange={(event) => setOrganizerId(event.target.value)} placeholder="user_12345" />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium">Organizer name (preview)</label>
-                <Input value={organizerName} readOnly />
-              </div>
-            </div>
-          )}
-        </section>
-
-
-        <section className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold">Main Destination Select</h2>
-          </div>
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <div className="space-y-3">
-              <LocationPicker value={mainDestination} onChange={setMainDestination} />
-              <div className="flex justify-end">
-                <Button type="button" variant="outline" onClick={addMainDestination}>
-                  Add as main destination
-                </Button>
-              </div>
-            </div>
-            <div className="space-y-3 rounded border border-border p-3">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-medium">Main destinations</h3>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground">{mainDestinations.length}</span>
-                  <Button type="button" variant="outline" size="sm" onClick={loadTravelDestinations} disabled={isLoadingTravelDestinations}>
-                    {isLoadingTravelDestinations ? "Loading..." : "Load travel destinations"}
-                  </Button>
-                </div>
-              </div>
-              {mainDestinations.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No main destinations added yet.</p>
-              ) : (
-                <div className="space-y-2">
-                  {mainDestinations.map((destination, index) => (
-                    <div key={`${destination.address}-${index}`} className="flex items-center justify-between gap-2 rounded border border-border px-3 py-2">
-                      <div className="text-sm">
-                        <p className="font-medium">{destination.address}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {destination.lat.toFixed(5)}, {destination.lng.toFixed(5)}
-                        </p>
+                  ) : (
+                    <>
+                      <div>
+                        <label className="mb-1 block text-sm font-medium">Pickup Origin (Guide&apos;s start location)</label>
+                        <LocationPicker
+                          value={pickupStartLocation}
+                          onChange={(location) => {
+                            setPickupStartLocation(location);
+                            setStartLocation(location.address);
+                          }}
+                        />
                       </div>
-                      <Button type="button" variant="ghost" onClick={() => removeMainDestination(index)}>
-                        Remove
-                      </Button>
-                    </div>
-                  ))}
+                      {pickupType === "Pickup Available" || isAirportPickupType(pickupType) ? (
+                        <div>
+                          <label className="mb-1 block text-sm font-medium">Pickup Cost Per Km (LKR)</label>
+                          <Input
+                            type="number"
+                            min={0}
+                            value={pickupCostPerKm}
+                            onChange={(event) => setPickupCostPerKm(event.target.value)}
+                            placeholder="e.g., 100"
+                          />
+                        </div>
+                      ) : null}
+                    </>
+                  )}
+                  <div>
+                    <label className="mb-1 block text-sm font-medium">Organizer ID</label>
+                    <Input value={organizerId} onChange={(event) => setOrganizerId(event.target.value)} placeholder="user_12345" />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium">Organizer Name</label>
+                    <Input value={organizerName} readOnly />
+                  </div>
                 </div>
               )}
             </div>
-          </div>
-        </section>
-
-        <section className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold">Travel Destinations</h2>
-          </div>
-          {travelDestinationGroups.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Load travel destinations to see recommendations.</p>
-          ) : (
-            <div className="space-y-6">
-              {travelDestinationGroups.map((group, groupIndex) => (
-                <div key={`${group.location}-${groupIndex}`} className="space-y-3">
-                  <h3 className="text-sm font-semibold">{group.location}</h3>
-                  <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                    <div className="space-y-2">
-                      {group.destinations.map((destination, destinationIndex) => (
-                        <button
-                          key={`${destination.name}-${destinationIndex}`}
-                          type="button"
-                          onClick={() => addSelectedTravelDestination(group.location, destination)}
-                          className="flex w-full items-center gap-3 rounded border border-border bg-card p-2 text-left transition hover:bg-accent"
-                        >
-                          {destination.imageUrl ? (
-                            <img src={destination.imageUrl} alt={destination.name} className="h-12 w-12 rounded object-cover" />
-                          ) : (
-                            <div className="flex h-12 w-12 items-center justify-center rounded bg-muted text-xs text-muted-foreground">
-                              No image
-                            </div>
-                          )}
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-medium">{destination.name}</p>
-                            <p className="truncate text-xs text-muted-foreground">{destination.description}</p>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                    <div className="space-y-2 rounded border border-dashed border-border p-3">
-                      <p className="text-xs font-semibold text-muted-foreground">Selected destinations</p>
-                      {selectedTravelDestinations.filter((item) => item.location === group.location).length === 0 ? (
-                        <p className="text-xs text-muted-foreground">Click a destination to add it here.</p>
-                      ) : (
-                        <div className="space-y-2">
-                          {selectedTravelDestinations
-                            .filter((item) => item.location === group.location)
-                            .map((item) => (
-                              <button
-                                key={`${item.location}-${item.name}`}
-                                type="button"
-                                onClick={() => removeSelectedTravelDestination(item.location, item.name)}
-                                className="flex w-full items-center gap-3 rounded border border-border bg-background p-2 text-left transition hover:bg-accent"
-                              >
-                                {item.imageUrl ? (
-                                  <img src={item.imageUrl} alt={item.name} className="h-10 w-10 rounded object-cover" />
-                                ) : (
-                                  <div className="flex h-10 w-10 items-center justify-center rounded bg-muted text-xs text-muted-foreground">
-                                    No image
-                                  </div>
-                                )}
-                                <div className="min-w-0">
-                                  <p className="truncate text-sm font-medium">{item.name}</p>
-                                  <p className="truncate text-xs text-muted-foreground">{item.description}</p>
-                                </div>
-                              </button>
-                            ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
           )}
-        </section>
+        </div>
 
-        {isEditMode ? (
-          <section className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Selected Destinations</h2>
-              <span className="text-xs text-muted-foreground">{destinations.length} selected</span>
-            </div>
 
-            {destinations.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No selected destinations available.</p>
-            ) : (
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-                {destinations.map((destination, index) => {
-                  const firstPhoto = toLines(destination.photosEditor)[0];
-                  return (
-                    <div key={`${destination.name}-${index}`} className="relative rounded border border-border bg-card p-3">
-                      <button
-                        type="button"
-                        onClick={() => removeDestinationInEdit(index)}
-                        className="absolute right-2 top-2 rounded border border-border bg-background px-2 py-0.5 text-xs"
-                        aria-label={`Remove destination ${destination.name || index + 1}`}
-                      >
-                        x
-                      </button>
-                      {firstPhoto ? (
-                        <img src={firstPhoto} alt={destination.name || "Destination"} className="mb-2 h-24 w-full rounded object-cover" />
-                      ) : null}
-                      <p className="pr-8 text-sm font-medium">{destination.name || "Unnamed destination"}</p>
-                      <p className="text-xs text-muted-foreground">{destination.description || "No description"}</p>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </section>
-        ) : null}
-
-  
-
-        <section className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold">Travel By</h2>
-            <p className="text-xs text-muted-foreground">Choose one or more transport options</p>
-          </div>
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
-            {travelMethods.map((method) => {
-              const Icon = method.icon;
-              const isSelected = travelMethodsSelected.includes(method.label);
-              return (
-                <button
-                  key={method.key}
-                  type="button"
-                  onClick={() => toggleTravelMethod(method.label)}
-                  className={
-                    "flex items-center gap-2 rounded border px-3 py-2 text-left transition" +
-                    (isSelected ? " border-primary bg-primary/10" : " border-border bg-card hover:bg-accent")
-                  }
-                >
-                  <Icon className="size-4" />
-                  <span className="text-sm font-medium">{method.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </section>
-
-        <section className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold">Payment Method</h2>
-            <p className="text-xs text-muted-foreground">Select one or both options</p>
-          </div>
-          <p className="text-sm text-muted-foreground">You can select one or both payment methods for this trip.</p>
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            {paymentMethodOptions.map((method) => {
-              const isSelected = paymentMethods.includes(method);
-
-              return (
-                <label
-                  key={method}
-                  className={
-                    "flex cursor-pointer items-start gap-3 rounded border px-3 py-3 text-left transition" +
-                    (isSelected ? " border-primary bg-primary/10" : " border-border bg-card hover:bg-accent")
-                  }
-                >
-                  <input
-                    type="checkbox"
-                    checked={isSelected}
-                    onChange={() => togglePaymentMethod(method)}
-                    className="mt-1"
-                  />
-                  <span>
-                    <span className="block text-sm font-medium">{method}</span>
-                    <span className="block text-xs text-muted-foreground">
-                      {method === "Pay Online" ? "Guests can pay digitally before the trip." : "Guests can pay the guide on the trip day."}
-                    </span>
-                  </span>
-                </label>
-              );
-            })}
-          </div>
-        </section>
-
-        <section className="space-y-4">
-          <h2 className="text-lg font-semibold">Included</h2>
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            <div>
-              <label className="mb-1 block text-sm font-medium">Hotel facilities (one per line)</label>
-              <textarea
-                value={hotelFacilitiesEditor}
-                onChange={(event) => setHotelFacilitiesEditor(event.target.value)}
-                className="min-h-24 w-full border border-input bg-background px-3 py-2 text-sm"
-                placeholder={"3-star hotel\nWiFi\nAir conditioning"}
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium">Other inclusions (one per line)</label>
-              <textarea
-                value={otherInclusionsEditor}
-                onChange={(event) => setOtherInclusionsEditor(event.target.value)}
-                className="min-h-24 w-full border border-input bg-background px-3 py-2 text-sm"
-                placeholder={"Breakfast\nGuided tours\nEntrance fees"}
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium">Exclusions (one per line)</label>
-              <textarea
-                value={exclusionsEditor}
-                onChange={(event) => setExclusionsEditor(event.target.value)}
-                className="min-h-24 w-full border border-input bg-background px-3 py-2 text-sm"
-                placeholder={"Visa fees\nPersonal expenses\nMeals not mentioned"}
-              />
-            </div>
-          </div>
-        </section>
-
-        <section className="space-y-4">
-          <h2 className="text-lg font-semibold">Pricing & Trip Photos</h2>
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            <Input type="number" value={price} onChange={(event) => setPrice(event.target.value)} placeholder="Price (e.g. 450)" />
-            <Input
-              type="number"
-              value={maxParticipants}
-              onChange={(event) => setMaxParticipants(event.target.value)}
-              placeholder="Max participants (e.g. 20)"
-            />
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium">Trip photos</label>
-            <div className="flex items-center gap-3">
-              <input
-                type="file"
-                accept="image/*"
-                multiple
-                onChange={handleTripPhotosChange}
-                className="text-sm"
-              />
-            </div>
-
-            {tripPhotoFiles.length > 0 ? (
-              <div className="mt-3 grid grid-cols-3 gap-2">
-                {tripPhotoFiles.map((file, idx) => (
-                  <div key={`${file.name}-${idx}`} className="flex flex-col items-center gap-1">
-                    <img src={tripPhotoPreviews[idx]} alt={file.name} className="h-20 w-28 rounded object-cover" />
-                    <div className="flex items-center gap-2 text-xs">
-                      <span className="truncate max-w-[120px]">{file.name}</span>
-                      <button type="button" className="text-primary text-xs" onClick={() => removeTripPhotoFile(idx)}>
-                        Remove
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : null}
-
-            {isEditMode && editModePhotoUrls.length > 0 ? (
-              <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-3">
-                {editModePhotoUrls.map((photoUrl, index) => (
-                  <div key={`${photoUrl}-${index}`} className="relative rounded border border-border p-2">
-                    <button
-                      type="button"
-                      onClick={() => removeEditModePhotoUrl(index)}
-                      className="absolute right-2 top-2 rounded border border-border bg-background px-2 py-0.5 text-xs"
-                      aria-label={`Remove photo ${index + 1}`}
-                    >
-                      x
-                    </button>
-                    <img src={photoUrl} alt={`Trip photo ${index + 1}`} className="h-28 w-full rounded object-cover" />
-                  </div>
-                ))}
-              </div>
-            ) : null}
-
-            {!isEditMode ? (
-              <>
-                <p className="mt-3 mb-1 text-xs text-muted-foreground">Optional: paste image URLs if you already have hosted images</p>
-                <textarea
-                  value={tripPhotosEditor}
-                  onChange={(event) => setTripPhotosEditor(event.target.value)}
-                  className="min-h-24 w-full border border-input bg-background px-3 py-2 text-sm"
-                  placeholder={"https://example.com/trips/sri-lanka-1.jpg\nhttps://example.com/trips/sri-lanka-2.jpg"}
-                />
-              </>
-            ) : null}
-          </div>
-        </section>
-
-        <section className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold">itinerary</h2>
+        {/* Section 3: Add Main Destinations */}
+        <div className="border border-border rounded-xl overflow-hidden bg-card transition-all">
+          <button
+            type="button"
+            onClick={() => toggleSection("mainDestinations")}
+            className="flex w-full items-center justify-between p-4 bg-muted/30 hover:bg-muted/50 transition-colors"
+          >
             <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">{effectiveDayCount} day(s)</span>
-              <Button type="button" variant="outline" size="sm" onClick={generateItinerary} disabled={isGenerating}>
-                {isGenerating ? "Generating..." : "Generate itinerary"}
-              </Button>
-              <Button type="button" variant="outline" size="sm" onClick={clearEntireGenerated}>
-                Clear generated
-              </Button>
+              <h2 className="text-sm font-bold text-foreground uppercase tracking-wider">Add Main Destinations</h2>
+              <span className="text-xs text-muted-foreground hidden sm:inline">- Cities & route highlights</span>
             </div>
-          </div>
-
-          {effectiveDayCount === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              {isOnDemandTrip ? "Select a duration to build the day plan." : "Select start and end dates to build the day plan."}
-            </p>
-          ) : (
-            <div className="space-y-4">
-              {activitiesByDay.map((dayActivities, dayIndex) => (
-                <div key={dayIndex} className="space-y-3 border border-border p-3">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-medium">Day {dayIndex + 1}</p>
-                    <Button type="button" variant="outline" size="sm" onClick={() => addActivity(dayIndex)}>
-                      Add activity
+            {openSections.mainDestinations ? <ChevronUp className="size-4 text-muted-foreground" /> : <ChevronDown className="size-4 text-muted-foreground" />}
+          </button>
+          
+          {openSections.mainDestinations && (
+            <div className="p-5 border-t border-border space-y-4">
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <div className="space-y-3">
+                  <LocationPicker value={mainDestination} onChange={setMainDestination} />
+                  <div className="flex justify-end">
+                    <Button type="button" variant="outline" onClick={addMainDestination}>
+                      Add to Route
                     </Button>
                   </div>
-
-                  <div className="space-y-3">
-                    {dayActivities.map((item, activityIndex) => (
-                      <div key={activityIndex} className="space-y-3 rounded border border-border p-3">
-                        <div className="flex items-center justify-between">
-                          <p className="text-sm font-medium">Activity {activityIndex + 1}</p>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            onClick={() => removeActivity(dayIndex, activityIndex)}
-                            disabled={dayActivities.length === 1}
-                          >
+                </div>
+                <div className="space-y-3 rounded-lg border border-border p-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-medium">Main Route Destinations</h3>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground font-semibold">{mainDestinations.length} added</span>
+                      <Button type="button" variant="outline" size="sm" onClick={loadTravelDestinations} disabled={isLoadingTravelDestinations}>
+                        {isLoadingTravelDestinations ? "Loading..." : "Get Recommendations"}
+                      </Button>
+                    </div>
+                  </div>
+                  {mainDestinations.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No main destinations added yet.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {mainDestinations.map((destination, index) => (
+                        <div key={`${destination.address}-${index}`} className="flex items-center justify-between gap-2 rounded border border-border px-3 py-2 bg-muted/20">
+                          <div className="text-sm min-w-0">
+                            <p className="font-medium truncate">{destination.address}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {destination.lat.toFixed(5)}, {destination.lng.toFixed(5)}
+                            </p>
+                          </div>
+                          <Button type="button" variant="ghost" size="sm" onClick={() => removeMainDestination(index)}>
                             Remove
                           </Button>
                         </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
 
-                        <Input
-                          value={item.title}
-                          onChange={(event) => updateActivity(dayIndex, activityIndex, "title", event.target.value)}
-                          placeholder="Arrival and check-in"
-                        />
-
-                        {!isOnDemandTrip ? (
-                          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                            <div>
-                              <label className="mb-1 block text-xs font-medium">Start time</label>
-                              <Input
-                                type="time"
-                                value={item.startTime}
-                                onChange={(event) => updateActivity(dayIndex, activityIndex, "startTime", event.target.value)}
-                              />
+        {/* Section 4: Recommended Locations */}
+        <div className="border border-border rounded-xl overflow-hidden bg-card transition-all">
+          <button
+            type="button"
+            onClick={() => toggleSection("travelDestinations")}
+            className="flex w-full items-center justify-between p-4 bg-muted/30 hover:bg-muted/50 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm font-bold text-foreground uppercase tracking-wider">Recommended Attractions</h2>
+              <span className="text-xs text-muted-foreground hidden sm:inline">- Sightseeing recommendations near your route</span>
+            </div>
+            {openSections.travelDestinations ? <ChevronUp className="size-4 text-muted-foreground" /> : <ChevronDown className="size-4 text-muted-foreground" />}
+          </button>
+          
+          {openSections.travelDestinations && (
+            <div className="p-5 border-t border-border space-y-4">
+              {travelDestinationGroups.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">Click &quot;Get Recommendations&quot; in the Main Destinations section to find nearby sightseeing spots.</p>
+              ) : (
+                <div className="space-y-6">
+                  {travelDestinationGroups.map((group, groupIndex) => (
+                    <div key={`${group.location}-${groupIndex}`} className="space-y-3">
+                      <h3 className="text-sm font-semibold border-b pb-1 text-primary">{group.location}</h3>
+                      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                        <div className="space-y-2">
+                          <p className="text-xs font-semibold text-muted-foreground">Nearby Places</p>
+                          {group.destinations.map((destination, destinationIndex) => (
+                            <button
+                              key={`${destination.name}-${destinationIndex}`}
+                              type="button"
+                              onClick={() => addSelectedTravelDestination(group.location, destination)}
+                              className="flex w-full items-center gap-3 rounded border border-border bg-card p-2 text-left transition hover:bg-accent"
+                            >
+                              {destination.imageUrl ? (
+                                <img src={destination.imageUrl} alt={destination.name} className="h-12 w-12 rounded object-cover" />
+                              ) : (
+                                <div className="flex h-12 w-12 items-center justify-center rounded bg-muted text-xs text-muted-foreground">
+                                  No image
+                                </div>
+                              )}
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-medium">{destination.name}</p>
+                                <p className="truncate text-xs text-muted-foreground">{destination.description}</p>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                        <div className="space-y-2 rounded-lg border border-dashed border-border p-3 bg-muted/10">
+                          <p className="text-xs font-semibold text-muted-foreground">Selected Attractions</p>
+                          {selectedTravelDestinations.filter((item) => item.location === group.location).length === 0 ? (
+                            <p className="text-xs text-muted-foreground py-2">Click places on the left to add them to your trip.</p>
+                          ) : (
+                            <div className="space-y-2">
+                              {selectedTravelDestinations
+                                .filter((item) => item.location === group.location)
+                                .map((item) => (
+                                  <button
+                                    key={`${item.location}-${item.name}`}
+                                    type="button"
+                                    onClick={() => removeSelectedTravelDestination(item.location, item.name)}
+                                    className="flex w-full items-center gap-3 rounded border border-border bg-background p-2 text-left transition hover:bg-accent hover:border-destructive/30"
+                                  >
+                                    {item.imageUrl ? (
+                                      <img src={item.imageUrl} alt={item.name} className="h-10 w-10 rounded object-cover" />
+                                    ) : (
+                                      <div className="flex h-10 w-10 items-center justify-center rounded bg-muted text-xs text-muted-foreground">
+                                        No image
+                                      </div>
+                                    )}
+                                    <div className="min-w-0">
+                                      <p className="truncate text-sm font-medium">{item.name}</p>
+                                      <p className="truncate text-xs text-muted-foreground">{item.description}</p>
+                                    </div>
+                                  </button>
+                                ))}
                             </div>
-                            <div>
-                              <label className="mb-1 block text-xs font-medium">End time</label>
-                              <Input
-                                type="time"
-                                value={item.endTime}
-                                onChange={(event) => updateActivity(dayIndex, activityIndex, "endTime", event.target.value)}
-                              />
-                            </div>
-                          </div>
-                        ) : null}
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
 
-                        <div>
-                          <label className="mb-1 block text-xs font-medium">Notes (one per line)</label>
-                          <textarea
-                            value={item.notesEditor}
-                            onChange={(event) => updateActivity(dayIndex, activityIndex, "notesEditor", event.target.value)}
-                            className="min-h-20 w-full border border-input bg-background px-3 py-2 text-sm"
-                            placeholder={"Arrival and check-in\nWelcome dinner with southern cuisine tasting"}
-                          />
+        {/* Section 5: Selected Destinations (Edit Mode Only) */}
+        {isEditMode && (
+          <div className="border border-border rounded-xl overflow-hidden bg-card transition-all">
+            <button
+              type="button"
+              onClick={() => toggleSection("selectedDestinations")}
+              className="flex w-full items-center justify-between p-4 bg-muted/30 hover:bg-muted/50 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm font-bold text-foreground uppercase tracking-wider">Saved Trip Destinations</h2>
+                <span className="text-xs text-muted-foreground hidden sm:inline">- {destinations.length} destinations saved</span>
+              </div>
+              {openSections.selectedDestinations ? <ChevronUp className="size-4 text-muted-foreground" /> : <ChevronDown className="size-4 text-muted-foreground" />}
+            </button>
+            
+            {openSections.selectedDestinations && (
+              <div className="p-5 border-t border-border space-y-4">
+                {destinations.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No saved destinations found.</p>
+                ) : (
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+                    {destinations.map((destination, index) => {
+                      const firstPhoto = toLines(destination.photosEditor)[0];
+                      return (
+                        <div key={`${destination.name}-${index}`} className="relative rounded-lg border border-border bg-card p-3">
+                          <button
+                            type="button"
+                            onClick={() => removeDestinationInEdit(index)}
+                            className="absolute right-2 top-2 rounded border border-border bg-background px-2 py-0.5 text-xs text-muted-foreground hover:bg-accent"
+                            aria-label={`Remove destination ${destination.name || index + 1}`}
+                          >
+                            Remove
+                          </button>
+                          {firstPhoto ? (
+                            <img src={firstPhoto} alt={destination.name || "Destination"} className="mb-2 h-24 w-full rounded object-cover" />
+                          ) : null}
+                          <p className="pr-16 text-sm font-medium truncate">{destination.name || "Unnamed destination"}</p>
+                          <p className="text-xs text-muted-foreground truncate">{destination.description || "No description"}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+  
+
+        {/* Section 6: Transport Modes */}
+        <div className="border border-border rounded-xl overflow-hidden bg-card transition-all">
+          <button
+            type="button"
+            onClick={() => toggleSection("travelBy")}
+            className="flex w-full items-center justify-between p-4 bg-muted/30 hover:bg-muted/50 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm font-bold text-foreground uppercase tracking-wider">Transport Modes</h2>
+              <span className="text-xs text-muted-foreground hidden sm:inline">- Choose transport options</span>
+            </div>
+            {openSections.travelBy ? <ChevronUp className="size-4 text-muted-foreground" /> : <ChevronDown className="size-4 text-muted-foreground" />}
+          </button>
+          
+          {openSections.travelBy && (
+            <div className="p-5 border-t border-border space-y-4">
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
+                {travelMethods.map((method) => {
+                  const Icon = method.icon;
+                  const isSelected = travelMethodsSelected.includes(method.label);
+                  return (
+                    <button
+                      key={method.key}
+                      type="button"
+                      onClick={() => toggleTravelMethod(method.label)}
+                      className={
+                        "flex items-center gap-2 rounded-lg border px-3 py-2 text-left transition" +
+                        (isSelected ? " border-primary bg-primary/10" : " border-border bg-card hover:bg-accent")
+                      }
+                    >
+                      <Icon className="size-4 text-muted-foreground" />
+                      <span className="text-sm font-medium">{method.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Section 7: Payment Methods */}
+        <div className="border border-border rounded-xl overflow-hidden bg-card transition-all">
+          <button
+            type="button"
+            onClick={() => toggleSection("paymentMethod")}
+            className="flex w-full items-center justify-between p-4 bg-muted/30 hover:bg-muted/50 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm font-bold text-foreground uppercase tracking-wider">Payment Methods</h2>
+              <span className="text-xs text-muted-foreground hidden sm:inline">- Select online or on-trip payments</span>
+            </div>
+            {openSections.paymentMethod ? <ChevronUp className="size-4 text-muted-foreground" /> : <ChevronDown className="size-4 text-muted-foreground" />}
+          </button>
+          
+          {openSections.paymentMethod && (
+            <div className="p-5 border-t border-border space-y-4">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                {paymentMethodOptions.map((method) => {
+                  const isSelected = paymentMethods.includes(method);
+
+                  return (
+                    <label
+                      key={method}
+                      className={
+                        "flex cursor-pointer items-start gap-3 rounded-lg border p-3 text-left transition" +
+                        (isSelected ? " border-primary bg-primary/10" : " border-border bg-card hover:bg-accent")
+                      }
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => togglePaymentMethod(method)}
+                        className="mt-1"
+                      />
+                      <span>
+                        <span className="block text-sm font-medium">{method}</span>
+                        <span className="block text-xs text-muted-foreground">
+                          {method === "Pay Online" ? "Guests pay digitally in advance." : "Guests pay the guide on the trip day."}
+                        </span>
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Section 8: Inclusions & Exclusions */}
+        <div className="border border-border rounded-xl overflow-hidden bg-card transition-all">
+          <button
+            type="button"
+            onClick={() => toggleSection("included")}
+            className="flex w-full items-center justify-between p-4 bg-muted/30 hover:bg-muted/50 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm font-bold text-foreground uppercase tracking-wider">Inclusions & Exclusions</h2>
+              <span className="text-xs text-muted-foreground hidden sm:inline">- Hotel facilities, other inclusions, exclusions</span>
+            </div>
+            {openSections.included ? <ChevronUp className="size-4 text-muted-foreground" /> : <ChevronDown className="size-4 text-muted-foreground" />}
+          </button>
+          
+          {openSections.included && (
+            <div className="p-5 border-t border-border space-y-4">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-sm font-medium">Hotel Facilities (one per line)</label>
+                  <textarea
+                    value={hotelFacilitiesEditor}
+                    onChange={(event) => setHotelFacilitiesEditor(event.target.value)}
+                    className="min-h-24 w-full border border-input bg-background px-3 py-2 text-sm rounded-md"
+                    placeholder={"3-star hotel\nWiFi\nAir conditioning"}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium">Other Inclusions (one per line)</label>
+                  <textarea
+                    value={otherInclusionsEditor}
+                    onChange={(event) => setOtherInclusionsEditor(event.target.value)}
+                    className="min-h-24 w-full border border-input bg-background px-3 py-2 text-sm rounded-md"
+                    placeholder={"Breakfast\nGuided tours\nEntrance fees"}
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="mb-1 block text-sm font-medium">Exclusions (one per line)</label>
+                  <textarea
+                    value={exclusionsEditor}
+                    onChange={(event) => setExclusionsEditor(event.target.value)}
+                    className="min-h-24 w-full border border-input bg-background px-3 py-2 text-sm rounded-md"
+                    placeholder={"Visa fees\nPersonal expenses\nMeals not mentioned"}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Section 9: Pricing & Photos */}
+        <div className="border border-border rounded-xl overflow-hidden bg-card transition-all">
+          <button
+            type="button"
+            onClick={() => toggleSection("pricingPhotos")}
+            className="flex w-full items-center justify-between p-4 bg-muted/30 hover:bg-muted/50 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm font-bold text-foreground uppercase tracking-wider">Pricing & Photos</h2>
+              <span className="text-xs text-muted-foreground hidden sm:inline">- Cost, traveler limits, images</span>
+            </div>
+            {openSections.pricingPhotos ? <ChevronUp className="size-4 text-muted-foreground" /> : <ChevronDown className="size-4 text-muted-foreground" />}
+          </button>
+          
+          {openSections.pricingPhotos && (
+            <div className="p-5 border-t border-border space-y-4">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-sm font-medium">Price (USD)</label>
+                  <Input type="number" value={price} onChange={(event) => setPrice(event.target.value)} placeholder="Price (e.g., 450)" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium">Max Travelers</label>
+                  <Input
+                    type="number"
+                    value={maxParticipants}
+                    onChange={(event) => setMaxParticipants(event.target.value)}
+                    placeholder="Max participants (e.g., 20)"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-medium">Trip Photos</label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handleTripPhotosChange}
+                    className="text-sm"
+                  />
+                </div>
+
+                {tripPhotoFiles.length > 0 ? (
+                  <div className="mt-3 grid grid-cols-3 gap-2">
+                    {tripPhotoFiles.map((file, idx) => (
+                      <div key={`${file.name}-${idx}`} className="flex flex-col items-center gap-1 rounded border p-2 bg-muted/10">
+                        <img src={tripPhotoPreviews[idx]} alt={file.name} className="h-20 w-28 rounded object-cover" />
+                        <div className="flex items-center gap-2 text-xs w-full justify-between">
+                          <span className="truncate max-w-[80px] font-medium">{file.name}</span>
+                          <button type="button" className="text-primary text-xs font-semibold" onClick={() => removeTripPhotoFile(idx)}>
+                            Remove
+                          </button>
                         </div>
                       </div>
                     ))}
                   </div>
-                </div>
-              ))}
+                ) : null}
+
+                {isEditMode && editModePhotoUrls.length > 0 ? (
+                  <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-3">
+                    {editModePhotoUrls.map((photoUrl, index) => (
+                      <div key={`${photoUrl}-${index}`} className="relative rounded-lg border border-border p-2">
+                        <button
+                          type="button"
+                          onClick={() => removeEditModePhotoUrl(index)}
+                          className="absolute right-2 top-2 rounded border border-border bg-background px-2 py-0.5 text-xs text-muted-foreground hover:bg-accent"
+                          aria-label={`Remove photo ${index + 1}`}
+                        >
+                          Remove
+                        </button>
+                        <img src={photoUrl} alt={`Trip photo ${index + 1}`} className="h-28 w-full rounded object-cover" />
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+
+                {!isEditMode ? (
+                  <div className="mt-4">
+                    <label className="mb-1 block text-xs text-muted-foreground">Optional: Paste photo URLs (one per line)</label>
+                    <textarea
+                      value={tripPhotosEditor}
+                      onChange={(event) => setTripPhotosEditor(event.target.value)}
+                      className="min-h-24 w-full border border-input bg-background px-3 py-2 text-sm rounded-md"
+                      placeholder={"https://example.com/photo1.jpg\nhttps://example.com/photo2.jpg"}
+                    />
+                  </div>
+                ) : null}
+              </div>
             </div>
           )}
-        </section>
+        </div>
+
+        {/* Section 10: Itinerary Day Plan */}
+        <div className="border border-border rounded-xl overflow-hidden bg-card transition-all">
+          <button
+            type="button"
+            onClick={() => toggleSection("itinerary")}
+            className="flex w-full items-center justify-between p-4 bg-muted/30 hover:bg-muted/50 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm font-bold text-foreground uppercase tracking-wider">Itinerary Day Plan</h2>
+              <span className="text-xs text-muted-foreground hidden sm:inline">- Daily schedule of activities</span>
+            </div>
+            {openSections.itinerary ? <ChevronUp className="size-4 text-muted-foreground" /> : <ChevronDown className="size-4 text-muted-foreground" />}
+          </button>
+          
+          {openSections.itinerary && (
+            <div className="p-5 border-t border-border space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3 bg-muted/20 p-3 rounded-lg">
+                <span className="text-xs font-semibold text-muted-foreground">{effectiveDayCount} day(s) planned</span>
+                <div className="flex items-center gap-2">
+                  <Button type="button" variant="outline" size="sm" onClick={generateItinerary} disabled={isGenerating}>
+                    {isGenerating ? "Generating..." : "AI Generate Plan"}
+                  </Button>
+                  <Button type="button" variant="outline" size="sm" onClick={clearEntireGenerated}>
+                    Reset All
+                  </Button>
+                </div>
+              </div>
+
+              {effectiveDayCount === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  {isOnDemandTrip ? "Select duration in Template Details to build schedule." : "Select dates in Schedule Details to build schedule."}
+                </p>
+              ) : (
+                <div className="space-y-4">
+                  {activitiesByDay.map((dayActivities, dayIndex) => (
+                    <div key={dayIndex} className="space-y-3 border border-border p-4 rounded-lg bg-muted/5">
+                      <div className="flex items-center justify-between border-b pb-2">
+                        <p className="text-sm font-bold text-primary">Day {dayIndex + 1}</p>
+                        <Button type="button" variant="outline" size="sm" onClick={() => addActivity(dayIndex)}>
+                          Add Activity
+                        </Button>
+                      </div>
+
+                      <div className="space-y-3">
+                        {dayActivities.map((item, activityIndex) => (
+                          <div key={activityIndex} className="space-y-3 rounded-lg border border-border p-3 bg-background shadow-xs">
+                            <div className="flex items-center justify-between">
+                              <p className="text-xs font-semibold text-muted-foreground">Activity {activityIndex + 1}</p>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+                                onClick={() => removeActivity(dayIndex, activityIndex)}
+                                disabled={dayActivities.length === 1}
+                              >
+                                Remove
+                              </Button>
+                            </div>
+
+                            <Input
+                              value={item.title}
+                              onChange={(event) => updateActivity(dayIndex, activityIndex, "title", event.target.value)}
+                              placeholder="e.g., Hotel arrival & check-in"
+                            />
+
+                            {!isOnDemandTrip ? (
+                              <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                  <label className="mb-1 block text-[10px] font-bold text-muted-foreground uppercase">Start Time</label>
+                                  <Input
+                                    type="time"
+                                    value={item.startTime}
+                                    onChange={(event) => updateActivity(dayIndex, activityIndex, "startTime", event.target.value)}
+                                  />
+                                </div>
+                                <div>
+                                  <label className="mb-1 block text-[10px] font-bold text-muted-foreground uppercase">End Time</label>
+                                  <Input
+                                    type="time"
+                                    value={item.endTime}
+                                    onChange={(event) => updateActivity(dayIndex, activityIndex, "endTime", event.target.value)}
+                                  />
+                                </div>
+                              </div>
+                            ) : null}
+
+                            <div>
+                              <label className="mb-1 block text-[10px] font-bold text-muted-foreground uppercase">Notes (one per line)</label>
+                              <textarea
+                                value={item.notesEditor}
+                                onChange={(event) => updateActivity(dayIndex, activityIndex, "notesEditor", event.target.value)}
+                                className="min-h-20 w-full border border-input bg-background px-3 py-2 text-sm rounded-md"
+                                placeholder={"e.g., Transfer to hotel\nWelcome drinks on arrival"}
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
 
         {errors.length > 0 ? (
           <div className="border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
