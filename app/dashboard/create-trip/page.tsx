@@ -216,15 +216,18 @@ const toMainDestinationValue = (destination: { name?: string; lat?: number; lng?
   return { lat, lng, address };
 };
 
-const durationOptions: Array<{ label: string; days: number }> = [
-  { label: "Half day", days: 1 },
-  { label: "1 day", days: 1 },
-  { label: "2 days", days: 2 },
-  { label: "3 days", days: 3 },
-  { label: "4 days", days: 4 },
-  { label: "5 days", days: 5 },
-  { label: "7 days", days: 7 },
+const durationOptions: Array<{ label: string; value: string; days: number; durationLabel: string }> = [
+  { label: "Half day", value: "0.5", days: 1, durationLabel: "Half day" },
+  { label: "1 day", value: "1", days: 1, durationLabel: "1 day" },
+  { label: "2 days", value: "2", days: 2, durationLabel: "2 days" },
+  { label: "3 days", value: "3", days: 3, durationLabel: "3 days" },
+  { label: "4 days", value: "4", days: 4, durationLabel: "4 days" },
+  { label: "5 days", value: "5", days: 5, durationLabel: "5 days" },
+  { label: "7 days", value: "7", days: 7, durationLabel: "7 days" },
 ];
+
+const getOnDemandDurationOption = (value: string) =>
+  durationOptions.find((option) => option.value === value) ?? durationOptions[1];
 
 export default function CreateTripPage() {
   const { pushToast } = useToast();
@@ -325,7 +328,8 @@ export default function CreateTripPage() {
   const endDateMin = startDate || minStartDate;
   const isOnDemandTrip = tripFlow === "on-demand";
   const dayCount = useMemo(() => getDayCount(startDate, endDate), [startDate, endDate]);
-  const effectiveDayCount = isOnDemandTrip ? Math.max(1, Number(onDemandDurationDays) || 1) : dayCount;
+  const selectedDuration = useMemo(() => getOnDemandDurationOption(onDemandDurationDays), [onDemandDurationDays]);
+  const effectiveDayCount = isOnDemandTrip ? Math.max(1, selectedDuration.days) : dayCount;
 
   const syntheticAiDates = useMemo(() => {
     const start = new Date(`${minStartDate}T00:00:00`);
@@ -394,6 +398,12 @@ export default function CreateTripPage() {
         if (isOnDemand) {
           setTripFlow("on-demand");
           setOnDemandDurationDays(String(trip.durationDays ?? "3"));
+          const loadedDurationLabel = typeof trip.durationLabel === "string" ? trip.durationLabel.trim().toLowerCase() : "";
+          if (loadedDurationLabel === "half day") {
+            setOnDemandDurationDays("0.5");
+          } else {
+            setOnDemandDurationDays(String(trip.durationDays ?? "3"));
+          }
         } else {
           setTripFlow("scheduled");
           setStartDate(trip.startDate ?? "");
@@ -653,6 +663,7 @@ export default function CreateTripPage() {
     }
     if (isOnDemandTrip) {
       if (Number(onDemandDurationDays) <= 0) issues.push("Select a trip duration.");
+      if (!selectedDuration) issues.push("Select a trip duration.");
     } else {
       if (!startDate || !endDate) issues.push("Start date and end date are required.");
       if (!startTime) issues.push("Start time is required.");
@@ -1069,8 +1080,8 @@ export default function CreateTripPage() {
     return {
       status,
       tripName: tripName.trim(),
-      durationLabel: Number(onDemandDurationDays) === 1 ? "1 day" : `${Number(onDemandDurationDays)} days`,
-      durationDays: Math.max(1, Number(onDemandDurationDays) || 1),
+      durationLabel: selectedDuration.durationLabel,
+      durationDays: selectedDuration.days,
       tripCategory: "On-demand trip",
       destinations: destinationsPayload,
       mainDestinations: mainDestinations.map((destination) => ({
@@ -1313,7 +1324,7 @@ export default function CreateTripPage() {
                       className="h-9 w-full border border-input bg-background px-3 text-sm rounded-md"
                     >
                       {durationOptions.map((option) => (
-                        <option key={option.label} value={String(option.days)}>
+                        <option key={option.value} value={option.value}>
                           {option.label}
                         </option>
                       ))}
