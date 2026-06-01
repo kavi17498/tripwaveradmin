@@ -6,6 +6,7 @@ import { Navbar } from "@/components/layout/navbar";
 import { Footer } from "@/components/layout/footer";
 import { SmoothScrollHero } from "@/components/publicavailable/full_hero";
 import { Button } from "@/components/ui/button";
+import { CardSkeletonGrid } from "@/components/feedback/loading-skeletons";
 import { TripCardEnhanced } from "@/components/trips/trip-card-enhanced";
 import { OnDemandTripCard } from "@/components/trips/on-demand-trip-card";
 import { Trip } from "@/lib/types";
@@ -73,8 +74,8 @@ function mapApiToTrip(item: TripApiItem): Trip {
 export default function HomePage() {
   const [trips, setTrips] = useState<Trip[]>([]);
   const [onDemandTrips, setOnDemandTrips] = useState<OnDemandTripTemplateApiItem[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [loadingOnDemand, setLoadingOnDemand] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadingOnDemand, setLoadingOnDemand] = useState(true);
   const [isSearchActive, setIsSearchActive] = useState(false);
   const [heroQuery, setHeroQuery] = useState("");
   const [heroSearchLoading, setHeroSearchLoading] = useState(false);
@@ -209,6 +210,7 @@ export default function HomePage() {
   const teamTrips = onDemandTrips.filter((t) => t.maxParticipants > 6);
   const searchedTrips = (heroSearchResults?.trips || []).map((trip) => mapApiToTrip(trip as TripApiItem));
   const searchedOnDemandTrips = heroSearchResults?.onDemandTrips || [];
+  const showHomeSkeleton = (loading || loadingOnDemand) && trips.length === 0 && onDemandTrips.length === 0;
 
   return (
     <div className="bg-background">
@@ -269,6 +271,18 @@ export default function HomePage() {
           </section>
         )}
 
+        {showHomeSkeleton ? (
+          <section className="mx-auto max-w-7xl space-y-12 px-4 py-12 md:px-6 md:py-16">
+            <div className="space-y-4">
+              <div className="h-7 w-56 rounded-full bg-muted animate-pulse" />
+              <CardSkeletonGrid />
+            </div>
+            <div className="space-y-4">
+              <div className="h-7 w-48 rounded-full bg-muted animate-pulse" />
+              <CardSkeletonGrid />
+            </div>
+          </section>
+        ) : (
         <section className="mx-auto max-w-7xl px-4 py-12 md:px-6 md:py-16">
           
           <form onSubmit={handleSearch} className="mb-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end border border-border bg-card p-6 rounded-sm">
@@ -398,6 +412,7 @@ export default function HomePage() {
             </div>
           )}
         </section>
+        )}
 
         {mounted && !currentUser && (
           <section className="mx-auto max-w-7xl px-4 pb-24 md:px-6">
