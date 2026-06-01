@@ -845,7 +845,7 @@ export default function CreateTripPage() {
       }
     }
     if (!isOnDemandTrip && !startTime) issues.push("Start time is required.");
-    if (!isOnDemandTrip && pickupType === "Meet at Location" && !startLocation.trim()) {
+    if (pickupType === "Meet at Location" && !startLocation.trim()) {
       issues.push("Start location is required.");
     }
     if (pickupType !== "Meet at Location" && !pickupStartLocation) {
@@ -1314,119 +1314,123 @@ export default function CreateTripPage() {
           
           {openSections.schedule && (
             <div className="p-5 border-t border-border space-y-4">
-              {isOnDemandTrip ? (
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
-                  <div>
-                    <label className="mb-1 block text-sm font-medium">Duration</label>
-                    <select
-                      value={onDemandDurationDays}
-                      onChange={(event) => setOnDemandDurationDays(event.target.value)}
-                      className="h-9 w-full border border-input bg-background px-3 text-sm rounded-md"
-                    >
-                      {durationOptions.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="rounded-xl border border-dashed border-border bg-muted/20 p-4 text-sm text-muted-foreground lg:col-span-2 flex items-center">
-                    Flexible date trip. Traveler chooses booking dates later.
-                  </div>
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+                {isOnDemandTrip ? (
+                  <>
+                    <div>
+                      <label className="mb-1 block text-sm font-medium">Duration</label>
+                      <select
+                        value={onDemandDurationDays}
+                        onChange={(event) => setOnDemandDurationDays(event.target.value)}
+                        className="h-9 w-full border border-input bg-background px-3 text-sm rounded-md"
+                      >
+                        {durationOptions.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="rounded-xl border border-dashed border-border bg-muted/20 p-4 text-sm text-muted-foreground lg:col-span-2 flex items-center">
+                      Flexible date trip. Traveler chooses booking dates later.
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div>
+                      <label className="mb-1 block text-sm font-medium">Start Date</label>
+                      <Input
+                        type="date"
+                        value={startDate}
+                        min={isEditMode ? undefined : minStartDate}
+                        onChange={(event) => setStartDate(event.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm font-medium">End Date</label>
+                      <Input type="date" value={endDate} min={endDateMin} onChange={(event) => setEndDate(event.target.value)} />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm font-medium">Start Time</label>
+                      <Input type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm font-medium">End Time</label>
+                      <Input type="time" value={endTime} onChange={(event) => setEndTime(event.target.value)} />
+                    </div>
+                  </>
+                )}
+
+                {/* Common fields for both scheduled and on-demand trips */}
+                <div>
+                  <label className="mb-1 block text-sm font-medium">Pickup Option</label>
+                  <select
+                    value={pickupType}
+                    onChange={(event) => {
+                      const nextType = event.target.value as PickupType;
+                      setPickupType(nextType);
+
+                      const defaultPickupLocation = getDefaultPickupLocation(nextType);
+                      if (defaultPickupLocation) {
+                        setPickupStartLocation(defaultPickupLocation);
+                        setStartLocation(defaultPickupLocation.address);
+                      }
+                    }}
+                    className="h-9 w-full border border-input bg-background px-3 text-sm rounded-md"
+                  >
+                    {pickupTypeOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-              ) : (
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+
+                {pickupType === "Meet at Location" ? (
                   <div>
-                    <label className="mb-1 block text-sm font-medium">Start Date</label>
-                    <Input
-                      type="date"
-                      value={startDate}
-                      min={isEditMode ? undefined : minStartDate}
-                      onChange={(event) => setStartDate(event.target.value)}
+                    <label className="mb-1 block text-sm font-medium">Start Location</label>
+                    <LocationPicker
+                      value={startLocation ? { address: startLocation, lat: mainDestination?.lat ?? 0, lng: mainDestination?.lng ?? 0 } : undefined}
+                      onChange={(location) => {
+                        setStartLocation(location.address);
+                      }}
                     />
                   </div>
-                  <div>
-                    <label className="mb-1 block text-sm font-medium">End Date</label>
-                    <Input type="date" value={endDate} min={endDateMin} onChange={(event) => setEndDate(event.target.value)} />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-sm font-medium">Start Time</label>
-                    <Input type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-sm font-medium">End Time</label>
-                    <Input type="time" value={endTime} onChange={(event) => setEndTime(event.target.value)} />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-sm font-medium">Pickup Option</label>
-                    <select
-                      value={pickupType}
-                      onChange={(event) => {
-                        const nextType = event.target.value as PickupType;
-                        setPickupType(nextType);
-
-                        const defaultPickupLocation = getDefaultPickupLocation(nextType);
-                        if (defaultPickupLocation) {
-                          setPickupStartLocation(defaultPickupLocation);
-                          setStartLocation(defaultPickupLocation.address);
-                        }
-                      }}
-                      className="h-9 w-full border border-input bg-background px-3 text-sm rounded-md"
-                    >
-                      {pickupTypeOptions.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {pickupType === "Meet at Location" ? (
+                ) : (
+                  <>
                     <div>
-                      <label className="mb-1 block text-sm font-medium">Start Location</label>
+                      <label className="mb-1 block text-sm font-medium">Pickup Origin (Guide&apos;s start location)</label>
                       <LocationPicker
-                        value={startLocation ? { address: startLocation, lat: mainDestination?.lat ?? 0, lng: mainDestination?.lng ?? 0 } : undefined}
+                        value={pickupStartLocation}
                         onChange={(location) => {
+                          setPickupStartLocation(location);
                           setStartLocation(location.address);
                         }}
                       />
                     </div>
-                  ) : (
-                    <>
+                    {pickupType === "Pickup Available" || isAirportPickupType(pickupType) ? (
                       <div>
-                        <label className="mb-1 block text-sm font-medium">Pickup Origin (Guide&apos;s start location)</label>
-                        <LocationPicker
-                          value={pickupStartLocation}
-                          onChange={(location) => {
-                            setPickupStartLocation(location);
-                            setStartLocation(location.address);
-                          }}
+                        <label className="mb-1 block text-sm font-medium">Pickup Cost Per Km (LKR)</label>
+                        <Input
+                          type="number"
+                          min={0}
+                          value={pickupCostPerKm}
+                          onChange={(event) => setPickupCostPerKm(event.target.value)}
+                          placeholder="e.g., 100"
                         />
                       </div>
-                      {pickupType === "Pickup Available" || isAirportPickupType(pickupType) ? (
-                        <div>
-                          <label className="mb-1 block text-sm font-medium">Pickup Cost Per Km (LKR)</label>
-                          <Input
-                            type="number"
-                            min={0}
-                            value={pickupCostPerKm}
-                            onChange={(event) => setPickupCostPerKm(event.target.value)}
-                            placeholder="e.g., 100"
-                          />
-                        </div>
-                      ) : null}
-                    </>
-                  )}
-                  <div>
-                    <label className="mb-1 block text-sm font-medium">Organizer ID</label>
-                    <Input value={organizerId} onChange={(event) => setOrganizerId(event.target.value)} placeholder="user_12345" />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-sm font-medium">Organizer Name</label>
-                    <Input value={organizerName} readOnly />
-                  </div>
+                    ) : null}
+                  </>
+                )}
+                <div>
+                  <label className="mb-1 block text-sm font-medium">Organizer ID</label>
+                  <Input value={organizerId} onChange={(event) => setOrganizerId(event.target.value)} placeholder="user_12345" />
                 </div>
-              )}
+                <div>
+                  <label className="mb-1 block text-sm font-medium">Organizer Name</label>
+                  <Input value={organizerName} readOnly />
+                </div>
+              </div>
             </div>
           )}
         </div>
